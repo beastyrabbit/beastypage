@@ -6,6 +6,7 @@ import { TOOL_MAP } from "@/lib/dash/registry.generated";
 import type { DashSettings, ToolWidgetMeta } from "@/lib/dash/types";
 import { useBackendAuth } from "@/lib/data";
 import { useUpsertUserVariant, useUserVariants } from "@/lib/data/users";
+import type { list } from "@/server/services/userVariants";
 import { DEFAULT_DASH_SETTINGS, parseDashPayload } from "@/utils/dashVariants";
 import { AddWidgetModal } from "./AddWidgetModal";
 import { DashHero } from "./DashHero";
@@ -14,6 +15,7 @@ import { WidgetGrid } from "./WidgetGrid";
 
 const DASH_VARIANT_ID = "dash-settings";
 const APP_VERSION = "dev";
+type RemoteVariant = Awaited<ReturnType<typeof list>>[number];
 
 type DashClientProps = {
   initialSlug?: string | null;
@@ -64,7 +66,7 @@ export function DashClient({
     if (loadedFromPostgreSQL || initialSlug) return;
     if (!postgresqlVariants) return;
     const saved = postgresqlVariants.find(
-      (v: any) => v.variantId === DASH_VARIANT_ID,
+      (v: RemoteVariant) => v.variantId === DASH_VARIANT_ID,
     );
     if (saved) {
       justLoadedRef.current = true;

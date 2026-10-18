@@ -53,13 +53,6 @@ const bodySchema = z
       });
   });
 
-function unavailable() {
-  return NextResponse.json(
-    { error: "Not found", code: "not_found" },
-    { status: 404 },
-  );
-}
-
 export async function GET(request: NextRequest) {
   try {
     const args = parseSearchParams(request.nextUrl.searchParams, querySchema);

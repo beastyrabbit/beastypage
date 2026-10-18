@@ -54,12 +54,6 @@ const bodySchema = z
         message: "Participant id is required",
       });
   });
-function unavailable() {
-  return NextResponse.json(
-    { error: "Not found", code: "not_found" },
-    { status: 404 },
-  );
-}
 export async function GET(request: NextRequest) {
   try {
     return NextResponse.json(

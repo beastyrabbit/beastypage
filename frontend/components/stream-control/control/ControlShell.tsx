@@ -13,7 +13,7 @@ import { MotionConfig, motion, type Variants } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
-import type { BatchStreamCommand } from "@/lib/adoption/streamBatch";
+import { parseBatchStreamCommand } from "@/lib/adoption/streamBatch";
 import {
   catDataToLegacyPersistence,
   catParamsToLegacyPersistence,
@@ -36,7 +36,7 @@ import {
   useUpdateCatStreamSettings,
 } from "@/lib/data/stream";
 import { useUserViewer } from "@/lib/data/users";
-import type { EvolutionStreamCommand } from "@/lib/evolution/streamEvolution";
+import { parseEvolutionStreamCommand } from "@/lib/evolution/streamEvolution";
 import { normalizePortableSettingsCode } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import { withResolvedAfterlifeParams } from "@/utils/catSettingsHelpers";
@@ -904,23 +904,29 @@ export function ControlShell() {
       spinning || wheelSpinning || sceneCommandPending !== null;
     const activeScene = getActiveStreamScene(session);
     const sessionCommand = session?.currentCommand;
-    const currentBatchCommand =
-      sessionCommand?.type === "batch" && sessionCommand.batch
-        ? {
-            ...(sessionCommand.batch as BatchStreamCommand),
-            seq: sessionCommand.seq,
-            timestamp: sessionCommand.timestamp,
-          }
+    const parsedBatchCommand =
+      sessionCommand?.type === "batch"
+        ? parseBatchStreamCommand(sessionCommand.batch)
         : null;
+    const currentBatchCommand = parsedBatchCommand
+      ? {
+          ...parsedBatchCommand,
+          seq: sessionCommand?.seq ?? 0,
+          timestamp: sessionCommand?.timestamp ?? 0,
+        }
+      : null;
     const batchLiveState = session?.batchState ?? null;
-    const currentEvolutionCommand =
-      sessionCommand?.type === "evolution" && sessionCommand.evolution
-        ? {
-            ...(sessionCommand.evolution as EvolutionStreamCommand),
-            seq: sessionCommand.seq,
-            timestamp: sessionCommand.timestamp,
-          }
+    const parsedEvolutionCommand =
+      sessionCommand?.type === "evolution"
+        ? parseEvolutionStreamCommand(sessionCommand.evolution)
         : null;
+    const currentEvolutionCommand = parsedEvolutionCommand
+      ? {
+          ...parsedEvolutionCommand,
+          seq: sessionCommand?.seq ?? 0,
+          timestamp: sessionCommand?.timestamp ?? 0,
+        }
+      : null;
     const evolutionLiveState = session?.evolutionState ?? null;
     const showLive = isShowLive(session, now);
     const endShow = async () => {

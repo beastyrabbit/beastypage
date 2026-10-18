@@ -11,8 +11,6 @@ const schema = z.object({
   loserId: z.string().min(1),
   matchupToken: z.string().optional(),
 });
-const notFound = () =>
-  NextResponse.json({ error: "Not found", code: "not_found" }, { status: 404 });
 export async function POST(request: Request) {
   try {
     return NextResponse.json(

@@ -21,7 +21,7 @@ export type DataQueryOptions<TArgs, TData> = {
   enabled?: boolean;
 };
 
-export function useDataQuery<TArgs = any, TData = any>(
+export function useDataQuery<TArgs = unknown, TData = unknown>(
   args: TArgs | "skip",
   options: DataQueryOptions<TArgs, TData>,
 ): TData | undefined {
@@ -45,7 +45,7 @@ export type DataMutationOptions<TArgs, TResult> = {
   invalidate?: QueryKey[];
 };
 
-export function useDataMutation<TArgs = any, TResult = any>(
+export function useDataMutation<TArgs = unknown, TResult = unknown>(
   options: DataMutationOptions<TArgs, TResult> = {},
 ): (args: TArgs) => Promise<TResult> {
   const client = useQueryClient();
@@ -87,7 +87,7 @@ export type DataPaginatedOptions<TArgs, TItem> = {
   enabled?: boolean;
 };
 
-export function useDataPaginatedQuery<TArgs = any, TItem = any>(
+export function useDataPaginatedQuery<TArgs = unknown, TItem = unknown>(
   args: TArgs | "skip",
   options: DataPaginatedOptions<TArgs, TItem>,
 ): UsePaginatedQueryResult<TItem> {

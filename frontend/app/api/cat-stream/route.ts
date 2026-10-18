@@ -128,12 +128,6 @@ const bodySchema = z
   });
 const querySchema = z.object({ key: z.string().optional() });
 
-function unavailable() {
-  return NextResponse.json(
-    { error: "Not found", code: "not_found" },
-    { status: 404 },
-  );
-}
 function resultResponse(value: unknown) {
   return NextResponse.json(value === undefined ? null : value);
 }

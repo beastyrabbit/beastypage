@@ -9,12 +9,6 @@ import {
   getStreamSessionByLink,
 } from "@/server/services/stream";
 
-function unavailable() {
-  return NextResponse.json(
-    { error: "Not found", code: "not_found" },
-    { status: 404 },
-  );
-}
 const querySchema = z.object({ host: z.literal("1").optional() });
 export async function GET(
   request: NextRequest,

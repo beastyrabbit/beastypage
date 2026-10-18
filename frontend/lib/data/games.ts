@@ -2,8 +2,17 @@
 
 import { fetchJson } from "@/lib/api";
 import { dataQueryKeys, useDataMutation, useDataQuery } from "@/lib/data";
+import type {
+  perfectLeaderboard,
+  requestPerfectMatchup,
+  submitPerfectVote,
+  wheelStats,
+} from "@/server/services/games";
 
-type Matchup = any;
+type Matchup = Awaited<ReturnType<typeof requestPerfectMatchup>>;
+type PerfectVote = Awaited<ReturnType<typeof submitPerfectVote>>;
+type Leaderboard = Awaited<ReturnType<typeof perfectLeaderboard>>;
+type WheelStats = Awaited<ReturnType<typeof wheelStats>>;
 
 export function usePerfectCatRegister() {
   return useDataMutation({
@@ -30,7 +39,7 @@ export function usePerfectCatMatchup() {
 export function usePerfectCatVote() {
   return useDataMutation({
     mutationFn: (args, signal) =>
-      fetchJson<any>("/api/perfect-cats/vote", {
+      fetchJson<PerfectVote>("/api/perfect-cats/vote", {
         method: "POST",
         body: args,
         signal,
@@ -44,10 +53,9 @@ export function usePerfectCatLeaderboard(limit = 10) {
     {
       queryKey: dataQueryKeys.list("perfect-cats-leaderboard", limit),
       queryFn: (_args, signal) =>
-        fetchJson<Matchup["cats"]>(
-          `/api/perfect-cats/leaderboard?limit=${limit}`,
-          { signal },
-        ),
+        fetchJson<Leaderboard>(`/api/perfect-cats/leaderboard?limit=${limit}`, {
+          signal,
+        }),
     },
   );
 }
@@ -98,7 +106,7 @@ export function useWheelStats() {
     {
       queryKey: dataQueryKeys.query("wheel-stats"),
       queryFn: (_args, signal) =>
-        fetchJson<any>("/api/wheel/stats", { signal }),
+        fetchJson<WheelStats>("/api/wheel/stats", { signal }),
     },
   );
 }

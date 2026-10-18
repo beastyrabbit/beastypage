@@ -1,12 +1,45 @@
 "use client";
 
 import { fetchJson } from "@/lib/api";
+import type {
+  createBatch,
+  getBatch,
+  listBatches,
+  updateBatchMeta,
+} from "@/server/services/adoption";
+import type {
+  getBySlug,
+  listTrees,
+  saveTree,
+} from "@/server/services/ancestry";
+import type {
+  createProfile,
+  getProfile,
+  listHistory,
+  updateProfileMeta,
+} from "@/server/services/cats";
 import { useDataMutation, useDataQuery } from "./hooks";
 import { dataQueryKeys } from "./keys";
 
-type Profile = any;
-type Batch = any;
-type Tree = any;
+type Profile = NonNullable<Awaited<ReturnType<typeof getProfile>>>;
+type Batch = NonNullable<Awaited<ReturnType<typeof getBatch>>>;
+type Tree = NonNullable<Awaited<ReturnType<typeof getBySlug>>>;
+type CatHistory = Awaited<ReturnType<typeof listHistory>>;
+type AdoptionHistory = Awaited<ReturnType<typeof listBatches>>;
+type AncestryHistory = Awaited<ReturnType<typeof listTrees>>;
+type CatCreateArgs = Parameters<typeof createProfile>[1];
+type CatCreateResult = Awaited<ReturnType<typeof createProfile>>;
+type AdoptionCreateArgs = Parameters<typeof createBatch>[1];
+type AdoptionCreateResult = Awaited<ReturnType<typeof createBatch>>;
+type TreeSaveArgs = Parameters<typeof saveTree>[1];
+type TreeSaveResult = Awaited<ReturnType<typeof saveTree>>;
+type SlugCheck = { exists: boolean; hasPassword: boolean };
+type PaletteRecord = {
+  slug: string;
+  config: unknown;
+  createdAt: number;
+  updatedAt: number;
+};
 
 export function useCatProfile(
   slugOrId: string | null | undefined,
@@ -27,7 +60,7 @@ export function useCatHistory(limit = 200) {
     {
       queryKey: dataQueryKeys.list("cat-history", { limit }),
       queryFn: (args) =>
-        fetchJson<NonNullable<any>>(`/api/cats/history?limit=${args.limit}`),
+        fetchJson<CatHistory>(`/api/cats/history?limit=${args.limit}`),
     },
   );
 }
@@ -51,9 +84,7 @@ export function useAdoptionHistory(limit = 50) {
     {
       queryKey: dataQueryKeys.list("adoption-history", { limit }),
       queryFn: (args) =>
-        fetchJson<NonNullable<any>>(
-          `/api/adoption/batches?limit=${args.limit}`,
-        ),
+        fetchJson<AdoptionHistory>(`/api/adoption/batches?limit=${args.limit}`),
     },
   );
 }
@@ -77,7 +108,7 @@ export function useAncestryHistory(limit = 20) {
     {
       queryKey: dataQueryKeys.list("ancestry-history", { limit }),
       queryFn: (args) =>
-        fetchJson<NonNullable<any>>(`/api/ancestry/trees?limit=${args.limit}`),
+        fetchJson<AncestryHistory>(`/api/ancestry/trees?limit=${args.limit}`),
     },
   );
 }
@@ -86,51 +117,56 @@ export function useAncestrySlugCheck(slug: string | null | undefined) {
   return useDataQuery(slug ? { slug } : "skip", {
     queryKey: dataQueryKeys.query("ancestry-slug", slug ?? "none"),
     queryFn: (args) =>
-      fetchJson<any>(
+      fetchJson<SlugCheck>(
         `/api/ancestry/check-slug?slug=${encodeURIComponent(args.slug)}`,
       ),
   });
 }
 
 export function useCatCreate() {
-  return useDataMutation({
+  return useDataMutation<CatCreateArgs, CatCreateResult>({
     mutationFn: (args) =>
-      fetchJson<any>("/api/cats/profile", { method: "POST", body: args }),
+      fetchJson<CatCreateResult>("/api/cats/profile", {
+        method: "POST",
+        body: args,
+      }),
   });
 }
 export function useCatUpdateMeta() {
-  return useDataMutation({
+  return useDataMutation<Parameters<typeof updateProfileMeta>[1], Profile>({
     mutationFn: (args) =>
-      fetchJson<any>("/api/cats/profile", { method: "PATCH", body: args }),
+      fetchJson<Profile>("/api/cats/profile", { method: "PATCH", body: args }),
   });
 }
 export function useAdoptionCreate() {
-  return useDataMutation({
+  return useDataMutation<AdoptionCreateArgs, AdoptionCreateResult>({
     mutationFn: (args) =>
-      fetchJson<any>("/api/adoption/batch", { method: "POST", body: args }),
+      fetchJson<AdoptionCreateResult>("/api/adoption/batch", {
+        method: "POST",
+        body: args,
+      }),
   });
 }
 export function useAdoptionUpdateMeta() {
-  return useDataMutation({
+  return useDataMutation<Parameters<typeof updateBatchMeta>[1], Batch>({
     mutationFn: (args) =>
-      fetchJson<any>("/api/adoption/batch", { method: "PATCH", body: args }),
+      fetchJson<Batch>("/api/adoption/batch", { method: "PATCH", body: args }),
   });
 }
 
-type TreeSaveArgs = any;
 export function useAncestrySave() {
-  return useDataMutation({
+  return useDataMutation<TreeSaveArgs, TreeSaveResult>({
     mutationFn: (args) =>
-      fetchJson<any>("/api/ancestry/tree", {
+      fetchJson<TreeSaveResult>("/api/ancestry/tree", {
         method: "POST",
         body: { ...args, operation: "save" },
       }),
   });
 }
 export function useAncestrySaveAsNew() {
-  return useDataMutation({
+  return useDataMutation<TreeSaveArgs, TreeSaveResult>({
     mutationFn: (args: TreeSaveArgs) =>
-      fetchJson<any>("/api/ancestry/tree", {
+      fetchJson<TreeSaveResult>("/api/ancestry/tree", {
         method: "POST",
         body: { ...args, operation: "saveAsNew" },
       }),
@@ -141,7 +177,7 @@ export function usePaletteRecord(slug: string | null | undefined) {
   return useDataQuery(slug ? { slug } : "skip", {
     queryKey: dataQueryKeys.detail("palette-settings", slug ?? "none"),
     queryFn: (args) =>
-      fetchJson<any>(
+      fetchJson<PaletteRecord>(
         `/api/palette-generator-settings?slug=${encodeURIComponent(args.slug)}`,
         { nullable: true },
       ),

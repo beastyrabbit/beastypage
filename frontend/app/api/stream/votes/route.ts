@@ -20,12 +20,6 @@ const bodySchema = z.object({
   optionMeta: z.record(z.string(), z.unknown()).optional(),
   votedBy: z.string().uuid().optional(),
 });
-function unavailable() {
-  return NextResponse.json(
-    { error: "Not found", code: "not_found" },
-    { status: 404 },
-  );
-}
 export async function GET(request: NextRequest) {
   try {
     return NextResponse.json(

@@ -12,8 +12,6 @@ const schema = z.object({
     .min(1)
     .max(32),
 });
-const notFound = () =>
-  NextResponse.json({ error: "Not found", code: "not_found" }, { status: 404 });
 export async function POST(request: Request) {
   try {
     const body = await parseJsonBody(request, schema);

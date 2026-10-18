@@ -27,13 +27,6 @@ const createSchema = z.object({
   customCard: cardSchema.optional(),
 });
 
-function notFound() {
-  return NextResponse.json(
-    { error: "Not found", code: "not_found" },
-    { status: 404 },
-  );
-}
-
 export async function GET(request: NextRequest) {
   try {
     const params = parseSearchParams(

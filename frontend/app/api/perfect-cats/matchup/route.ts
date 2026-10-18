@@ -6,8 +6,6 @@ import { parseJsonBody } from "@/server/request";
 import { requestPerfectMatchup } from "@/server/services/games";
 export const dynamic = "force-dynamic";
 const schema = z.object({ clientId: z.string().max(128).optional() });
-const notFound = () =>
-  NextResponse.json({ error: "Not found", code: "not_found" }, { status: 404 });
 export async function POST(request: Request) {
   try {
     const body = await parseJsonBody(request, schema);

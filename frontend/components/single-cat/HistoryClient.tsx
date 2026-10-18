@@ -129,7 +129,8 @@ function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
   );
   if (focusable.length === 0) return;
   const first = focusable[0];
-  const last = focusable.at(-1)!;
+  const last = focusable.at(-1);
+  if (!last) return;
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();
@@ -207,8 +208,8 @@ export function HistoryClient() {
   const trees = treesQuery ?? [];
 
   const singleItems: HistoryItem[] = profiles
-    .filter((profile: any) => !profile.adoptionBatchId)
-    .map((profile: any) => {
+    .filter((profile) => !profile.adoptionBatchId)
+    .map((profile) => {
       const catData = profile.cat_data as Record<string, unknown> | null;
       const mode = (catData as { mode?: string } | null)?.mode ?? null;
       let source: unknown = catData?.source;
@@ -242,7 +243,7 @@ export function HistoryClient() {
       };
     });
 
-  const adoptionItems: HistoryItem[] = batches.map((batch: any) => {
+  const adoptionItems: HistoryItem[] = batches.map((batch) => {
     const isEvolution = isEvolutionBatchSettings(batch.settings);
     const baseTitle =
       cleanDisplay(batch.title) ||
@@ -250,7 +251,7 @@ export function HistoryClient() {
     const baseCreator = cleanDisplay(batch.creatorName) || null;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const cats: AdoptionHistoryCat[] = (batch.cats ?? []).map(
-      (cat: any, index: number) => {
+      (cat, index: number) => {
         let encoded = cat.encoded ?? null;
         if ((!encoded || encoded.length === 0) && cat.catData) {
           try {
@@ -301,7 +302,7 @@ export function HistoryClient() {
     };
   });
 
-  const treeItems: HistoryItem[] = trees.map((tree: any) => ({
+  const treeItems: HistoryItem[] = trees.map((tree) => ({
     kind: "tree" as const,
     id: tree.id,
     title: cleanDisplay(tree.name) || "Ancestry Tree",

@@ -5,8 +5,6 @@ import { errorResponse } from "@/server/http";
 import { parseSearchParams } from "@/server/request";
 import { perfectLeaderboard } from "@/server/services/games";
 export const dynamic = "force-dynamic";
-const notFound = () =>
-  NextResponse.json({ error: "Not found", code: "not_found" }, { status: 404 });
 export async function GET(request: Request) {
   try {
     const params = parseSearchParams(

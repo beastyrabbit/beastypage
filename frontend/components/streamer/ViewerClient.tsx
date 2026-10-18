@@ -8,6 +8,11 @@ import OptionPreview from "@/components/streamer/OptionPreview";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import UsersIcon from "@/components/ui/users-icon";
 import { track } from "@/lib/analytics";
+import type {
+  StreamParticipant,
+  StreamSession,
+  StreamVote,
+} from "@/lib/data/stream";
 import {
   useCreateStreamParticipant,
   useCreateStreamVote,
@@ -26,8 +31,8 @@ import {
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
 
-type SessionRecord = any;
-type ParticipantRecord = any;
+type SessionRecord = StreamSession;
+type ParticipantRecord = StreamParticipant;
 
 type StreamParams = StreamerParams;
 type StepOption = ReturnType<StreamStep["getOptions"]>[number];
@@ -248,7 +253,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
 
   const voteCounts = useMemo(() => {
     const map = new Map<string, number>();
-    votes.forEach((vote: any) => {
+    votes.forEach((vote: StreamVote) => {
       map.set(vote.option_key, (map.get(vote.option_key) ?? 0) + 1);
     });
     return map;
@@ -283,7 +288,11 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     if (!participant) return null;
     return (
       votes.find(
-        (vote: any) => vote.option_meta?.participantId === participant.id,
+        (vote: StreamVote) =>
+          typeof vote.option_meta === "object" &&
+          vote.option_meta !== null &&
+          "participantId" in vote.option_meta &&
+          vote.option_meta.participantId === participant.id,
       ) ?? null
     );
   }, [votes, participant]);
@@ -719,22 +728,30 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         <div className="grid gap-2 text-sm">
           {Array.isArray(session?.step_history) &&
           session.step_history.length > 0 ? (
-            session.step_history.map((entry: any, index: number) => (
-              <div
-                key={`${entry.step_id ?? "step"}-${entry.option_key ?? "option"}-${entry.title ?? "untitled"}-${entry.label ?? "choice"}`}
-                className="rounded-xl border border-border/50 bg-background/70 px-3 py-2"
-              >
-                <div className="text-xs text-muted-foreground">
-                  Step {index + 1}
+            session.step_history.map((entry, index: number) => {
+              const historyEntry = entry as {
+                step_id?: string;
+                option_key?: string;
+                title?: string;
+                label?: string;
+              };
+              return (
+                <div
+                  key={`${historyEntry.step_id ?? "step"}-${historyEntry.option_key ?? "option"}-${historyEntry.title ?? "untitled"}-${historyEntry.label ?? "choice"}`}
+                  className="rounded-xl border border-border/50 bg-background/70 px-3 py-2"
+                >
+                  <div className="text-xs text-muted-foreground">
+                    Step {index + 1}
+                  </div>
+                  <div className="font-semibold text-foreground">
+                    {historyEntry.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {historyEntry.label}
+                  </div>
                 </div>
-                <div className="font-semibold text-foreground">
-                  {entry.title}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {entry.label}
-                </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <p className="text-muted-foreground">
               The streamer hasn&apos;t locked any steps yet.

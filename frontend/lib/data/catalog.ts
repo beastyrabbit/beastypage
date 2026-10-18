@@ -12,6 +12,7 @@ import type {
   CollectionPayload,
   RarityPayload,
   SeasonPayload,
+  setCollectionFocus,
 } from "@/server/services/catalog";
 
 type CatdexPageArgs = { approved: boolean };
@@ -77,7 +78,7 @@ export function useCatalogHasPending() {
 }
 
 export function useCatalogGenerateUploadUrl() {
-  return useDataMutation({
+  return useDataMutation<{ clientKey?: string }, string>({
     mutationFn: async ({ clientKey }, signal) => {
       const result = await fetchJson<{ uploadUrl: string }>(
         "/api/catdex/upload-url",
@@ -126,11 +127,14 @@ export function useCatalogCollectionPage() {
 export function useCatalogSetFocus() {
   return useDataMutation({
     mutationFn: (args, signal) =>
-      fetchJson<any>("/api/collection", {
-        method: "PATCH",
-        body: args,
-        signal,
-      }),
+      fetchJson<Awaited<ReturnType<typeof setCollectionFocus>>>(
+        "/api/collection",
+        {
+          method: "PATCH",
+          body: args,
+          signal,
+        },
+      ),
     invalidate: [dataQueryKeys.list("collection")],
   });
 }

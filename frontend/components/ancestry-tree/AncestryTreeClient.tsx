@@ -884,7 +884,7 @@ export function AncestryTreeClient({
           success: true,
           slug: result.slug,
           isNew: result.isNew,
-          editToken: result.editToken,
+          editToken: result.editToken ?? undefined,
         };
       } catch (error) {
         console.error("Failed to save tree:", error);

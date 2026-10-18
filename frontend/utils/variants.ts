@@ -8,6 +8,7 @@ import {
   useUpsertUserVariant,
   useUserVariants,
 } from "@/lib/data/users";
+import type { list } from "@/server/services/userVariants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,6 +27,8 @@ export interface VariantStore<T> {
   activeId: string | null;
   variants: Variant<T>[];
 }
+
+type RemoteVariant = Awaited<ReturnType<typeof list>>[number];
 
 // ---------------------------------------------------------------------------
 // localStorage helpers
@@ -185,7 +188,9 @@ export function useVariants<T>(
     }
 
     // Check if any local variants are missing from remote service
-    const remoteIds = new Set(remoteVariants.map((v: any) => v.variantId));
+    const remoteIds = new Set(
+      remoteVariants.map((v: RemoteVariant) => v.variantId),
+    );
     const toImport = localData.variants.filter((v) => !remoteIds.has(v.id));
 
     if (toImport.length === 0) {
@@ -197,7 +202,7 @@ export function useVariants<T>(
     importedRef.current = true;
     void importBatchMut({
       toolKey,
-      variants: toImport.map((v: any) => ({
+      variants: toImport.map((v) => ({
         variantId: v.id,
         name: v.name,
         slug: v.slug,
@@ -232,8 +237,9 @@ export function useVariants<T>(
     useRemote && remoteVariants
       ? {
           activeId:
-            remoteVariants.find((v: any) => v.isActive)?.variantId ?? null,
-          variants: remoteVariants.map((v: any) => ({
+            remoteVariants.find((v: RemoteVariant) => v.isActive)?.variantId ??
+            null,
+          variants: remoteVariants.map((v: RemoteVariant) => ({
             id: v.variantId,
             name: v.name,
             slug: v.slug,

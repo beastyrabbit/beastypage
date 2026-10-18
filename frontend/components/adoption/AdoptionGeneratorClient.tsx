@@ -193,7 +193,7 @@ export function AdoptionGeneratorClient() {
                   catData: catDataToLegacyPersistence(
                     cat.catData as Record<string, unknown>,
                   ),
-                  profileId: profileIdStr ? profileIdStr : undefined,
+                  profileId: profileIdStr ?? undefined,
                   encoded,
                   shareToken,
                   editToken,

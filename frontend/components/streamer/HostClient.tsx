@@ -31,6 +31,7 @@ import { track } from "@/lib/analytics";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { useBackendAuth } from "@/lib/data";
 import { useCatCreate } from "@/lib/data/cats";
+import type { StreamParticipant, StreamSession } from "@/lib/data/stream";
 import {
   useCreateStreamSession,
   useCreateStreamVote,
@@ -51,8 +52,8 @@ import {
 } from "@/lib/streamer/steps";
 import { cn } from "@/lib/utils";
 
-type SessionListItem = any;
-type ParticipantRecord = any;
+type SessionListItem = StreamSession;
+type ParticipantRecord = StreamParticipant;
 
 type LockedEntry = {
   step_id?: string;
@@ -61,6 +62,25 @@ type LockedEntry = {
   label?: string;
   votes?: number;
 };
+
+function normalizeLockedHistory(value: unknown): LockedEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const record = entry as Record<string, unknown>;
+    return [
+      {
+        step_id:
+          typeof record.step_id === "string" ? record.step_id : undefined,
+        title: typeof record.title === "string" ? record.title : undefined,
+        option_key:
+          typeof record.option_key === "string" ? record.option_key : undefined,
+        label: typeof record.label === "string" ? record.label : undefined,
+        votes: typeof record.votes === "number" ? record.votes : undefined,
+      },
+    ];
+  });
+}
 
 type StreamParams = StreamerParams;
 
@@ -425,9 +445,7 @@ function AuthenticatedHostClient() {
     if ("allowRepeatIps" in params) {
       delete (params as Record<string, unknown>).allowRepeatIps;
     }
-    const history = Array.isArray(session.step_history)
-      ? [...session.step_history]
-      : [];
+    const history = normalizeLockedHistory(session.step_history);
     setLocalState({ params, history });
   }, [session]);
 
@@ -603,7 +621,7 @@ function AuthenticatedHostClient() {
     [voteRows],
   );
   const activeParticipantCount = participants.filter(
-    (p: any) => (p.status ?? "active").toLowerCase() === "active",
+    (p: ParticipantRecord) => (p.status ?? "active").toLowerCase() === "active",
   ).length;
 
   const leaderOption = useMemo(() => {
@@ -1754,7 +1772,7 @@ function AuthenticatedHostClient() {
               </p>
             ) : (
               <ul className="divide-y divide-border/40 text-sm">
-                {participants.map((participant: any) => {
+                {participants.map((participant: ParticipantRecord) => {
                   const status = (participant.status ?? "active").toLowerCase();
                   return (
                     <li
@@ -1811,7 +1829,7 @@ function AuthenticatedHostClient() {
               </p>
             ) : (
               <ul className="divide-y divide-border/40 text-sm">
-                {sessionListResolved.map((item: any) => (
+                {sessionListResolved.map((item: SessionListItem) => (
                   <li
                     key={item.id}
                     className="flex items-center justify-between gap-3 px-4 py-3"

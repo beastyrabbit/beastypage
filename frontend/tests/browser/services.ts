@@ -118,12 +118,10 @@ function fixtureResponse(body: unknown, status = 200) {
 
 const nativeFetch = window.fetch.bind(window);
 window.fetch = (input, init) => {
-  const inputUrl =
-    typeof input === "string"
-      ? input
-      : input instanceof Request
-        ? input.url
-        : input.href;
+  let inputUrl: string;
+  if (typeof input === "string") inputUrl = input;
+  else if (input instanceof Request) inputUrl = input.url;
+  else inputUrl = input.href;
   const url = new URL(inputUrl, location.origin);
   if (!url.pathname.startsWith("/api/")) return nativeFetch(input, init);
   if (url.pathname === "/api/pixelator") return nativeFetch(input, init);
