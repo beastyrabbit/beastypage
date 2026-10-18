@@ -11,6 +11,11 @@ import { dataBackend } from "@/server/backend";
 import { isMaintenanceMode } from "@/server/maintenance";
 import "./globals.css";
 
+// The data backend and maintenance gate are read from the runtime environment.
+// A prerendered layout would bake in the build's values (no DATA_BACKEND, so
+// Convex) and send every static page's browser to Convex after the switch.
+export const dynamic = "force-dynamic";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
