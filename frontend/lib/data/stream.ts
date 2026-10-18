@@ -300,7 +300,7 @@ export function useStreamSession(
     enabled: Boolean(id),
     eventSource,
   });
-  return live?.session ? live.session : query;
+  return live?.session ?? query;
 }
 
 export function useStreamSessionForHost(args: StreamSessionArgs | "skip") {
@@ -326,7 +326,7 @@ export function useStreamSessionForHost(args: StreamSessionArgs | "skip") {
   }>(id ? `stream/${id}` : null, {
     enabled: Boolean(id),
   });
-  return live?.session ? live.session : query;
+  return live?.session ?? query;
 }
 export function useStreamParticipants(
   args: StreamParticipantListArgs | "skip",
@@ -362,7 +362,7 @@ export function useStreamParticipants(
     enabled: Boolean(id),
     eventSource,
   });
-  return live?.participants ? live.participants : query;
+  return live?.participants ?? query;
 }
 export function useStreamVotes(
   args: StreamVoteListArgs | "skip",
@@ -391,7 +391,7 @@ export function useStreamVotes(
     enabled: Boolean(id),
     eventSource,
   });
-  return live?.votes ? live.votes : query;
+  return live?.votes ?? query;
 }
 export const useCreateStreamSession = () =>
   useDataMutation<

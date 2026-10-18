@@ -38,7 +38,7 @@ type VariantRenameArgs = {
 };
 type VariantSetActiveArgs = {
   toolKey: Parameters<typeof setActive>[2];
-  variantId?: Parameters<typeof setActive>[3];
+  variantId?: NonNullable<Parameters<typeof setActive>[3]>;
 };
 
 import { useDataMutation, useDataQuery } from "./hooks";
