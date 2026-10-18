@@ -1,9 +1,5 @@
 import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
-import {
-  RequestBodyTooLargeError,
-  readRequestBody,
-} from "@/app/api/_lib/request-body";
 import { api } from "@/convex/_generated/api";
 import { isDiscordServiceRequest } from "@/convex/discordAuth";
 import {
@@ -13,53 +9,19 @@ import {
 import type { ExtractedColor } from "@/lib/color-extraction/types";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 import { downloadPublicImage } from "@/lib/public-image-download";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { errorResponse } from "@/server/http";
+import { parseJsonBody } from "@/server/request";
+import { discordPaletteSchema } from "@/server/services/cat-validation";
+import { storeDiscordImage as storePostgresDiscordImage } from "@/server/services/palette";
 
 const PUBLIC_BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ?? "https://beastyrabbit.com";
-const MAX_BODY_BYTES = 64 * 1024;
-
-type BodyResult =
-  | { body: Record<string, unknown> }
-  | { response: NextResponse };
-
 type Result<T> = { value: T } | { response: NextResponse };
 
 function abortedResponse() {
   return NextResponse.json({ error: "Request aborted" }, { status: 499 });
-}
-
-async function parseRequestBody(request: NextRequest): Promise<BodyResult> {
-  try {
-    const rawBody = await readRequestBody(request, MAX_BODY_BYTES);
-    const parsed: unknown = JSON.parse(rawBody);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {
-        response: NextResponse.json(
-          { error: "Invalid JSON body" },
-          { status: 400 },
-        ),
-      };
-    }
-    return { body: parsed as Record<string, unknown> };
-  } catch (error) {
-    if (error instanceof RequestBodyTooLargeError) {
-      return {
-        response: NextResponse.json(
-          { error: "Request body is too large" },
-          { status: 413 },
-        ),
-      };
-    }
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return { response: abortedResponse() };
-    }
-    return {
-      response: NextResponse.json(
-        { error: "Invalid JSON body" },
-        { status: 400 },
-      ),
-    };
-  }
 }
 
 async function downloadImage(
@@ -160,6 +122,16 @@ async function persistPalette(
 
   try {
     if (signal.aborted) return { response: abortedResponse() };
+    if (dataBackend() === "postgres") {
+      const result = await storePostgresDiscordImage(getDb(), {
+        dataUrl: `data:image/png;base64,${imageBuffer.toString("base64")}`,
+        colors: colorsPayload,
+        serviceToken: (process.env.DISCORD_API_TOKEN ?? "").trim(),
+      });
+      slug = result.slug;
+      customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?paletteSlug=${slug}`;
+      return { value: { slug, customizeUrl } };
+    }
     const convexUrl = getServerConvexUrl();
     if (convexUrl) {
       const convex = new ConvexHttpClient(convexUrl);
@@ -191,20 +163,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if ("response" in bodyResult) return bodyResult.response;
-
-  const imageUrl = bodyResult.body.imageUrl;
-  if (typeof imageUrl !== "string") {
-    return NextResponse.json(
-      { error: "Missing or invalid imageUrl" },
-      { status: 400 },
-    );
+  let body: { imageUrl: string; colors?: number };
+  try {
+    body = await parseJsonBody(request, discordPaletteSchema, {
+      maxBytes: 64 * 1024,
+    });
+  } catch (error) {
+    return errorResponse(error, "Invalid request body", "Invalid request body");
   }
 
-  const rawColors =
-    typeof bodyResult.body.colors === "number" ? bodyResult.body.colors : 6;
-  const colorCount = Math.min(Math.max(Math.round(rawColors), 2), 12);
+  const imageUrl = body.imageUrl;
+  const colorCount = body.colors ?? 6;
   const imageResult = await downloadImage(imageUrl, request.signal);
   if ("response" in imageResult) return imageResult.response;
 

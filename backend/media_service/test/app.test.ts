@@ -7,6 +7,7 @@ const config: Config = {
 	port: 8003,
 	publicBaseUrl: "https://beastyrabbit.com",
 	convexSiteUrl: "https://control.example",
+	controlPlaneUrl: "https://control.example/quick-share/internal",
 	internalToken: "i".repeat(32),
 	hmacKey: "h".repeat(32),
 	s3Endpoint: "https://s3.example",

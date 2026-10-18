@@ -1,20 +1,22 @@
 "use client";
 
-import { useMutation, usePaginatedQuery } from "convex/react";
 import { useCallback, useMemo, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
-import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { CollectionEntry } from "@/convex/collection";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
+import {
+  useCatalogCollectionPage,
+  useCatalogSetFocus,
+} from "@/lib/data/catalog";
 
 export default function CollectionFocusTestingPage() {
   const {
     results: entries,
     status: pageStatus,
     loadMore,
-  } = usePaginatedQuery(api.collection.page, {}, { initialNumItems: 36 });
-  const setFocus = useMutation(api.collection.setFocus);
+  } = useCatalogCollectionPage();
+  const setFocus = useCatalogSetFocus();
   const [drafts, setDrafts] = useState<
     Record<string, { focusX: number; focusY: number }>
   >({});
@@ -227,6 +229,7 @@ export default function CollectionFocusTestingPage() {
 function absoluteUrl(url?: string | null): string | null {
   if (!url) return null;
   if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/api/files/")) return url;
   const base = CONVEX_HTTP_URL.replace(/\/$/, "");
   return url.startsWith("/") ? `${base}${url}` : `${base}/${url}`;
 }

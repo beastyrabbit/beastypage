@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { Loader2, ShieldQuestion } from "lucide-react";
 import {
   type FormEvent,
@@ -15,8 +14,10 @@ import { createPortal } from "react-dom";
 import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import XIcon from "@/components/ui/x-icon";
-
-import { api } from "@/convex/_generated/api";
+import {
+  useDiscordChallenge,
+  useRedeemDiscordChallenge,
+} from "@/lib/data/users";
 import { cn } from "@/lib/utils";
 
 type InviteStatus =
@@ -194,8 +195,8 @@ function InviteSuccessPanel({
 export function DiscordInviteButton({
   className,
 }: Readonly<{ className?: string }>) {
-  const issueChallenge = useMutation(api.discord.issueChallenge);
-  const redeemChallenge = useMutation(api.discord.redeemChallenge);
+  const issueChallenge = useDiscordChallenge();
+  const redeemChallenge = useRedeemDiscordChallenge();
 
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<InviteStatus>("idle");
@@ -246,14 +247,14 @@ export function DiscordInviteButton({
       setCopied(false);
 
       try {
-        let payload = await issueChallenge();
+        let payload = await issueChallenge({});
         if (typeof options?.avoidAnswer === "number") {
           let attempts = 0;
           while (
             sumFromPrompt(payload.prompt) === options.avoidAnswer &&
             attempts < 5
           ) {
-            payload = await issueChallenge();
+            payload = await issueChallenge({});
             attempts += 1;
           }
         }

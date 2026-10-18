@@ -3,6 +3,7 @@ import { api } from "@/convex/_generated/api";
 
 const handlers = createSettingsRouteHandlers({
   serviceName: "single cat",
+  kind: "singleCat",
   get: (convex, slug) => convex.query(api.singleCatSettings.get, { slug }),
   save: (convex, args) => convex.mutation(api.singleCatSettings.save, args),
 });

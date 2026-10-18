@@ -1,22 +1,48 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { isDiscordServiceRequest } from "@/convex/discordAuth";
 import { discordConfig } from "@/lib/discord-service";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { errorResponse } from "@/server/http";
+import { parseJsonBody, parseSearchParams } from "@/server/request";
+import {
+  getUserConfig as getPostgresConfig,
+  updateUserConfig as updatePostgresConfig,
+} from "@/server/services/discord";
+
+const querySchema = z.object({ discordUserId: z.string().min(1) });
+const bodySchema = z.object({
+  discordUserId: z.string().min(1),
+  reset: z.boolean().optional(),
+  addPalette: z.string().optional(),
+  removePalette: z.string().optional(),
+  accessoriesMin: z.number().optional(),
+  accessoriesMax: z.number().optional(),
+  scarsMin: z.number().optional(),
+  scarsMax: z.number().optional(),
+  tortiesMin: z.number().optional(),
+  tortiesMax: z.number().optional(),
+  darkForest: z.boolean().optional(),
+  starclan: z.boolean().optional(),
+});
 
 export async function GET(request: NextRequest) {
   if (!isDiscordServiceRequest(request))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const discordUserId = request.nextUrl.searchParams.get("discordUserId");
-  if (!discordUserId)
-    return NextResponse.json(
-      { error: "Missing discordUserId" },
-      { status: 400 },
-    );
   try {
+    const { discordUserId } = parseSearchParams(
+      request.nextUrl.searchParams,
+      querySchema,
+    );
+    if (dataBackend() === "postgres")
+      return NextResponse.json(await getPostgresConfig(getDb(), discordUserId));
     return NextResponse.json(await discordConfig("get", { discordUserId }));
-  } catch {
-    return NextResponse.json(
-      { error: "Config service unavailable" },
-      { status: 503 },
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Config service unavailable",
+      "discord config get",
     );
   }
 }
@@ -55,25 +81,21 @@ function resolveConfigUpdate(body: Record<string, unknown>): {
 export async function PATCH(request: NextRequest) {
   if (!isDiscordServiceRequest(request))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  let body: Record<string, unknown>;
   try {
-    body = await request.json();
-    if (!body || typeof body.discordUserId !== "string")
-      throw new Error("Invalid body");
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid config request" },
-      { status: 400 },
-    );
-  }
-  const { operation, fields } = resolveConfigUpdate(body);
-  try {
+    const body = await parseJsonBody(request, bodySchema);
+    const bodyRecord = body as Record<string, unknown>;
+    const { operation, fields } = resolveConfigUpdate(bodyRecord);
+    if (dataBackend() === "postgres") {
+      await updatePostgresConfig(getDb(), operation, fields);
+      return NextResponse.json({ ok: true, action: operation });
+    }
     await discordConfig(operation, fields);
     return NextResponse.json({ ok: true, action: operation });
-  } catch {
-    return NextResponse.json(
-      { error: "Config update failed" },
-      { status: 503 },
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Config update failed",
+      "discord config update",
     );
   }
 }

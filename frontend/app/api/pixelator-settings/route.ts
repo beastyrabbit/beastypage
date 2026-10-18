@@ -4,6 +4,7 @@ import { parsePixelatorPayload } from "@/utils/pixelatorVariants";
 
 const handlers = createSettingsRouteHandlers({
   serviceName: "pixelator",
+  kind: "pixelator",
   parseConfig: parsePixelatorPayload,
   get: (convex, slug) => convex.query(api.pixelatorSettings.get, { slug }),
   save: (convex, args) => convex.mutation(api.pixelatorSettings.save, args),

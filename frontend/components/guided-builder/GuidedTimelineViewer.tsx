@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,13 +8,13 @@ import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
-import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   getCoatChoiceValue,
   getCoatPatternName,
 } from "@/lib/cat-v3/coatPatterns";
 import type { CatParams } from "@/lib/cat-v3/types";
+import { useCatProfile, useCatUpdateMeta } from "@/lib/data/cats";
 import { readMapperEditToken } from "@/lib/mapperEditToken";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
@@ -76,10 +75,7 @@ export function GuidedTimelineViewer({
   slug,
   encoded,
 }: Readonly<GuidedTimelineViewerProps>) {
-  const mapperRecord = useQuery(
-    api.mapper.getBySlug,
-    slug ? { slugOrId: slug } : "skip",
-  ) as MapperRecord | null | undefined;
+  const mapperRecord = useCatProfile(slug) as MapperRecord | null | undefined;
 
   const [payload, setPayload] = useState<TimelinePayload | null>(null);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
@@ -102,7 +98,7 @@ export function GuidedTimelineViewer({
   const [creatorNameDraft, setCreatorNameDraft] = useState("");
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaSaved, setMetaSaved] = useState(false);
-  const updateMeta = useMutation(api.mapper.updateMeta);
+  const updateMeta = useCatUpdateMeta();
 
   // Auto-fill creator name when username loads and field is still empty
   const creatorFilledRef = useRef(false);

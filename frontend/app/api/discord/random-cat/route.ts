@@ -1,10 +1,6 @@
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
-import {
-  RequestBodyTooLargeError,
-  readRequestBody,
-} from "@/app/api/_lib/request-body";
 import { RENDERER_BASE } from "@/app/api/renderer/_lib/proxy";
 import { api } from "@/convex/_generated/api";
 import { isDiscordServiceRequest } from "@/convex/discordAuth";
@@ -17,54 +13,23 @@ import {
 } from "@/lib/cat-v3/random-cat-server";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 import { discordConfig } from "@/lib/discord-service";
+import { ANONYMOUS } from "@/server/auth/identity";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { errorResponse } from "@/server/http";
+import { parseJsonBody } from "@/server/request";
+import { discordRandomCatSchema } from "@/server/services/cat-validation";
+import { createProfile } from "@/server/services/cats";
 
 const DISCORD_IMAGE_SIZE = 500;
 
 const PUBLIC_BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ?? "https://beastyrabbit.com";
-const MAX_BODY_BYTES = 32 * 1024;
-
-type BodyResult =
-  | { body: Record<string, unknown> }
-  | { response: NextResponse };
-
 type OverrideResult =
   | { overrides: DiscordCatOverrides }
   | { response: NextResponse };
 
 type RenderResult = { image: string } | { response: NextResponse };
-
-async function parseRequestBody(request: NextRequest): Promise<BodyResult> {
-  let body: Record<string, unknown> = {};
-  try {
-    const rawBody = await readRequestBody(request, MAX_BODY_BYTES);
-    if (rawBody.trim()) {
-      const parsed: unknown = JSON.parse(rawBody);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return { response: invalidBodyResponse() };
-      }
-      body = parsed as Record<string, unknown>;
-    }
-  } catch (error) {
-    if (error instanceof RequestBodyTooLargeError) {
-      return {
-        response: NextResponse.json(
-          { error: "Request body is too large" },
-          { status: 413 },
-        ),
-      };
-    }
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return { response: abortedResponse() };
-    }
-    return { response: invalidBodyResponse() };
-  }
-  return { body };
-}
-
-function invalidBodyResponse() {
-  return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-}
 
 function abortedResponse() {
   return NextResponse.json({ error: "Request aborted" }, { status: 499 });
@@ -260,6 +225,32 @@ async function saveCat(
 ): Promise<string | undefined> {
   let slug: string | undefined;
   try {
+    const catData = {
+      params: { ...params, source: "discordkitten" },
+      accessorySlots: params.accessories ?? [],
+      scarSlots: params.scars ?? [],
+      tortieSlots: params.tortie ?? [],
+      counts: {
+        accessories: (params.accessories ?? []).length,
+        scars: (params.scars ?? []).length,
+        tortie: (params.tortie ?? []).length,
+      },
+    };
+    if (dataBackend() === "postgres") {
+      const discordUsername =
+        typeof body.discord_username === "string"
+          ? body.discord_username
+          : undefined;
+      const result = await createProfile(
+        getDb(),
+        {
+          catData: catDataToLegacyPersistence(catData),
+          creatorName: discordUsername || "Discord",
+        },
+        ANONYMOUS,
+      );
+      return result.slug;
+    }
     const convexUrl = getServerConvexUrl();
     if (!convexUrl) {
       console.warn(
@@ -267,17 +258,6 @@ async function saveCat(
       );
     } else {
       const convex = new ConvexHttpClient(convexUrl);
-      const catData = {
-        params: { ...params, source: "discordkitten" },
-        accessorySlots: params.accessories ?? [],
-        scarSlots: params.scars ?? [],
-        tortieSlots: params.tortie ?? [],
-        counts: {
-          accessories: (params.accessories ?? []).length,
-          scars: (params.scars ?? []).length,
-          tortie: (params.tortie ?? []).length,
-        },
-      };
       const discordUsername =
         typeof body.discord_username === "string"
           ? body.discord_username
@@ -300,12 +280,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if ("response" in bodyResult) return bodyResult.response;
+  let body: Record<string, unknown>;
+  try {
+    body = await parseJsonBody(request, discordRandomCatSchema, {
+      maxBytes: 32 * 1024,
+      emptyBody: {},
+    });
+  } catch (error) {
+    return errorResponse(error, "Invalid request body", "Invalid request body");
+  }
 
-  const overrideResult = buildOverrides(bodyResult.body);
+  const overrideResult = buildOverrides(body);
   if ("response" in overrideResult) return overrideResult.response;
-  await applyUserConfig(bodyResult.body, overrideResult.overrides);
+  await applyUserConfig(body, overrideResult.overrides);
 
   const generated = await generateCatParams(overrideResult.overrides);
   if ("response" in generated) return generated.response;
@@ -314,7 +301,7 @@ export async function POST(request: NextRequest) {
   const renderResult = await renderImage(document, params, request.signal);
   if ("response" in renderResult) return renderResult.response;
 
-  const slug = await saveCat(bodyResult.body, params);
+  const slug = await saveCat(body, params);
   const viewUrl = slug ? `${PUBLIC_BASE_URL}/view/${slug}` : undefined;
 
   return NextResponse.json({

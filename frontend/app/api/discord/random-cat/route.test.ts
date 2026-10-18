@@ -92,6 +92,27 @@ describe("Discord random-cat renderer catalog guard", () => {
     });
   });
 
+  it("generates a cat for an empty request body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          image: "data:image/png;base64,AA==",
+          meta: { catalogHash: CAT_CATALOG_HASH },
+        }),
+      ),
+    );
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/discord/random-cat", {
+        method: "POST",
+        headers: { authorization: `Bearer ${"x".repeat(32)}` },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
   it("accepts a legacy renderer response without a catalog hash during rollout", async () => {
     vi.stubGlobal(
       "fetch",
@@ -130,9 +151,11 @@ describe("Discord random-cat renderer catalog guard", () => {
   it("reports renderer timeouts separately from service failures", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockRejectedValue(
-        new DOMException("The operation timed out", "TimeoutError"),
-      ),
+      vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException("The operation timed out", "TimeoutError"),
+        ),
     );
 
     const response = await POST(request());

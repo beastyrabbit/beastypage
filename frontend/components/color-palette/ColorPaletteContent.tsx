@@ -1,18 +1,21 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import type { RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import DownChevron from "@/components/ui/down-chevron";
-import { api } from "@/convex/_generated/api";
 import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import {
   DEFAULT_POSE_NAME,
   formatPoseName,
   getUserSelectablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
+import {
+  useCatProfile,
+  usePaletteImageUrl,
+  usePaletteRecord,
+} from "@/lib/data/cats";
 import { ColorPaletteClient } from "./ColorPaletteClient";
 
 const EXPORT_SIZE = 700;
@@ -159,23 +162,14 @@ export function ColorPaletteContent({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Load cat data from Convex if slug is provided
-  const mapperRecord = useQuery(
-    api.mapper.getBySlug,
-    slug ? { slugOrId: slug } : "skip",
-  );
+  const mapperRecord = useCatProfile(slug);
 
   // Load palette config from Convex if paletteSlug is provided
-  const paletteRecord = useQuery(
-    api.paletteGeneratorSettings.get,
-    paletteSlug ? { slug: paletteSlug } : "skip",
-  );
+  const paletteRecord = usePaletteRecord(paletteSlug);
 
   // Get image download URL from the palette record; do not expose raw storage
   // IDs as a public capability.
-  const paletteImageUrl = useQuery(
-    api.paletteGeneratorSettings.getImageUrl,
-    paletteSlug ? { slug: paletteSlug } : "skip",
-  );
+  const paletteImageUrl = usePaletteImageUrl(paletteSlug);
 
   // Compute cat params with dark forest override
   // Handles both wrapped format ({ params: {...} }) and flat format (pre-v4.2.3 Discord cats)

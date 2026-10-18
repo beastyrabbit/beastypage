@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
 import { Vote } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,9 +7,17 @@ import { useCatGenerator } from "@/components/cat-builder/hooks";
 import OptionPreview from "@/components/streamer/OptionPreview";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import UsersIcon from "@/components/ui/users-icon";
-import { api } from "@/convex/_generated/api";
+import type { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
+import {
+  useCreateStreamParticipant,
+  useCreateStreamVote,
+  useStreamParticipants,
+  useStreamSession,
+  useStreamSessions,
+  useStreamVotes,
+} from "@/lib/data/stream";
 import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
 import {
   cloneParams,
@@ -160,8 +167,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     return { viewerKey, limit: 1 } as const;
   }, [viewerKey]);
 
-  const sessionMatches =
-    useQuery(api.streamSessionsV2.list, sessionLookupArgs) ?? [];
+  const sessionMatches = useStreamSessions(sessionLookupArgs) ?? [];
   const sessionId = sessionMatches[0]?.id ?? null;
 
   const sessionArgs = useMemo(() => {
@@ -169,10 +175,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     return { id: toId("stream_sessions", sessionId) } as const;
   }, [sessionId]);
 
-  const session = useQuery(
-    api.streamSessionsV2.get,
-    sessionArgs,
-  ) as SessionRecord;
+  const session = useStreamSession(sessionArgs, viewerKey) as SessionRecord;
 
   const votesArgs = useMemo(() => {
     if (!sessionId) return "skip" as const;
@@ -183,7 +186,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     } as const;
   }, [sessionId, session?.current_step]);
 
-  const rawVotes = useQuery(api.streamVotesV2.list, votesArgs);
+  const rawVotes = useStreamVotes(votesArgs, viewerKey);
   const votes = useMemo(() => rawVotes ?? [], [rawVotes]);
 
   const participantArgs = useMemo(() => {
@@ -195,10 +198,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     } as const;
   }, [sessionId, viewerSession]);
 
-  const rawParticipantList = useQuery(
-    api.streamParticipantsV2.list,
-    participantArgs,
-  );
+  const rawParticipantList = useStreamParticipants(participantArgs, viewerKey);
   const participantList = useMemo(
     () => rawParticipantList ?? [],
     [rawParticipantList],
@@ -214,8 +214,8 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     return () => window.clearTimeout(timer);
   }, [participant?.display_name]);
 
-  const registerParticipant = useMutation(api.streamParticipantsV2.create);
-  const createVote = useMutation(api.streamVotesV2.create);
+  const registerParticipant = useCreateStreamParticipant();
+  const createVote = useCreateStreamVote();
 
   const currentStepId = session?.current_step ?? null;
   const params = useMemo(

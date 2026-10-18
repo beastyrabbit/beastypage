@@ -32,6 +32,9 @@ frontend/build/
 frontend/.vercel
 frontend/next-env.d.ts
 frontend/*.tsbuildinfo
+# Bundled PostgreSQL migration runner (built in the Docker image)
+frontend/dist-db/
+frontend/.drift-check/
 
 # Backend virtual envs / caches
 backend/renderer_service/.venv/

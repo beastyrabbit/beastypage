@@ -1,5 +1,4 @@
 "use client";
-import { useQuery } from "convex/react";
 import { Loader2 } from "lucide-react";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import {
@@ -8,14 +7,13 @@ import {
   VisualBuilderClient,
   type VisualBuilderInitialPayload,
 } from "@/components/visual-builder/VisualBuilderClient";
-import { api } from "@/convex/_generated/api";
-
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   hydrateBuilderParams,
   synchronizeBuilderParams,
 } from "@/lib/cat-builder/genericTraitEditor";
 import { isCoatPatternId } from "@/lib/cat-v3/coatPatterns";
+import { useCatProfile } from "@/lib/data/cats";
 import type { PaletteMode } from "@/lib/palettes";
 
 type TortieLayer = {
@@ -252,10 +250,7 @@ type VisualBuilderLoaderProps = {
 export function VisualBuilderLoader({
   slug,
 }: Readonly<VisualBuilderLoaderProps>) {
-  const record = useQuery(
-    api.mapper.getBySlug,
-    slug ? { slugOrId: slug } : "skip",
-  ) as MapperRecord | null | undefined;
+  const record = useCatProfile(slug) as MapperRecord | null | undefined;
 
   if (!slug) {
     return (

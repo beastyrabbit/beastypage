@@ -1,14 +1,16 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
 import { Trophy } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
-import { api } from "@/convex/_generated/api";
 import type { ScoreRecord } from "@/convex/coinflipper";
 import { track } from "@/lib/analytics";
+import {
+  useCoinflipLeaderboard,
+  useSubmitCoinflipScore,
+} from "@/lib/data/games";
 import { cn } from "@/lib/utils";
 
 const FLIP_DURATION_MS = 1200;
@@ -27,8 +29,8 @@ const FACE_LABELS: Record<FlipSide, string> = {
 };
 
 export default function CoinflipPage() {
-  const rawLeaderboard = useQuery(api.coinflipper.leaderboard, { limit: 10 });
-  const submitScore = useMutation(api.coinflipper.submitScore);
+  const rawLeaderboard = useCoinflipLeaderboard(10);
+  const submitScore = useSubmitCoinflipScore();
 
   const [gameState, setGameState] = useState<GameState>("ready");
   const [currentScore, setCurrentScore] = useState(0);

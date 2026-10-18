@@ -1,0 +1,5 @@
+# InfisicalStaticSecret target templates: `kind: Secret` with only
+# {{ .KEY.Value }} references; the values live in Infisical, not in Git.
+deploy/postgres/production/infisical-sync.yaml:kubernetes-secret-yaml:36
+deploy/postgres/production/infisical-sync.yaml:kubernetes-secret-yaml:46
+deploy/postgres/production/infisical-sync.yaml:kubernetes-secret-yaml:58

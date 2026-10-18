@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import { Loader2, Save } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import CheckedIcon from "@/components/ui/checked-icon";
@@ -8,7 +7,7 @@ import CopyIcon from "@/components/ui/copy-icon";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import LockIcon from "@/components/ui/lock-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
+import { useAncestrySlugCheck } from "@/lib/data/cats";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 
 const MAX_SLUG_LENGTH = 40;
@@ -107,7 +106,7 @@ export function SaveTreeDialog({
   }, [onClose]);
 
   // Check if the current slug exists and has a password
-  const slugCheck = useQuery(api.ancestryTree.checkSlug, { slug: currentSlug });
+  const slugCheck = useAncestrySlugCheck(currentSlug);
   const slugExists = slugCheck?.exists ?? false;
   const treeHasPassword = initialHasPassword ?? slugCheck?.hasPassword ?? false;
 

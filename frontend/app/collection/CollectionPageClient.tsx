@@ -1,6 +1,5 @@
 "use client";
 
-import { usePaginatedQuery } from "convex/react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
@@ -8,16 +7,16 @@ import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
 import type { CollectionEntry } from "@/convex/collection";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
+import { useCatalogCollectionPage } from "@/lib/data/catalog";
 
 export default function CollectionPage() {
   const {
     results: entries,
     status: pageStatus,
     loadMore,
-  } = usePaginatedQuery(api.collection.page, {}, { initialNumItems: 36 });
+  } = useCatalogCollectionPage();
   const [search, setSearch] = useState("");
   const [activeEntry, setActiveEntry] = useState<CollectionEntry | null>(null);
 
@@ -281,16 +280,19 @@ export default function CollectionPage() {
                   )}
                 </dl>
                 <div className="mt-auto flex flex-wrap gap-3 text-xs">
-                  {absoluteUrl(activeEntry.full_img) && (
-                    <a
-                      href={absoluteUrl(activeEntry.full_img)!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-bold text-primary-foreground transition-all hover:opacity-90 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5"
-                    >
-                      Open full image <ExternalLinkIcon size={12} />
-                    </a>
-                  )}
+                  {(() => {
+                    const fullImageUrl = absoluteUrl(activeEntry.full_img);
+                    return fullImageUrl ? (
+                      <a
+                        href={fullImageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-bold text-primary-foreground transition-all hover:opacity-90 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5"
+                      >
+                        Open full image <ExternalLinkIcon size={12} />
+                      </a>
+                    ) : null;
+                  })()}
                   {activeEntry.link && (
                     <Link
                       href={normalizeLink(activeEntry.link)}
@@ -371,6 +373,7 @@ function absoluteUrl(url?: string | null): string | null {
       return url;
     }
   }
+  if (url.startsWith("/api/files/")) return url;
   const base = CONVEX_HTTP_URL.replace(/\/$/, "");
   if (url.startsWith("/")) return `${base}${url}`;
   return `${base}/${url}`;

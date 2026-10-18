@@ -57,7 +57,7 @@ export function ToolCardGrid({
               >
                 {card.icon}
               </div>
-              {card.comingSoon && (
+              {(card.comingSoon || card.statusLabel) && (
                 <span className="rounded-full bg-primary/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-primary shadow-[0_0_10px_rgba(236,72,153,0.2)]">
                   {card.statusLabel ?? "Coming soon"}
                 </span>

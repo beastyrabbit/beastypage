@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -29,7 +28,6 @@ import {
 import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
-import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
 import { GenericTraitEditors } from "@/lib/cat-builder/GenericTraitEditors";
 import {
@@ -51,6 +49,7 @@ import {
 } from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
+import { useCatCreate } from "@/lib/data/cats";
 import { storeMapperEditToken } from "@/lib/mapperEditToken";
 import type { PaletteMode } from "@/lib/palettes";
 import { getPaletteMetadata } from "@/lib/palettes";
@@ -472,7 +471,7 @@ export function GuidedBuilderClient() {
     new Map(),
   );
 
-  const createMapperRecord = useMutation(api.mapper.create);
+  const createMapperRecord = useCatCreate();
 
   useEffect(() => {
     spriteMapperRef.current = mapper ?? null;

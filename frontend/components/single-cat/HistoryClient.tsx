@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import {
   ArrowUpRight,
   ChevronLeft,
@@ -13,13 +12,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import RightChevron from "@/components/ui/right-chevron";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
 import {
   catViewPayloadToShareSeed,
   normalizeCatViewPayload,
 } from "@/lib/cat-consumers/viewPayload";
 import { encodeCatShare } from "@/lib/catShare";
+import {
+  useAdoptionHistory,
+  useAncestryHistory,
+  useCatHistory,
+} from "@/lib/data/cats";
 import { isEvolutionBatchSettings } from "@/lib/evolution/evolutionGenerator";
 import { HistoryAncestryTreeCard } from "./HistoryAncestryTreeCard";
 
@@ -148,9 +151,9 @@ export function HistoryClient() {
   const previewDialogRef = useRef<HTMLDialogElement>(null);
   const previewCloseRef = useRef<HTMLButtonElement>(null);
 
-  const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
-  const batchesQuery = useQuery(api.adoptionV2.listBatches, { limit: 120 });
-  const treesQuery = useQuery(api.ancestryTree.list, { limit: 50 });
+  const profilesQuery = useCatHistory(200);
+  const batchesQuery = useAdoptionHistory(120);
+  const treesQuery = useAncestryHistory(50);
   const closeFocusedPreview = useCallback(() => setFocusedPreview(null), []);
 
   useEffect(() => {

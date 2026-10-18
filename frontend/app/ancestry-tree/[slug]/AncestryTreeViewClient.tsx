@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import { ArrowUpRight, Loader2, Trees } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,8 +14,8 @@ import ArrowBackIcon from "@/components/ui/arrow-back-icon";
 import LockIcon from "@/components/ui/lock-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
 import { encodeCatShare } from "@/lib/catShare";
+import { useAncestryTree } from "@/lib/data/cats";
 
 interface TreeCat {
   id: string;
@@ -79,10 +78,7 @@ function formatTimestamp(created?: number): string | null {
 export function AncestryTreeViewClient({
   slug,
 }: Readonly<AncestryTreeViewClientProps>) {
-  const record = useQuery(api.ancestryTree.getBySlug, { slug }) as
-    | AncestryTreeRecord
-    | null
-    | undefined;
+  const record = useAncestryTree(slug) as AncestryTreeRecord | null | undefined;
   const [focusedPreview, setFocusedPreview] = useState<{
     label: string;
     url: string;

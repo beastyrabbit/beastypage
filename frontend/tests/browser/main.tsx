@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster } from "sonner";
@@ -8,6 +9,7 @@ import { SaveTreeDialog } from "../../components/ancestry-tree/SaveTreeDialog";
 import { PixelatorClient } from "../../components/pixelator/PixelatorClient";
 import { QuickShareClient } from "../../components/quick-share/QuickShareClient";
 import HostClient from "../../components/streamer/HostClient";
+import { BackendAuthProvider, DataBackendProvider } from "../../lib/data";
 import "../../app/globals.css";
 
 function AncestrySaveFixture() {
@@ -72,9 +74,14 @@ if (view === "pixelator") {
   content = <Collection />;
 }
 
+// The fixtures fake Convex, so they run the app's Convex-mode providers.
 createRoot(document.getElementById("root")!).render(
-  <>
-    <Toaster />
-    {content}
-  </>,
+  <QueryClientProvider client={new QueryClient()}>
+    <DataBackendProvider backend="convex">
+      <BackendAuthProvider>
+        <Toaster />
+        {content}
+      </BackendAuthProvider>
+    </DataBackendProvider>
+  </QueryClientProvider>,
 );
