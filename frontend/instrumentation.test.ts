@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { shouldStartJobs } from "./instrumentation";
 
 describe("job instrumentation startup guard", () => {
-  it("only starts a PostgreSQL worker in the Node runtime", () => {
+  it("only starts a worker for the PostgreSQL backend", () => {
     expect(shouldStartJobs({})).toBe(false);
     expect(
       shouldStartJobs({ NEXT_RUNTIME: "nodejs", DATA_BACKEND: "convex" }),
@@ -24,6 +24,11 @@ describe("job instrumentation startup guard", () => {
     expect(
       shouldStartJobs({ NEXT_RUNTIME: "nodejs", DATA_BACKEND: "postgres" }),
     ).toBe(true);
+  });
+
+  it("starts without a NEXT_RUNTIME environment variable", () => {
+    // The production server only has NEXT_RUNTIME as a build-time constant.
+    expect(shouldStartJobs({ DATA_BACKEND: "postgres" })).toBe(true);
   });
 
   it("does not start a worker in maintenance mode", () => {
