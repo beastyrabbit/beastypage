@@ -143,6 +143,34 @@ describe("catalog jobs against PostgreSQL", () => {
     ).rejects.toThrow("files reference coverage mismatch");
   });
 
+  it("finds the files FKs as a role that owns no tables", async () => {
+    // Production runs jobs as the app role, which owns no tables and so
+    // sees no constraints in information_schema.
+    const job = jobKindRegistry.get("files.orphan-cleanup");
+    const role = `orphan_check_${randomUUID().replaceAll("-", "")}`;
+    const rollback = new Error("rollback");
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.execute(sql.raw(`create role "${role}" nologin`));
+        await tx.execute(sql.raw(`grant usage on schema public to "${role}"`));
+        await tx.execute(
+          sql.raw(
+            `grant select, delete on all tables in schema public to "${role}"`,
+          ),
+        );
+        await tx.execute(sql.raw(`set local role "${role}"`));
+        await job?.handler(
+          {},
+          {
+            ...context("files.orphan-cleanup"),
+            db: tx as unknown as Database,
+          },
+        );
+        throw rollback;
+      }),
+    ).rejects.toBe(rollback);
+  });
+
   it("generates JPEG thumbnails once per cat and keeps the Convex 256px bound", async () => {
     const bytes = await sharp({
       create: {
