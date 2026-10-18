@@ -130,6 +130,18 @@ describe("Quick Share PostgreSQL service", () => {
       status: 200,
       body: { key: `derivatives/${suffix}`, mime: "image/png", size: 4 },
     });
+    const adminRead = await handleQuickShareOperation(
+      db,
+      "adminGet",
+      { uploadId },
+      { tokenIdentifier: "admin" },
+      1_700_000_000_600,
+      { QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS: "admin" },
+    );
+    expect(adminRead.body).toMatchObject({
+      publicKey: `derivatives/${suffix}`,
+      publicMime: "image/png",
+    });
 
     await db
       .delete(quickShareUploads)

@@ -484,3 +484,99 @@ describe("multipart completion", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("moderation previews", () => {
+	const adminUpload = {
+		id: "upload1",
+		slug: "Abcdefg1",
+		source: "file",
+		originalName: "shot.png",
+		originalSize: 4,
+		state: "ready",
+		rawIp: "203.0.113.5",
+		ipHash: "hash",
+		ownerTokenIdentifier: null,
+		originalKey: "originals/upload1",
+		createdAt: 1,
+	};
+
+	async function listPreviews(uploads: unknown[]) {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => controlResponse(uploads)),
+		);
+		const get = vi.fn(async () => ({
+			body: new Blob(["safe"]).stream(),
+			contentLength: 4,
+		}));
+		const { app } = createApp(config, { get } as unknown as ObjectStore);
+		const response = await app.request("/i/api/admin/uploads", {
+			headers: { authorization: "Bearer admin-token" },
+		});
+		const body = (await response.json()) as Array<{
+			previewUrl: string | null;
+		}>;
+		return { app, get, previews: body.map((item) => item.previewUrl) };
+	}
+
+	it("signs previews only for sanitized derivatives and videos", async () => {
+		const { previews } = await listPreviews([
+			{
+				...adminUpload,
+				publicKey: "derivatives/upload1-a.webp",
+				publicMime: "image/webp",
+			},
+			{
+				...adminUpload,
+				id: "upload2",
+				publicKey: "originals/upload2",
+				publicMime: "video/mp4",
+			},
+			{
+				...adminUpload,
+				id: "upload3",
+				publicKey: "originals/upload3",
+				publicMime: "image/png",
+			},
+			{
+				...adminUpload,
+				id: "upload4",
+				state: "removed",
+				publicKey: "derivatives/upload4-a.webp",
+				publicMime: "image/webp",
+			},
+			{ ...adminUpload, id: "upload5", publicMime: null },
+		]);
+		expect(previews[0]).toMatch(
+			/^\/i\/api\/admin\/uploads\/upload1\/preview\?/,
+		);
+		expect(previews[1]).toMatch(
+			/^\/i\/api\/admin\/uploads\/upload2\/preview\?/,
+		);
+		expect(previews.slice(2)).toEqual([null, null, null]);
+	});
+
+	it("serves a signed preview inline and rejects tampering", async () => {
+		const { app, get, previews } = await listPreviews([
+			{
+				...adminUpload,
+				publicKey: "derivatives/upload1-a.webp",
+				publicMime: "image/webp",
+			},
+		]);
+		const url = previews[0] as string;
+		const response = await app.request(url);
+		expect(response.status).toBe(200);
+		expect(response.headers.get("content-type")).toBe("image/webp");
+		expect(response.headers.get("content-disposition")).toBeNull();
+		expect(get).toHaveBeenCalledWith("derivatives/upload1-a.webp", undefined);
+
+		const otherId = url.replace("/upload1/", "/upload9/");
+		expect((await app.request(otherId)).status).toBe(403);
+		const badSignature = url.replace(/signature=[^&]+/, "signature=nope");
+		expect((await app.request(badSignature)).status).toBe(403);
+		const asDownload = url.replace("/preview?", "/original?");
+		expect((await app.request(asDownload)).status).toBe(403);
+		expect(get).toHaveBeenCalledTimes(1);
+	});
+});

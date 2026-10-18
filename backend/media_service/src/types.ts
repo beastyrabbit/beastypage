@@ -71,4 +71,5 @@ export type AdminUpload = UploadStatus & {
 	ipHash: string;
 	ownerTokenIdentifier: string | null;
 	originalKey: string;
+	publicKey?: string | null;
 };
