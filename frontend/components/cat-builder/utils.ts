@@ -1,8 +1,14 @@
 import type { SpriteMapperApi } from "./types";
 
 export function formatName(value: unknown): string {
-  if (value === null || value === undefined) return "None";
   if (typeof value === "number") return `#${value}`;
+  if (
+    typeof value !== "string" &&
+    typeof value !== "boolean" &&
+    typeof value !== "bigint" &&
+    typeof value !== "symbol"
+  )
+    return "None";
   return (
     String(value)
       .replace(/[_-]/g, " ")

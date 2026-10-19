@@ -52,7 +52,14 @@ function cloneJson<T>(value: T): T {
 }
 
 function cleanString(value: unknown): string | undefined {
-  if (value === undefined || value === null) return undefined;
+  if (
+    typeof value !== "string" &&
+    typeof value !== "number" &&
+    typeof value !== "boolean" &&
+    typeof value !== "bigint" &&
+    typeof value !== "symbol"
+  )
+    return undefined;
   const stringValue = String(value).trim();
   return stringValue === "" ? undefined : stringValue;
 }

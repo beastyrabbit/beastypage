@@ -13,6 +13,7 @@ import {
 } from "@/lib/cat-v3/coatPatterns";
 import { buildRegistryRevealSequence } from "@/utils/spinTiming";
 import {
+  cloneParams,
   createStreamSteps,
   getDefaultStreamParams,
   getStepById,
@@ -25,6 +26,32 @@ vi.mock("@/lib/single-cat/spriteMapper", () => ({
     getPeltNames: () => ["SingleColour", "Tabby", "Tortie", "Calico"],
   },
 }));
+
+describe("streamer JSON cloning", () => {
+  it("removes undefined defaults and detaches nested voting state", () => {
+    const params = getDefaultStreamParams();
+    params.tortie = [
+      { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
+    ];
+    const cloned = cloneParams(params);
+    expect(params).toHaveProperty("eyeColour2", undefined);
+    expect(cloned).not.toHaveProperty("eyeColour2");
+    expect(structuredClone(params)).toHaveProperty("eyeColour2", undefined);
+    expect(JSON.stringify(cloned)).toBe(JSON.stringify(params));
+    expect(cloned.tortie).not.toBe(params.tortie);
+    expect(cloned.tortie?.[0]).not.toBe(params.tortie[0]);
+  });
+
+  it("keeps JSON normalization for sparse slot arrays", () => {
+    const slots = new Array(4);
+    slots[0] = "FERN";
+    slots[1] = undefined;
+    slots[3] = null;
+    const params = { slots };
+    expect(cloneParams(params)).toEqual({ slots: ["FERN", null, null, null] });
+    expect(structuredClone(params)).not.toEqual(cloneParams(params));
+  });
+});
 
 describe("streamer voting coat choices", () => {
   it("keeps the existing specialized voting flow unchanged", () => {
