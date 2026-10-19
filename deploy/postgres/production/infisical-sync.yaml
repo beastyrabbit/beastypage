@@ -4,7 +4,6 @@
 #   BEASTYPAGE_DB_OWNER_USERNAME   = beastypage_owner
 #   BEASTYPAGE_DB_OWNER_PASSWORD
 #   BEASTYPAGE_DB_APP_PASSWORD
-#   BEASTYPAGE_DB_IMPORT_PASSWORD
 ---
 apiVersion: secrets.infisical.com/v1beta1
 kind: InfisicalStaticSecret
