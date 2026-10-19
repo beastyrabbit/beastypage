@@ -83,6 +83,20 @@ function boardRowLabelClass(isActive: boolean, isPending: boolean): string {
   return "text-zinc-400";
 }
 
+function getWheelDisplay(wheelReward: WheelRewardState, spread: boolean) {
+  return {
+    showWheelOverlay: wheelReward.status !== "hidden",
+    wheelOverlayOpacity: wheelReward.status === "spinning" ? 1 : 0,
+    // In spread mode the wheel has its own region, so the cat never dims.
+    catCanvasOpacity: !spread && wheelReward.status === "spinning" ? 0.14 : 1,
+    wheelPrizeName:
+      wheelReward.status === "spinning"
+        ? "???"
+        : (wheelReward.prize?.prizeName ?? ""),
+    wheelPrizeColor: wheelReward.prize?.color ?? "var(--obs-accent)",
+  };
+}
+
 function RollerStatus({
   rollerLabel,
   rollerActiveValue,
@@ -169,16 +183,13 @@ export function SpinBoard({
     return map;
   }, [paramRows]);
 
-  const showWheelOverlay = wheelReward.status !== "hidden";
-  const wheelOverlayOpacity = wheelReward.status === "spinning" ? 1 : 0;
-  // In spread mode the wheel has its own region, so the cat never dims.
-  const catCanvasOpacity =
-    !spread && wheelReward.status === "spinning" ? 0.14 : 1;
-  const wheelPrizeName =
-    wheelReward.status === "spinning"
-      ? "???"
-      : (wheelReward.prize?.prizeName ?? "");
-  const wheelPrizeColor = wheelReward.prize?.color ?? "var(--obs-accent)";
+  const {
+    showWheelOverlay,
+    wheelOverlayOpacity,
+    catCanvasOpacity,
+    wheelPrizeName,
+    wheelPrizeColor,
+  } = getWheelDisplay(wheelReward, spread);
 
   // Spread mode gives every element its own separated region (50px gutters,
   // canvas larger than full HD) so each one can be cropped in OBS — see

@@ -764,6 +764,30 @@ export function compositeCountFrame(
   return canvas;
 }
 
+function appendSampledOptions<T>(
+  sampled: T[],
+  values: T[],
+  maxLength: number,
+  slots: number,
+) {
+  if (slots <= 0) return;
+  const step = Math.max(1, Math.floor(values.length / slots));
+  for (
+    let index = 0;
+    index < values.length && sampled.length < maxLength;
+    index += step
+  ) {
+    sampled.push(values[index]);
+  }
+  let fallbackIndex = 0;
+  while (sampled.length < maxLength && fallbackIndex < values.length) {
+    const candidate = values[fallbackIndex++];
+    if (!sampled.includes(candidate)) {
+      sampled.push(candidate);
+    }
+  }
+}
+
 export function buildLayerOptionStrings(
   allValuesInput: string[] | null | undefined,
   target: string | null | undefined,
@@ -783,43 +807,19 @@ export function buildLayerOptionStrings(
     results.push("none");
   }
 
-  const dedup = new Set<string>();
-  for (const value of allValues) {
-    if (!value) continue;
-    if (!dedup.has(value)) {
-      dedup.add(value);
-    }
-  }
+  const dedup = new Set(allValues.filter((value) => Boolean(value)));
 
   const nonTargetValues = Array.from(dedup).filter(
     (value) => value !== normalizedTarget && value !== "none",
   );
   const remainingSlots = Math.max(0, variationLimit - results.length - 1);
 
-  if (remainingSlots > 0) {
-    const step = Math.max(
-      1,
-      Math.floor(nonTargetValues.length / remainingSlots),
-    );
-    for (
-      let index = 0;
-      index < nonTargetValues.length && results.length < variationLimit - 1;
-      index += step
-    ) {
-      results.push(nonTargetValues[index]);
-    }
-
-    let fallbackIndex = 0;
-    while (
-      results.length < variationLimit - 1 &&
-      fallbackIndex < nonTargetValues.length
-    ) {
-      const candidate = nonTargetValues[fallbackIndex++];
-      if (!results.includes(candidate)) {
-        results.push(candidate);
-      }
-    }
-  }
+  appendSampledOptions(
+    results,
+    nonTargetValues,
+    variationLimit - 1,
+    remainingSlots,
+  );
 
   const hasTarget =
     results.includes(normalizedTarget) ||
@@ -930,6 +930,31 @@ export function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
   return formatValue(raw);
 }
 
+function applySpriteValue(params: Partial<CatParams>, value: unknown) {
+  if (typeof value === "string" && !/^-?\d+$/.test(value.trim())) {
+    params.poseName = value;
+  } else {
+    const parsed = coerceSpriteNumber(value);
+    if (parsed !== undefined) {
+      params.spriteNumber = parsed;
+      params.poseName = undefined;
+    }
+  }
+}
+
+function applySlotValue(
+  params: Partial<CatParams>,
+  paramId: "accessory" | "scar",
+  value: unknown,
+  isNoneValue: boolean,
+) {
+  const slotValue =
+    typeof value === "string" && !isNoneValue ? value : undefined;
+  params[paramId] = slotValue;
+  const listKey = paramId === "accessory" ? "accessories" : "scars";
+  params[listKey] = slotValue ? [slotValue] : [];
+}
+
 export function applyParamValue(
   params: Partial<CatParams>,
   paramId: ParamId,
@@ -949,7 +974,11 @@ export function applyParamValue(
       params.eyeColour = value as string;
       break;
     case "eyeColour2":
-      params.eyeColour2 = isNoneValue ? undefined : (value as string);
+    case "whitePatches":
+    case "points":
+    case "whitePatchesTint":
+    case "vitiligo":
+      params[paramId] = isNoneValue ? undefined : (value as string);
       break;
     case "tortie":
       params.isTortie = Boolean(value);
@@ -975,38 +1004,9 @@ export function applyParamValue(
     case "skinColour":
       params.skinColour = value as string;
       break;
-    case "whitePatches":
-      params.whitePatches = isNoneValue ? undefined : (value as string);
-      break;
-    case "points":
-      params.points = isNoneValue ? undefined : (value as string);
-      break;
-    case "whitePatchesTint":
-      params.whitePatchesTint = isNoneValue ? undefined : (value as string);
-      break;
-    case "vitiligo":
-      params.vitiligo = isNoneValue ? undefined : (value as string);
-      break;
-    case "accessory": {
-      const accessoryValue =
-        typeof value === "string" && !isNoneValue ? value : undefined;
-      params.accessory = accessoryValue;
-      if (accessoryValue) {
-        params.accessories = [accessoryValue];
-      } else {
-        params.accessories = [];
-      }
-      break;
-    }
+    case "accessory":
     case "scar": {
-      const scarValue =
-        typeof value === "string" && !isNoneValue ? value : undefined;
-      params.scar = scarValue;
-      if (scarValue) {
-        params.scars = [scarValue];
-      } else {
-        params.scars = [];
-      }
+      applySlotValue(params, paramId, value, isNoneValue);
       break;
     }
     case "shading":
@@ -1016,15 +1016,7 @@ export function applyParamValue(
       params.reverse = value as boolean;
       break;
     case "sprite": {
-      if (typeof value === "string" && !/^-?\d+$/.test(value.trim())) {
-        params.poseName = value;
-      } else {
-        const parsed = coerceSpriteNumber(value);
-        if (parsed !== undefined) {
-          params.spriteNumber = parsed;
-          params.poseName = undefined;
-        }
-      }
+      applySpriteValue(params, value);
       break;
     }
     default: {
@@ -1359,6 +1351,31 @@ export async function buildParameterOptions(
   return options;
 }
 
+function appendFinalOption(
+  sampled: VariationOption[],
+  finalOption: VariationOption,
+  finalKey: string,
+  effectiveLimit: number,
+  optionKey: (option: VariationOption) => string,
+) {
+  if (sampled.length === 0) {
+    sampled.push(finalOption);
+  } else {
+    const hasFinalAlready = sampled.some(
+      (option) => optionKey(option) === finalKey,
+    );
+    if (!hasFinalAlready) {
+      if (sampled.length >= effectiveLimit) {
+        sampled[sampled.length - 1] = finalOption;
+      } else {
+        sampled.push(finalOption);
+      }
+    } else {
+      sampled.push(finalOption);
+    }
+  }
+}
+
 export function sampleValues(
   options: ParameterOptions | null,
   id: ParamId,
@@ -1406,40 +1423,9 @@ export function sampleValues(
   );
 
   const sampled: VariationOption[] = [];
-  if (maxNonTarget > 0) {
-    const step = Math.max(1, Math.floor(nonTarget.length / maxNonTarget));
-    for (
-      let index = 0;
-      index < nonTarget.length && sampled.length < maxNonTarget;
-      index += step
-    ) {
-      sampled.push(nonTarget[index]);
-    }
-    let fallbackIndex = 0;
-    while (sampled.length < maxNonTarget && fallbackIndex < nonTarget.length) {
-      const candidate = nonTarget[fallbackIndex++];
-      if (!sampled.includes(candidate)) {
-        sampled.push(candidate);
-      }
-    }
-  }
+  appendSampledOptions(sampled, nonTarget, maxNonTarget, maxNonTarget);
 
-  if (sampled.length === 0) {
-    sampled.push(finalOption);
-  } else {
-    const hasFinalAlready = sampled.some(
-      (option) => optionKey(option) === finalKey,
-    );
-    if (!hasFinalAlready) {
-      if (sampled.length >= effectiveLimit) {
-        sampled[sampled.length - 1] = finalOption;
-      } else {
-        sampled.push(finalOption);
-      }
-    } else {
-      sampled.push(finalOption);
-    }
-  }
+  appendFinalOption(sampled, finalOption, finalKey, effectiveLimit, optionKey);
 
   const result = sampled.filter((option) => optionKey(option) !== finalKey);
   result.push(finalOption);
