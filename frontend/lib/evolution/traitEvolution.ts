@@ -30,17 +30,6 @@ export type ApplyEvolutionTraitChangesOptions<
   system?: EvolutionSystem;
 };
 
-function cloneJson<T>(value: T): T {
-  if (typeof structuredClone === "function") {
-    try {
-      return structuredClone(value);
-    } catch {
-      // Cat documents are JSON, so the fallback remains lossless here.
-    }
-  }
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJson).join(",")}]`;
@@ -183,7 +172,7 @@ export function applyEvolutionTraitChanges<
   changes,
   system = catSystem,
 }: ApplyEvolutionTraitChangesOptions<TDocument>): TDocument {
-  const next = cloneJson(parent);
+  const next = structuredClone(parent);
   const traits = { ...(next.traits as Record<string, unknown>) };
   const definitionById = new Map(
     system.traits.map((trait) => [trait.id, trait] as const),
@@ -215,7 +204,7 @@ export function applyEvolutionTraitChanges<
     ...next,
     traits,
     unknownTraits: next.unknownTraits
-      ? cloneJson(next.unknownTraits)
+      ? structuredClone(next.unknownTraits)
       : undefined,
   } as TDocument;
 }

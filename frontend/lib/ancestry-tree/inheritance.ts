@@ -31,11 +31,6 @@ interface MutationSelectionOptions {
   random?: () => number;
 }
 
-function clonePortableValue<T>(value: T): T {
-  if (typeof structuredClone === "function") return structuredClone(value);
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
 function wrapListCandidate(
   trait: AnyCatTraitDefinition,
   candidate: unknown,
@@ -59,13 +54,13 @@ function parseMutationCandidate(
   candidate: unknown,
 ): unknown {
   const direct = trait.value.schema.safeParse(candidate);
-  if (direct.success) return clonePortableValue(direct.data);
+  if (direct.success) return structuredClone(direct.data);
 
   const listCandidate = wrapListCandidate(trait, candidate);
   if (listCandidate === undefined) return undefined;
 
   const list = trait.value.schema.safeParse(listCandidate);
-  return list.success ? clonePortableValue(list.data) : undefined;
+  return list.success ? structuredClone(list.data) : undefined;
 }
 
 /**
@@ -117,7 +112,7 @@ export function selectAncestryTraitMutations(
         Object.hasOwn(generatedTraits, trait.id) &&
         generatedTraits[trait.id] !== undefined
       ) {
-        mutations[trait.id] = clonePortableValue(generatedTraits[trait.id]);
+        mutations[trait.id] = structuredClone(generatedTraits[trait.id]);
       }
       continue;
     }
@@ -139,12 +134,12 @@ export function applyGeneticsTraitOverrides(
   inheritedTraits: Readonly<Record<string, unknown>>,
   generatedTraits: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = clonePortableValue({
+  const result: Record<string, unknown> = structuredClone({
     ...inheritedTraits,
   });
   for (const traitId of GENETICS_TRAIT_IDS) {
     if (Object.hasOwn(generatedTraits, traitId)) {
-      result[traitId] = clonePortableValue(generatedTraits[traitId]);
+      result[traitId] = structuredClone(generatedTraits[traitId]);
     } else {
       delete result[traitId];
     }
