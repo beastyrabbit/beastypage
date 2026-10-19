@@ -3,14 +3,7 @@
 import { ArrowUpRight, Download, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
@@ -194,48 +187,6 @@ const layerGroupLabels: Record<string, string> = Object.fromEntries(
     (definition) => [definition.layerKey, definition.groupLabel],
   ),
 );
-
-const DIALOG_FOCUS_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
-
-function handleManagedDialogKeyDown(
-  event: ReactKeyboardEvent<HTMLElement>,
-  closeDialog: () => void,
-) {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeDialog();
-    return;
-  }
-
-  if (event.key !== "Tab") return;
-
-  const focusable = Array.from(
-    event.currentTarget.querySelectorAll<HTMLElement>(DIALOG_FOCUS_SELECTOR),
-  ).filter((element) => element.offsetParent !== null);
-
-  if (focusable.length === 0) {
-    event.preventDefault();
-    event.currentTarget.focus();
-    return;
-  }
-
-  const first = focusable[0];
-  const last = focusable.at(-1)!;
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
-}
 
 function stringifyValue(value: unknown): string {
   if (typeof value === "string") return value;
@@ -924,9 +875,11 @@ export function SingleCatPlusClient({
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
   const spriteGalleryCloseRef = useRef<HTMLButtonElement | null>(null);
+  const spriteGalleryDialogRef = useRef<HTMLDialogElement>(null);
   const spritePreviewTokenRef = useRef(0);
   const timingTriggerRef = useRef<HTMLButtonElement | null>(null);
   const timingCloseRef = useRef<HTMLButtonElement | null>(null);
+  const timingDialogRef = useRef<HTMLDialogElement>(null);
   const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
   const [creatorNameDraft, setCreatorNameDraft] = useState(
@@ -946,30 +899,36 @@ export function SingleCatPlusClient({
 
   useEffect(() => {
     if (!spriteGalleryOpen) return;
+    const dialog = spriteGalleryDialogRef.current;
     const previousFocus =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    dialog?.showModal();
     const focusTimer = window.setTimeout(() => {
       spriteGalleryCloseRef.current?.focus();
     }, 0);
     return () => {
       window.clearTimeout(focusTimer);
+      dialog?.close();
       previousFocus?.focus();
     };
   }, [spriteGalleryOpen]);
 
   useEffect(() => {
     if (!timingModalOpen) return;
+    const dialog = timingDialogRef.current;
     const previousFocus =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    dialog?.showModal();
     const focusTimer = window.setTimeout(() => {
       timingCloseRef.current?.focus();
     }, 0);
     return () => {
       window.clearTimeout(focusTimer);
+      dialog?.close();
       previousFocus?.focus();
     };
   }, [timingModalOpen]);
@@ -3002,65 +2961,77 @@ export function SingleCatPlusClient({
     }
   }, [generateSpritePreviews, spritePreviewLoading, spriteVariations.length]);
 
+  const persistShareMapper = useCallback(
+    async (
+      state: CatState,
+      payload: ReturnType<typeof buildSharePayload>,
+      shareSlug: string | null,
+      legacyEncoded: string | null,
+      origin: string,
+    ) => {
+      try {
+        const result = await createMapper({
+          catData: catDataToLegacyPersistence(
+            shareSlug ? { ...payload, shareSlug } : payload,
+          ),
+          catName: state.catName ?? undefined,
+          creatorName: state.creatorName ?? undefined,
+        });
+        if (result) {
+          const shareToken =
+            (result as { shareToken?: string }).shareToken ??
+            result.slug ??
+            result.id;
+          const url = withOrigin(origin, `/view/${shareToken}`);
+          catStateRef.current = {
+            ...state,
+            profileId: result.id,
+            mapperSlug: shareToken,
+            editToken: result.editToken ?? state.editToken ?? null,
+            legacyEncoded,
+            shareUrl: url,
+            catShareSlug: shareSlug ?? state.catShareSlug ?? null,
+          };
+          setShareLink(url);
+          return url;
+        }
+      } catch (err) {
+        console.warn("Failed to persist share payload to PostgreSQL", err);
+      }
+      return null;
+    },
+    [createMapper],
+  );
+
   const buildShareUrl = useCallback(async () => {
     const state = catStateRef.current;
     if (!state) return null;
     if (state.shareUrl) return state.shareUrl;
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const origin = appOrigin();
 
     let shareSlug: string | null = state.catShareSlug ?? null;
 
     const slugCandidate = state.mapperSlug ?? state.profileId ?? null;
     if (slugCandidate) {
-      const url = origin
-        ? `${origin}/view/${slugCandidate}`
-        : `/view/${slugCandidate}`;
+      const url = withOrigin(origin, `/view/${slugCandidate}`);
       catStateRef.current = { ...state, shareUrl: url };
       setShareLink(url);
       return url;
     }
 
     const payload = buildSharePayload(state);
-    let legacyEncoded = state.legacyEncoded ?? null;
-    if (!legacyEncoded) {
-      try {
-        legacyEncoded = encodeCatShare(payload);
-      } catch (err) {
-        console.warn("Failed to encode share payload", err);
-      }
-    }
-
-    try {
-      const result = await createMapper({
-        catData: catDataToLegacyPersistence(
-          shareSlug ? { ...payload, shareSlug } : payload,
-        ),
-        catName: state.catName ?? undefined,
-        creatorName: state.creatorName ?? undefined,
-      });
-      if (result) {
-        const shareToken =
-          (result as { shareToken?: string }).shareToken ??
-          result.slug ??
-          result.id;
-        const url = origin
-          ? `${origin}/view/${shareToken}`
-          : `/view/${shareToken}`;
-        catStateRef.current = {
-          ...state,
-          profileId: result.id,
-          mapperSlug: shareToken,
-          editToken: result.editToken ?? state.editToken ?? null,
-          legacyEncoded,
-          shareUrl: url,
-          catShareSlug: shareSlug ?? state.catShareSlug ?? null,
-        };
-        setShareLink(url);
-        return url;
-      }
-    } catch (err) {
-      console.warn("Failed to persist share payload to PostgreSQL", err);
-    }
+    const legacyEncoded = encodeLegacyShare(
+      payload,
+      state.legacyEncoded ?? null,
+    );
+    const mapperUrl = await persistShareMapper(
+      state,
+      payload,
+      shareSlug,
+      legacyEncoded,
+      origin,
+    );
+    if (mapperUrl) return mapperUrl;
 
     if (!shareSlug) {
       const shareRecord = await createCatShare({
@@ -3082,9 +3053,7 @@ export function SingleCatPlusClient({
     }
 
     if (shareSlug) {
-      const url = origin
-        ? `${origin}/visual-builder?share=${shareSlug}`
-        : `/visual-builder?share=${shareSlug}`;
+      const url = withOrigin(origin, `/visual-builder?share=${shareSlug}`);
       if (catStateRef.current) {
         catStateRef.current = {
           ...catStateRef.current,
@@ -3099,9 +3068,7 @@ export function SingleCatPlusClient({
     }
 
     if (legacyEncoded) {
-      const url = origin
-        ? `${origin}/view?cat=${legacyEncoded}`
-        : `/view?cat=${legacyEncoded}`;
+      const url = withOrigin(origin, `/view?cat=${legacyEncoded}`);
       catStateRef.current = { ...state, legacyEncoded, shareUrl: url };
       setShareLink(url);
       return url;
@@ -3109,7 +3076,7 @@ export function SingleCatPlusClient({
 
     setError("Unable to build share link right now.");
     return null;
-  }, [createMapper]);
+  }, [persistShareMapper]);
 
   const handleCopyShareLink = useCallback(async () => {
     const url = await buildShareUrl();
@@ -3216,6 +3183,11 @@ export function SingleCatPlusClient({
   const viewerSlug = currentState?.mapperSlug ?? null;
 
   const generationDisabled = initializing || !!initialError;
+  const toastMessage = toast && (
+    <div className="fixed bottom-6 right-6 z-50 rounded-full border border-border/40 bg-background/90 px-4 py-2 text-sm text-foreground shadow-lg shadow-primary/10">
+      {toast}
+    </div>
+  );
 
   return (
     <div className="grid gap-10">
@@ -3755,21 +3727,22 @@ export function SingleCatPlusClient({
       </div>
 
       {spriteGalleryOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              closeSpriteGallery();
-            }
+        <dialog
+          ref={spriteGalleryDialogRef}
+          className="fixed inset-0 z-50 m-0 flex h-full max-h-none w-full max-w-none items-center justify-center border-0 bg-black/80 px-6 py-10 text-inherit backdrop:bg-transparent"
+          onCancel={(event) => {
+            event.preventDefault();
+            closeSpriteGallery();
           }}
-          onKeyDown={(event) =>
-            handleManagedDialogKeyDown(event, closeSpriteGallery)
-          }
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
           aria-labelledby="sprite-gallery-title"
         >
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Close sprite gallery"
+            className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+            onClick={closeSpriteGallery}
+          />
           <div className="relative flex max-h-[85vh] w-full max-w-5xl flex-col rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
             <button
               ref={spriteGalleryCloseRef}
@@ -3868,25 +3841,27 @@ export function SingleCatPlusClient({
               )}
             </div>
           </div>
-        </div>
+          {toastMessage}
+        </dialog>
       )}
 
       {timingModalOpen && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setTimingModalOpen(false);
-            }
+        <dialog
+          ref={timingDialogRef}
+          className="fixed inset-0 z-[70] m-0 flex h-full max-h-none w-full max-w-none items-center justify-center border-0 bg-black/70 px-4 py-10 text-inherit backdrop:bg-transparent"
+          onCancel={(event) => {
+            event.preventDefault();
+            setTimingModalOpen(false);
           }}
-          onKeyDown={(event) =>
-            handleManagedDialogKeyDown(event, () => setTimingModalOpen(false))
-          }
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
           aria-labelledby="spin-timing-title"
         >
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Close timing settings"
+            className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+            onClick={() => setTimingModalOpen(false)}
+          />
           <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
             <button
               ref={timingCloseRef}
@@ -4082,14 +4057,10 @@ export function SingleCatPlusClient({
               </p>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-full border border-border/40 bg-background/90 px-4 py-2 text-sm text-foreground shadow-lg shadow-primary/10">
-          {toast}
-        </div>
-      )}
+      {!spriteGalleryOpen && toastMessage}
     </div>
   );
 }
