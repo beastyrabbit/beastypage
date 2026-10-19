@@ -261,6 +261,49 @@ const DEFAULT_PARAMS: CatParams = {
   whitePatchesTint: "none",
 };
 
+function getAccentsSummary(snapshot: CatParams): string {
+  const parts: string[] = [];
+  if (snapshot.whitePatches)
+    parts.push(`White patches: ${formatName(snapshot.whitePatches)}`);
+  if (snapshot.points)
+    parts.push(`Points: ${formatName(snapshot.points)}`);
+  if (snapshot.vitiligo)
+    parts.push(`Vitiligo: ${formatName(snapshot.vitiligo)}`);
+  return parts.length ? parts.join(" · ") : "No extra markings";
+}
+
+function getSkinTintSummary(snapshot: CatParams): string {
+  const skin = formatName(snapshot.skinColour);
+  const tint =
+    snapshot.tint && snapshot.tint !== "none"
+      ? formatName(snapshot.tint)
+      : "No tint";
+  const whiteTint =
+    snapshot.whitePatchesTint && snapshot.whitePatchesTint !== "none"
+      ? formatName(snapshot.whitePatchesTint)
+      : "No white tint";
+  return `${skin} skin · ${tint} · ${whiteTint}`;
+}
+
+function evaluateTortieLayerStep(
+  stepId: StepId,
+  tortieSource: TortieLayer[],
+): { complete: boolean; summary: string } {
+  const layerMatch = /^tortie-layer-(\d+)$/.exec(stepId);
+  if (layerMatch) {
+    const index = Number(layerMatch[1]) - 1;
+    const layer = index >= 0 ? tortieSource[index] : null;
+    const complete = Boolean(
+      layer?.pattern && layer?.colour && layer?.mask,
+    );
+    const summary = complete
+      ? `${formatName(layer?.pattern)} · ${formatName(layer?.colour)} · ${formatName(layer?.mask)}`
+      : "";
+    return { complete, summary };
+  }
+  return { complete: true, summary: "" };
+}
+
 function getStepNavClass(unlocked: boolean, active: boolean): string {
   if (!unlocked) {
     return "cursor-not-allowed border-slate-900 bg-slate-900/40 text-neutral-500";
@@ -814,31 +857,15 @@ export function GuidedBuilderClient() {
           };
         }
         case "accents": {
-          const parts: string[] = [];
-          if (snapshot.whitePatches)
-            parts.push(`White patches: ${formatName(snapshot.whitePatches)}`);
-          if (snapshot.points)
-            parts.push(`Points: ${formatName(snapshot.points)}`);
-          if (snapshot.vitiligo)
-            parts.push(`Vitiligo: ${formatName(snapshot.vitiligo)}`);
           return {
             complete: true,
-            summary: parts.length ? parts.join(" · ") : "No extra markings",
+            summary: getAccentsSummary(snapshot),
           };
         }
         case "skin-tint": {
-          const skin = formatName(snapshot.skinColour);
-          const tint =
-            snapshot.tint && snapshot.tint !== "none"
-              ? formatName(snapshot.tint)
-              : "No tint";
-          const whiteTint =
-            snapshot.whitePatchesTint && snapshot.whitePatchesTint !== "none"
-              ? formatName(snapshot.whitePatchesTint)
-              : "No white tint";
           return {
             complete: Boolean(snapshot.skinColour),
-            summary: `${skin} skin · ${tint} · ${whiteTint}`,
+            summary: getSkinTintSummary(snapshot),
           };
         }
         case "accessories": {
@@ -888,19 +915,7 @@ export function GuidedBuilderClient() {
           return { complete: true, summary: summary || "Defaults unchanged" };
         }
         default: {
-          const layerMatch = /^tortie-layer-(\d+)$/.exec(stepId);
-          if (layerMatch) {
-            const index = Number(layerMatch[1]) - 1;
-            const layer = index >= 0 ? tortieSource[index] : null;
-            const complete = Boolean(
-              layer?.pattern && layer?.colour && layer?.mask,
-            );
-            const summary = complete
-              ? `${formatName(layer?.pattern)} · ${formatName(layer?.colour)} · ${formatName(layer?.mask)}`
-              : "";
-            return { complete, summary };
-          }
-          return { complete: true, summary: "" };
+          return evaluateTortieLayerStep(stepId, tortieSource);
         }
       }
     },

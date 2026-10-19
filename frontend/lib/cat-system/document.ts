@@ -146,12 +146,24 @@ function normalizeDirectLegacyValue(
   return value;
 }
 
+function normalizeTortieString(value: unknown, fallback: string): string {
+  if (
+    typeof value !== "string" &&
+    typeof value !== "number" &&
+    typeof value !== "boolean" &&
+    typeof value !== "bigint" &&
+    typeof value !== "symbol"
+  )
+    return fallback;
+  return String(value);
+}
+
 function normalizeTortieLayers(params: Record<string, unknown>): unknown[] {
   if (Array.isArray(params.tortie)) {
     return params.tortie.filter(isRecord).map((layer) => ({
-      mask: String(layer.mask ?? "ONE"),
-      pattern: String(layer.pattern ?? "SingleColour"),
-      colour: String(layer.colour ?? "GINGER"),
+      mask: normalizeTortieString(layer.mask, "ONE"),
+      pattern: normalizeTortieString(layer.pattern, "SingleColour"),
+      colour: normalizeTortieString(layer.colour, "GINGER"),
     }));
   }
   if (!params.isTortie) return [];
@@ -160,9 +172,9 @@ function normalizeTortieLayers(params: Record<string, unknown>): unknown[] {
   }
   return [
     {
-      mask: String(params.tortieMask ?? "ONE"),
-      pattern: String(params.tortiePattern ?? "SingleColour"),
-      colour: String(params.tortieColour ?? "GINGER"),
+      mask: normalizeTortieString(params.tortieMask, "ONE"),
+      pattern: normalizeTortieString(params.tortiePattern, "SingleColour"),
+      colour: normalizeTortieString(params.tortieColour, "GINGER"),
     },
   ];
 }

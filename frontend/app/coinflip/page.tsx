@@ -27,8 +27,7 @@ type FlipSide = "heads" | "tails";
 
 type GameState = "ready" | "flipping" | "lost";
 
-type LeaderboardEntry = ScoreRecord;
-type LeaderboardRow = LeaderboardEntry & { placeholder?: boolean };
+type LeaderboardRow = ScoreRecord & { placeholder?: boolean };
 
 const FACE_LABELS: Record<FlipSide, string> = {
   heads: "Heads",

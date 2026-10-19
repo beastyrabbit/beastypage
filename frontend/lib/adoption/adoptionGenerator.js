@@ -1147,38 +1147,7 @@ export class AdoptionGenerator {
 
   applyStageValue(state, stage, value) {
     if (stage.type === "simple") {
-      if (stage.param === "peltName") {
-        applyCoatChoice(state, value);
-        return;
-      }
-      if (stage.param === "whitePatches" && value === "none") {
-        state.whitePatches = "none";
-        return;
-      }
-      if (stage.param === "points" && value === "none") {
-        state.points = "none";
-        return;
-      }
-      if (stage.param === "whitePatchesTint" && value === "none") {
-        state.whitePatchesTint = "none";
-        return;
-      }
-      if (stage.param === "vitiligo" && value === "none") {
-        state.vitiligo = "none";
-        return;
-      }
-      if (stage.param === "eyeColour2" && (!value || value === "none")) {
-        state.eyeColour2 = "none";
-        return;
-      }
-      if (stage.param === "poseName") {
-        state.poseName = value;
-      } else {
-        state[stage.param] = value;
-      }
-      if (stage.traitId && state.document) {
-        state.document = setCatTrait(state.document, stage.traitId, value);
-      }
+      this.applySimpleStageValue(state, stage, value);
       return;
     }
     if (stage.type === "slot") {
@@ -1198,6 +1167,41 @@ export class AdoptionGenerator {
     }
     if (stage.type === "scar") {
       state.scarSlots[stage.slotIndex] = value;
+    }
+  }
+
+  applySimpleStageValue(state, stage, value) {
+    if (stage.param === "peltName") {
+      applyCoatChoice(state, value);
+      return;
+    }
+    if (stage.param === "whitePatches" && value === "none") {
+      state.whitePatches = "none";
+      return;
+    }
+    if (stage.param === "points" && value === "none") {
+      state.points = "none";
+      return;
+    }
+    if (stage.param === "whitePatchesTint" && value === "none") {
+      state.whitePatchesTint = "none";
+      return;
+    }
+    if (stage.param === "vitiligo" && value === "none") {
+      state.vitiligo = "none";
+      return;
+    }
+    if (stage.param === "eyeColour2" && (!value || value === "none")) {
+      state.eyeColour2 = "none";
+      return;
+    }
+    if (stage.param === "poseName") {
+      state.poseName = value;
+    } else {
+      state[stage.param] = value;
+    }
+    if (stage.traitId && state.document) {
+      state.document = setCatTrait(state.document, stage.traitId, value);
     }
   }
 
@@ -1560,42 +1564,51 @@ export class AdoptionGenerator {
       []
     ).filter((item) => item && item !== "none");
 
-    if (layerConfig.accessoryCount > 0 && accessoriesPool.length) {
-      params.accessories = [];
-      for (let i = 0; i < layerConfig.accessoryCount; i++) {
-        const pickValue = pick(accessoriesPool);
-        if (pickValue) {
-          params.accessories.push(pickValue);
-        }
-      }
-      params.accessory = params.accessories[0] || undefined;
-    } else {
-      params.accessories = [];
-      params.accessory = undefined;
-    }
+    params.accessories = this.pickLayerValues(
+      accessoriesPool,
+      layerConfig.accessoryCount,
+      pick,
+    );
+    params.accessory = params.accessories[0] || undefined;
+    params.scars = this.pickLayerValues(scarsPool, layerConfig.scarCount, pick);
+    params.scar = params.scars[0] || undefined;
+    this.ensureTortieDepth(
+      params,
+      layerConfig.tortieCount,
+      tortieMaskPool,
+      tortiePatternPool,
+      tortieColourPool,
+      pick,
+    );
+  }
 
-    if (layerConfig.scarCount > 0 && scarsPool.length) {
-      params.scars = [];
-      for (let i = 0; i < layerConfig.scarCount; i++) {
-        const pickValue = pick(scarsPool);
-        if (pickValue) {
-          params.scars.push(pickValue);
-        }
+  pickLayerValues(pool, count, pick) {
+    const values = [];
+    if (count > 0 && pool.length) {
+      for (let i = 0; i < count; i++) {
+        const value = pick(pool);
+        if (value) values.push(value);
       }
-      params.scar = params.scars[0] || undefined;
-    } else {
-      params.scars = [];
-      params.scar = undefined;
     }
+    return values;
+  }
 
+  ensureTortieDepth(
+    params,
+    count,
+    tortieMaskPool,
+    tortiePatternPool,
+    tortieColourPool,
+    pick,
+  ) {
     if (
-      layerConfig.tortieCount > 0 &&
+      count > 0 &&
       tortieMaskPool.length &&
       tortiePatternPool.length &&
       tortieColourPool.length
     ) {
       params.tortie = [];
-      for (let i = 0; i < layerConfig.tortieCount; i++) {
+      for (let i = 0; i < count; i++) {
         const mask = pick(tortieMaskPool);
         const pattern = pick(tortiePatternPool);
         const colour = pick(tortieColourPool);

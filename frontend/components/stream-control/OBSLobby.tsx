@@ -700,6 +700,28 @@ function FlyingCatSprite({
     let blendStart = 0;
     const spriteW = Math.round(120 * cat.size);
 
+    const computeDvdPose = (t: number, moveK: number): CatPose => {
+      // Position advances incrementally so the cat keeps its course
+      // across mode switches.
+      const d = dvdRef.current;
+      d.px += d.vx * 2 * moveK;
+      d.py += d.vy * 2 * moveK;
+      if (d.px <= 0 || d.px >= 1920 - spriteW) d.vx *= -1;
+      if (d.py <= 0 || d.py >= 1080 - spriteW) d.vy *= -1;
+      d.px = Math.max(0, Math.min(1920 - spriteW, d.px));
+      d.py = Math.max(0, Math.min(1080 - spriteW, d.py));
+      const fadeStart = 1 - 2000 / cat.duration;
+      const opacity = t > fadeStart ? (1 - t) / (1 - fadeStart) : 1;
+      return {
+        x: d.px,
+        y: d.py,
+        scale: 0.85 * cat.size,
+        rotate: 0,
+        flip: false,
+        opacity,
+      };
+    };
+
     const computePose = (
       curMode: LobbyAnimationMode,
       t: number,
@@ -719,25 +741,7 @@ function FlyingCatSprite({
         };
       }
       if (curMode === "dvd") {
-        // Bounce around — position advances incrementally so the cat keeps
-        // its course across mode switches.
-        const d = dvdRef.current;
-        d.px += d.vx * 2 * moveK;
-        d.py += d.vy * 2 * moveK;
-        if (d.px <= 0 || d.px >= 1920 - spriteW) d.vx *= -1;
-        if (d.py <= 0 || d.py >= 1080 - spriteW) d.vy *= -1;
-        d.px = Math.max(0, Math.min(1920 - spriteW, d.px));
-        d.py = Math.max(0, Math.min(1080 - spriteW, d.py));
-        const fadeStart = 1 - 2000 / cat.duration;
-        const opacity = t > fadeStart ? (1 - t) / (1 - fadeStart) : 1;
-        return {
-          x: d.px,
-          y: d.py,
-          scale: 0.85 * cat.size,
-          rotate: 0,
-          flip: false,
-          opacity,
-        };
+        return computeDvdPose(t, moveK);
       }
       if (curMode === "parade") {
         // March across the screen — every cat in its own lane, with its own

@@ -100,6 +100,32 @@ export function AdoptionGeneratorClient() {
   );
   const [includeClassic, setIncludeClassic] = useState(true);
 
+  // The legacy generator toggles these classes. Keep native modal state in sync.
+  useEffect(() => {
+    const dialogs = ["catDetailOverlay", "spriteGalleryOverlay"].map(
+      (id) => document.getElementById(id) as HTMLDialogElement,
+    );
+    const syncDialog = (dialog: HTMLDialogElement) => {
+      if (dialog.classList.contains("open")) {
+        if (!dialog.open) dialog.showModal();
+      } else if (dialog.open) {
+        dialog.close();
+      }
+    };
+    const observer = new MutationObserver(() => dialogs.forEach(syncDialog));
+    for (const dialog of dialogs) {
+      observer.observe(dialog, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+      syncDialog(dialog);
+    }
+    return () => {
+      observer.disconnect();
+      for (const dialog of dialogs.toReversed()) dialog.close();
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof document === "undefined") return;
     const attr = "data-adoption-css";
@@ -525,18 +551,28 @@ export function AdoptionGeneratorClient() {
           </section>
         ) : null}
       </main>
-      <div
+      <dialog
         id="catDetailOverlay"
-        className="cat-detail-overlay"
+        className="cat-detail-overlay backdrop:bg-transparent"
         aria-hidden="true"
+        aria-labelledby="detailTitle"
+        style={{
+          margin: 0,
+          width: "100%",
+          height: "100%",
+          maxWidth: "none",
+          maxHeight: "none",
+          padding: 0,
+          border: 0,
+          background: "transparent",
+          color: "inherit",
+        }}
+        // The legacy Escape listener closes the top overlay. Native cancellation
+        // must not also close the dialog underneath it.
+        onCancel={(event) => event.preventDefault()}
       >
         <div className="overlay-backdrop" data-overlay-close />
-        <div
-          className="overlay-content"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="detailTitle"
-        >
+        <div className="overlay-content">
           <button
             className="overlay-close"
             type="button"
@@ -590,19 +626,27 @@ export function AdoptionGeneratorClient() {
             </div>
           </div>
         </div>
-      </div>
-      <div
+      </dialog>
+      <dialog
         id="spriteGalleryOverlay"
-        className="cat-detail-overlay sprite-gallery-overlay"
+        className="cat-detail-overlay sprite-gallery-overlay backdrop:bg-transparent"
         aria-hidden="true"
+        aria-labelledby="spriteGalleryTitle"
+        style={{
+          margin: 0,
+          width: "100%",
+          height: "100%",
+          maxWidth: "none",
+          maxHeight: "none",
+          padding: 0,
+          border: 0,
+          background: "transparent",
+          color: "inherit",
+        }}
+        onCancel={(event) => event.preventDefault()}
       >
         <div className="overlay-backdrop" data-sprite-gallery-close />
-        <div
-          className="overlay-content"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="spriteGalleryTitle"
-        >
+        <div className="overlay-content">
           <button
             className="overlay-close"
             type="button"
@@ -621,7 +665,7 @@ export function AdoptionGeneratorClient() {
             </div>
           </div>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

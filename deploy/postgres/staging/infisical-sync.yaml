@@ -3,7 +3,7 @@
 # are used by the dump restore, scrub verification and staging frontend.
 # Required key names (never values in Git):
 #   BEASTYPAGE_DB_OWNER_USERNAME, BEASTYPAGE_DB_OWNER_PASSWORD
-#   BEASTYPAGE_DB_APP_PASSWORD, BEASTYPAGE_DB_IMPORT_PASSWORD
+#   BEASTYPAGE_DB_APP_PASSWORD
 ---
 apiVersion: secrets.infisical.com/v1beta1
 kind: InfisicalStaticSecret

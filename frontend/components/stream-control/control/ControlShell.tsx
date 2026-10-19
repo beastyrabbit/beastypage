@@ -87,6 +87,33 @@ function resolveResultAutoClearSeconds(s: Record<string, unknown>): number {
   return 30;
 }
 
+function resolveResultAutoClearEnabled(s: Record<string, unknown>): boolean {
+  if (typeof s.resultAutoClearEnabled === "boolean") {
+    return s.resultAutoClearEnabled;
+  }
+  if (typeof s.autoClearEnabled === "boolean") return s.autoClearEnabled;
+  return (s.autoClearSeconds as number | undefined) !== 0;
+}
+
+function normalizeBrbSettingsCode(storedCode: string): string {
+  const trimmed = storedCode.trim();
+  const normalized = trimmed ? normalizePortableSettingsCode(trimmed) : "";
+  return normalized ?? trimmed;
+}
+
+function attachSpinViewSlug(
+  attach: (args: { seq: number; slug: string }) => Promise<unknown>,
+  spinSeq: unknown,
+  slug: string,
+) {
+  // Best-effort: a newer command may already have replaced the spin.
+  if (typeof spinSeq === "number") {
+    void attach({ seq: spinSeq, slug }).catch((err) => {
+      console.warn("[StreamControl] Failed to attach view slug to spin", err);
+    });
+  }
+}
+
 /** cat_profile payload for a spin (same shape as SingleCatPlus). */
 function buildSpinCatData(params: unknown, slots: SlotSelections | undefined) {
   return {
@@ -410,21 +437,9 @@ export function ControlShell() {
       if (isPaletteDisplayMode(s.paletteDisplayMode))
         setPaletteDisplayMode(s.paletteDisplayMode);
       setResultAutoClearSeconds(resolveResultAutoClearSeconds(s));
-      if (typeof s.resultAutoClearEnabled === "boolean") {
-        setResultAutoClearEnabled(s.resultAutoClearEnabled);
-      } else if (typeof s.autoClearEnabled === "boolean") {
-        setResultAutoClearEnabled(s.autoClearEnabled);
-      } else {
-        setResultAutoClearEnabled(
-          (s.autoClearSeconds as number | undefined) !== 0,
-        );
-      }
+      setResultAutoClearEnabled(resolveResultAutoClearEnabled(s));
       if (typeof s.brbSettingsCode === "string") {
-        const storedCode = s.brbSettingsCode.trim();
-        const normalized = storedCode
-          ? normalizePortableSettingsCode(storedCode)
-          : "";
-        const displayCode = normalized ?? storedCode;
+        const displayCode = normalizeBrbSettingsCode(s.brbSettingsCode);
         // Only touch the draft when the saved code actually changed, so a
         // half-typed draft survives unrelated settings echoes.
         if (displayCode !== brbSettingsCodeRef.current) {
@@ -595,17 +610,7 @@ export function ControlShell() {
         setCatNameDraft("");
         setMetaDirty(false);
         // Stamp the slug onto the live command so the overlay shows the QR.
-        // Best-effort: a newer command may already have replaced the spin.
-        if (typeof spinSeq === "number") {
-          void attachViewSlugMut({ seq: spinSeq, slug: profile.slug }).catch(
-            (err) => {
-              console.warn(
-                "[StreamControl] Failed to attach view slug to spin",
-                err,
-              );
-            },
-          );
-        }
+        attachSpinViewSlug(attachViewSlugMut, spinSeq, profile.slug);
       } catch (err) {
         if (spinRequestSeqRef.current !== requestSeq) return;
         console.error("Failed to save stream history entry", err);

@@ -1159,6 +1159,19 @@ function SubmitModal({
   );
 }
 
+function validateMassUploadEntry(entry: MassUploadEntry): string[] {
+  const trimmedName = entry.catName.trim();
+  const validationErrors: string[] = [];
+  if (!trimmedName) validationErrors.push("Add the cat name.");
+  if (trimmedName && !/^[A-Za-z0-9\s\-_'`]+$/.test(trimmedName)) {
+    validationErrors.push("Cat name contains invalid characters.");
+  }
+  if (!entry.seasonId) validationErrors.push("Choose a season.");
+  if (!entry.rarityId) validationErrors.push("Choose a rarity.");
+  if (!entry.defaultFile) validationErrors.push("Missing default art.");
+  return validationErrors;
+}
+
 function MassUploadModal({
   onClose,
   seasons,
@@ -1254,6 +1267,53 @@ function MassUploadModal({
     });
   };
 
+  const uploadEntry = async (entry: MassUploadEntry): Promise<boolean> => {
+    const trimmedName = entry.catName.trim();
+    const validationErrors = validateMassUploadEntry(entry);
+
+    if (validationErrors.length) {
+      updateEntry(entry.id, (prev) => ({
+        ...prev,
+        status: "error",
+        message: validationErrors.join(" "),
+      }));
+      return false;
+    }
+
+    updateEntry(entry.id, (prev) => ({
+      ...prev,
+      status: "uploading",
+      message: "Uploading…",
+    }));
+
+    try {
+      await onSubmit({
+        seasonId: entry.seasonId,
+        rarityId: entry.rarityId,
+        catName: trimmedName,
+        owner,
+        cardNumber: entry.cardNumber,
+        defaultFile: entry.defaultFile,
+        customFile: entry.customFile,
+      });
+      updateEntry(entry.id, (prev) => ({
+        ...prev,
+        status: "success",
+        message: "Uploaded",
+      }));
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Upload failed.";
+      updateEntry(entry.id, (prev) => ({
+        ...prev,
+        status: "error",
+        message,
+      }));
+      return false;
+    }
+  };
+
   const handleMassSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!owner.trim()) {
@@ -1271,57 +1331,10 @@ function MassUploadModal({
     let failed = 0;
 
     for (const entry of entries) {
-      const trimmedName = entry.catName.trim();
-      const validationErrors: string[] = [];
-      if (!trimmedName) validationErrors.push("Add the cat name.");
-      if (trimmedName && !/^[A-Za-z0-9\s\-_'`]+$/.test(trimmedName)) {
-        validationErrors.push("Cat name contains invalid characters.");
-      }
-      if (!entry.seasonId) validationErrors.push("Choose a season.");
-      if (!entry.rarityId) validationErrors.push("Choose a rarity.");
-      if (!entry.defaultFile) validationErrors.push("Missing default art.");
-
-      if (validationErrors.length) {
-        failed += 1;
-        updateEntry(entry.id, (prev) => ({
-          ...prev,
-          status: "error",
-          message: validationErrors.join(" "),
-        }));
-        continue;
-      }
-
-      updateEntry(entry.id, (prev) => ({
-        ...prev,
-        status: "uploading",
-        message: "Uploading…",
-      }));
-
-      try {
-        await onSubmit({
-          seasonId: entry.seasonId,
-          rarityId: entry.rarityId,
-          catName: trimmedName,
-          owner,
-          cardNumber: entry.cardNumber,
-          defaultFile: entry.defaultFile,
-          customFile: entry.customFile,
-        });
+      if (await uploadEntry(entry)) {
         success += 1;
-        updateEntry(entry.id, (prev) => ({
-          ...prev,
-          status: "success",
-          message: "Uploaded",
-        }));
-      } catch (error) {
+      } else {
         failed += 1;
-        const message =
-          error instanceof Error ? error.message : "Upload failed.";
-        updateEntry(entry.id, (prev) => ({
-          ...prev,
-          status: "error",
-          message,
-        }));
       }
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import XIcon from "@/components/ui/x-icon";
 import type { CatParams } from "@/lib/cat-v3/types";
@@ -99,6 +99,19 @@ export function FoundingCoupleSelector({
   const [selectedMother, setSelectedMother] = useState<HistoryCat | null>(null);
   const [selectedFather, setSelectedFather] = useState<HistoryCat | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    closeButtonRef.current?.focus();
+    return () => {
+      dialog?.close();
+      previousFocus?.focus();
+    };
+  }, []);
 
   // Query only single cat profiles (not batches or trees)
   const profilesQuery = useCatHistory(200);
@@ -187,33 +200,32 @@ export function FoundingCoupleSelector({
   const isLoading = profilesQuery === undefined;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      role="button"
-      tabIndex={0}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-        if (
-          (event.key === "Enter" || event.key === " ") &&
-          event.target === event.currentTarget
-        ) {
-          event.preventDefault();
-          onClose();
-        }
+    <dialog
+      ref={dialogRef}
+      className="fixed inset-0 z-50 m-0 flex h-full max-h-none w-full max-w-none items-center justify-center border-0 bg-black/60 p-4 text-inherit backdrop-blur-sm backdrop:bg-transparent"
+      aria-labelledby="founding-couple-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
       }}
     >
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close founding couple selector"
+        className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+        onClick={onClose}
+      />
       <div className="glass-card relative max-h-[90vh] w-full max-w-3xl overflow-hidden flex flex-col">
         <div className="flex items-center justify-between border-b border-white/10 p-4">
-          <h2 className="text-xl font-bold">Select Founding Couple</h2>
+          <h2 id="founding-couple-title" className="text-xl font-bold">
+            Select Founding Couple
+          </h2>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
+            aria-label="Close founding couple selector"
             className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
           >
             <XIcon size={20} />
@@ -361,6 +373,6 @@ export function FoundingCoupleSelector({
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

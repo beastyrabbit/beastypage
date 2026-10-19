@@ -13,11 +13,34 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("@/components/ui/x-icon", () => ({ default: () => null }));
 
-afterEach(() => vi.unstubAllGlobals());
+const dialogMethods = Object.fromEntries(
+  ["showModal", "close"].map((method) => [
+    method,
+    Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, method),
+  ]),
+);
+afterEach(() => {
+  vi.unstubAllGlobals();
+  for (const [method, descriptor] of Object.entries(dialogMethods)) {
+    if (descriptor)
+      Object.defineProperty(HTMLDialogElement.prototype, method, descriptor);
+    else Reflect.deleteProperty(HTMLDialogElement.prototype, method);
+  }
+});
 
-it("announces a modal, traps keyboard focus, and restores focus after Escape", async () => {
+it("opens a named native modal and restores focus after cancellation", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("React", React);
+  const showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true;
+  });
+  const closeModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false;
+  });
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: { configurable: true, value: showModal },
+    close: { configurable: true, value: closeModal },
+  });
   const cat: EvolutionTreeCat = {
     key: "kit",
     label: "Kit",
@@ -44,38 +67,23 @@ it("announces a modal, traps keyboard focus, and restores focus after Escape", a
     preview.focus();
     await act(async () => preview.click());
 
-    const dialog = container.querySelector<HTMLElement>('[role="dialog"]');
+    const dialog = container.querySelector<HTMLDialogElement>("dialog");
     if (!dialog) throw new Error("Missing preview dialog");
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(showModal).toHaveBeenCalledOnce();
+    expect(dialog.open).toBe(true);
     expect(
       document.getElementById(dialog.getAttribute("aria-labelledby") ?? "")
         ?.textContent,
     ).toBe("Kit");
-    const close = dialog.querySelector<HTMLButtonElement>("button");
-    const link = dialog.querySelector<HTMLAnchorElement>("a");
-    expect(document.activeElement).toBe(close);
-    await act(async () =>
-      window.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "Tab",
-          shiftKey: true,
-          cancelable: true,
-        }),
-      ),
-    );
-    expect(document.activeElement).toBe(link);
-    await act(async () =>
-      window.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Tab", cancelable: true }),
-      ),
+    const close = dialog.querySelector<HTMLButtonElement>(
+      "button:not([tabindex='-1'])",
     );
     expect(document.activeElement).toBe(close);
     await act(async () =>
-      window.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Escape", cancelable: true }),
-      ),
+      dialog.dispatchEvent(new Event("cancel", { cancelable: true })),
     );
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector("dialog")).toBeNull();
+    expect(closeModal).toHaveBeenCalledOnce();
     expect(document.activeElement).toBe(preview);
   } finally {
     await act(async () => root.unmount());

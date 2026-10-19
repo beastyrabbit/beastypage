@@ -44,26 +44,6 @@ type EvolutionTreeProps = {
   animateIn?: boolean;
 };
 
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
-  if (event.key !== "Tab" || !container) return;
-  const focusable = Array.from(
-    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-  );
-  if (focusable.length === 0) return;
-  const first = focusable[0];
-  const last = focusable.at(-1)!;
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
-}
-
 export function EvolutionTree({
   cats,
   animateIn = false,
@@ -383,41 +363,39 @@ function CatDetailModal({
     cat.additions,
     `${cat.key}-modal`,
   );
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = `${cat.key}-preview-title`;
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.showModal();
     closeButtonRef.current?.focus();
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      trapDialogFocus(event, dialogRef.current);
-    };
-    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      dialog?.close();
       previousFocus?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-8 sm:px-6">
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      className="fixed inset-0 z-50 m-0 flex h-full max-h-none w-full max-w-none items-center justify-center border-0 bg-black/80 px-4 py-8 text-inherit backdrop:bg-transparent sm:px-6"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
       <button
         type="button"
+        tabIndex={-1}
         aria-label="Close preview"
-        className="absolute inset-0 cursor-default"
+        className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
         onClick={onClose}
       />
       <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
         className="relative flex max-h-full w-full max-w-3xl flex-col gap-5 overflow-y-auto rounded-2xl border bg-slate-950/95 p-6 shadow-2xl sm:p-8"
         style={{ borderColor: withAlpha(theme.from, 0.4) }}
       >
@@ -488,6 +466,6 @@ function CatDetailModal({
           </Link>
         ) : null}
       </div>
-    </div>
+    </dialog>
   );
 }

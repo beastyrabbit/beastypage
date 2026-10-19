@@ -38,20 +38,23 @@ export function ColorSwatch({
   }, []);
 
   return (
-    <div
-      className={`group relative cursor-pointer overflow-hidden rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg ${
+    <fieldset
+      className={`group relative min-w-0 cursor-pointer overflow-hidden rounded-xl border-0 p-0 transition-all duration-200 hover:scale-105 hover:shadow-lg ${
         isSelected
           ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
           : ""
       }`}
       onMouseEnter={() => onHover(index)}
       onMouseLeave={() => onHover(null)}
-      onClick={() => onSelect(index)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && onSelect(index)}
-      aria-label={`Color ${index + 1}: ${color.hex}`}
+      aria-label={`Color ${index + 1}`}
     >
+      <button
+        type="button"
+        className="absolute inset-0 z-10 w-full cursor-pointer rounded-xl border-0 bg-transparent p-0 text-inherit"
+        onClick={() => onSelect(index)}
+        aria-label={`Color ${index + 1}: ${color.hex}`}
+        aria-pressed={isSelected}
+      />
       {/* Color preview */}
       <div
         className="flex h-24 flex-col items-center justify-center p-2"
@@ -77,7 +80,7 @@ export function ColorSwatch({
             e.stopPropagation();
             copyToClipboard(color.hex, "HEX");
           }}
-          className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-primary/10"
+          className="relative z-20 flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-primary/10"
         >
           <span className="font-mono font-semibold">
             {color.hex.toUpperCase()}
@@ -92,7 +95,7 @@ export function ColorSwatch({
             e.stopPropagation();
             copyToClipboard(rgbToCss(color.rgb), "RGB");
           }}
-          className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+          className="relative z-20 flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
         >
           <span className="font-mono">
             {color.rgb.r}, {color.rgb.g}, {color.rgb.b}
@@ -107,7 +110,7 @@ export function ColorSwatch({
             e.stopPropagation();
             copyToClipboard(hslToCss(color.hsl), "HSL");
           }}
-          className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+          className="relative z-20 flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
         >
           <span className="font-mono">
             {color.hsl.h}°, {color.hsl.s}%, {color.hsl.l}%
@@ -118,10 +121,10 @@ export function ColorSwatch({
 
       {/* Selected indicator */}
       {isSelected && (
-        <div className="absolute right-2 top-2 rounded-full bg-primary p-1">
+        <div className="pointer-events-none absolute right-2 top-2 rounded-full bg-primary p-1">
           <CheckedIcon size={12} className="text-primary-foreground" />
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }

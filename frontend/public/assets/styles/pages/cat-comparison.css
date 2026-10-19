@@ -149,8 +149,8 @@ body {
   padding: 10px 20px;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.08),
-    rgba(255, 255, 255, 0.04)
+    #2d2d30,
+    #252528
   );
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 12px;
@@ -168,8 +168,8 @@ body {
 .reset-button {
   background: linear-gradient(
     180deg,
-    rgba(239, 68, 68, 0.15),
-    rgba(239, 68, 68, 0.08)
+    #382027,
+    #281820
   );
   border-color: rgba(239, 68, 68, 0.3);
   color: #f87171;
@@ -317,7 +317,7 @@ body {
   width: 100%;
   padding: 14px 24px;
   background: linear-gradient(180deg, var(--purple), #b8860b);
-  color: white;
+  color: #171717;
   border: none;
   border-radius: 12px;
   font-size: 1.05em;
@@ -339,7 +339,8 @@ body {
 }
 
 .cat-a .choose-button {
-  background: linear-gradient(180deg, var(--blue), #2563eb);
+  background: linear-gradient(180deg, #245fe4, #1d4ed8);
+  color: #ffffff;
   box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
 }
 
@@ -516,7 +517,7 @@ body {
   left: 50%;
   transform: translateX(-50%) translateY(100px);
   background: linear-gradient(45deg, var(--purple), #ffd700);
-  color: white;
+  color: #171717;
   padding: 14px 28px;
   border-radius: 8px;
   font-weight: 500;

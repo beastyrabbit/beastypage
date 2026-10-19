@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   catDataToLegacyPersistence,
   catDocumentToLegacyParams,
@@ -25,6 +25,83 @@ const legacyCat = {
 };
 
 describe("CatDocument", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([false, true])(
+    "preserves JSON document and persistence roundtrips with structuredClone unavailable: %s",
+    (withoutStructuredClone) => {
+      if (withoutStructuredClone) vi.stubGlobal("structuredClone", undefined);
+      const params = {
+        ...legacyCat,
+        future: { label: "Mäuse 🐈", nested: [null, true, 3] },
+        tortie: [{ mask: "ONE", pattern: "SingleColour", colour: "GINGER" }],
+      };
+      const stored = JSON.stringify(decodeCatDocumentLegacy(params));
+      const restored = decodeCatDocumentLegacy(JSON.parse(stored));
+      expect(JSON.stringify(restored)).toBe(stored);
+      const persisted = catParamsToLegacyPersistence(params);
+      expect(persisted).toEqual(params);
+      expect(persisted.future).not.toBe(params.future);
+      expect(catDocumentToLegacyParams(restored)).toMatchObject(params);
+    },
+  );
+
+  it("keeps the JSON fallback for non-cloneable persistence metadata", () => {
+    const params = { ...legacyCat, transient: () => "not persisted" };
+    expect(() => structuredClone(params)).toThrow();
+    expect(catParamsToLegacyPersistence(params)).toEqual(legacyCat);
+  });
+
+  describe.each([false, true])("legacy tortie fields, flat: %s", (flat) => {
+    type TortieFields = {
+      mask: unknown;
+      pattern: unknown;
+      colour: unknown;
+    };
+    function readTortie(fields: TortieFields) {
+      const params = flat
+        ? {
+            isTortie: true,
+            tortieMask: fields.mask,
+            tortiePattern: fields.pattern,
+            tortieColour: fields.colour,
+          }
+        : { tortie: [fields] };
+      return decodeCatDocumentLegacy({ ...legacyCat, ...params }).traits.tortie;
+    }
+
+    it("preserves valid scalar fields", () => {
+      const fields = {
+        mask: "ONE",
+        pattern: "SingleColour",
+        colour: "BLACK",
+      };
+      expect(readTortie(fields)).toEqual([fields]);
+    });
+
+    const malformedFields: TortieFields[] = [
+      { mask: ["TWO"], pattern: ["Tabby"], colour: ["BLACK"] },
+      { mask: {}, pattern: {}, colour: {} },
+      {
+        mask: {
+          toString: () => {
+            throw new Error("Must not coerce objects");
+          },
+        },
+        pattern: null,
+        colour: undefined,
+      },
+    ];
+    it.each(malformedFields)(
+      "uses existing defaults for malformed fields: %j",
+      (fields) => {
+        expect(readTortie(fields)).toEqual([
+          { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
+        ]);
+      },
+    );
+  });
+
   it("imports legacy params and writes a strict canonical document", () => {
     const document = decodeCatDocumentLegacy(legacyCat);
 

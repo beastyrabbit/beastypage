@@ -291,19 +291,19 @@ body.stream-page--host {
 }
 
 .stream-badge.live {
-  background: rgba(52, 211, 153, 0.18);
+  background: #153d3e;
   border-color: rgba(16, 185, 129, 0.45);
   color: #bbf7d0;
 }
 
 .stream-badge.completed {
-  background: rgba(248, 113, 113, 0.18);
+  background: #392735;
   border-color: rgba(248, 113, 113, 0.4);
   color: #fecaca;
 }
 
 .stream-badge.testing {
-  background: rgba(250, 204, 21, 0.18);
+  background: #393824;
   border-color: rgba(250, 204, 21, 0.4);
   color: #facc15;
 }
@@ -468,8 +468,8 @@ body.stream-page--host {
 }
 
 .vote-option-card.disabled-option .score-pill {
-  background: rgba(148, 163, 184, 0.25);
-  color: rgba(226, 232, 240, 0.55);
+  background: #202735;
+  color: #e2e8f0;
 }
 
 .vote-option-card.disabled {
@@ -530,7 +530,7 @@ body.stream-page--host {
 }
 
 .vote-action--disable {
-  background: linear-gradient(135deg, #f87171, #ef4444);
+  background: linear-gradient(135deg, #c03939, #b91c1c);
   color: #fff5f5;
   box-shadow: 0 6px 16px rgba(239, 68, 68, 0.35);
 }
@@ -541,7 +541,7 @@ body.stream-page--host {
 }
 
 .vote-action--enable {
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #e8f1ff;
   box-shadow: 0 6px 16px rgba(96, 165, 250, 0.32);
 }
@@ -833,7 +833,7 @@ body.stream-page--host {
   padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid rgba(248, 113, 113, 0.4);
-  background: rgba(248, 113, 113, 0.15);
+  background: #322536;
   color: #fecaca;
   font-size: 14px;
 }

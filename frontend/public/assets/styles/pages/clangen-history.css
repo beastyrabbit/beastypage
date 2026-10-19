@@ -112,7 +112,7 @@ body {
   display: inline-block;
   padding: 6px 12px;
   background: linear-gradient(135deg, var(--purple), #d4af37);
-  color: white;
+  color: #171717;
   text-decoration: none;
   border-radius: 6px;
   font-size: 13px;
@@ -262,7 +262,7 @@ body {
 .primary-button {
   padding: 14px 32px;
   background: linear-gradient(180deg, var(--purple), #b8860b);
-  color: white;
+  color: #171717;
   border: none;
   border-radius: 12px;
   font-size: 16px;
@@ -553,7 +553,7 @@ body {
 .reset-button {
   width: 100%;
   padding: 10px;
-  background: rgba(239, 68, 68, 0.15);
+  background: #382027;
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 8px;
   color: #f87171;
@@ -687,7 +687,7 @@ body {
 }
 
 .stream-note {
-  background: rgba(251, 191, 36, 0.1);
+  background: #2b271b;
   border: 1px solid rgba(251, 191, 36, 0.3);
   border-radius: 12px;
   padding: 16px;
@@ -1313,7 +1313,7 @@ body {
   left: 50%;
   transform: translateX(-50%) translateY(100px);
   background: linear-gradient(45deg, var(--purple), #d4af37);
-  color: white;
+  color: #171717;
   padding: 14px 28px;
   border-radius: 8px;
   font-weight: 500;

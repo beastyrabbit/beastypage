@@ -204,7 +204,7 @@ export function AncestryTreeClient({
   );
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<TreeOrientation>("vertical");
-  const [_currentMainId, setCurrentMainId] = useState<string | null>(null);
+  const currentMainIdRef = useRef<string | null>(null);
   const [isEditingRelations, setIsEditingRelations] = useState(false);
   const [chartRedrawKey, setChartRedrawKey] = useState(0);
   const familyChartRef = useRef<FamilyChartTreeRef>(null);
@@ -617,7 +617,7 @@ export function AncestryTreeClient({
 
   // Handle mainId changes from the chart
   const handleMainIdChange = useCallback((mainId: string | null) => {
-    setCurrentMainId(mainId);
+    currentMainIdRef.current = mainId;
   }, []);
 
   // Handle edit mode changes from the chart (e.g., when clicking a different card cancels edit mode)
@@ -647,7 +647,7 @@ export function AncestryTreeClient({
   // Handle show full graph button click - forces complete chart redraw
   const handleShowFullGraph = useCallback(() => {
     // Reset to root cat and force chart recreation
-    setCurrentMainId(tree?.foundingMotherId ?? null);
+    currentMainIdRef.current = tree?.foundingMotherId ?? null;
     setChartRedrawKey((k) => k + 1);
   }, [tree?.foundingMotherId]);
 

@@ -1081,7 +1081,7 @@ body {
   left: 50%;
   transform: translateX(-50%) translateY(100px);
   background: linear-gradient(45deg, var(--purple), #d4af37);
-  color: white;
+  color: #171717;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 500;
@@ -1098,7 +1098,8 @@ body {
 
 /* Error variant */
 .toast.error {
-  background: linear-gradient(45deg, #ef4444, #dc2626);
+  background: linear-gradient(45deg, #dc2626, #b91c1c);
+  color: #ffffff;
   box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
 }
 
