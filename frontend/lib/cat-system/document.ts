@@ -399,6 +399,7 @@ export function readCatDocument(
 ): CatDocument {
   if (!isRecord(input)) throw new Error("Cat document must be an object");
   if (!isRecord(input.traits)) {
+    if (options.strict) return legacyParamsToCatDocument(input);
     const source = resolveLegacySource(input);
     const repaired = {
       ...source,

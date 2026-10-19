@@ -13,6 +13,12 @@ const duplicate = { colour: "GINGER", pattern: "SingleColour", mask: "ONE" };
 const tortie = [first, second, duplicate];
 
 describe("stored duplicate tortie layers", () => {
+  it("rejects duplicate legacy layers at the exported strict writer boundary", () => {
+    expect(() =>
+      parseCatDocumentStrict({ spriteNumber: 8, isTortie: true, tortie }),
+    ).toThrow(/Duplicate list item/);
+  });
+
   it.each(["params", "document"])(
     "never persists duplicate share slots supplied with %s",
     (source) => {
