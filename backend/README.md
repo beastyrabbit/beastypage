@@ -26,4 +26,4 @@ pnpm media:check
 pnpm image-processing:check
 ```
 
-GitHub and Forgejo container workflows remain in the repository. Each publication job requires its applicable validation job to succeed. Production deployment requires separate approval.
+The GitHub Actions container workflow publishes images only after its applicable validation job succeeds. Production deployment requires separate approval.

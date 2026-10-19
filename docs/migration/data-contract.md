@@ -1,5 +1,9 @@
 # Target data contract (Convex → PostgreSQL)
 
+> [!NOTE]
+> This procedure was completed on 2026-10-18 and is kept as the historical
+> record.
+
 This contract covers issues #107 (types for `v.any()` fields) and #109
 (table model).
 
@@ -72,9 +76,8 @@ This contract covers issues #107 (types for `v.any()` fields) and #109
 The importer writes a versioned validation report (`CONTRACT_VERSION`). For
 each field it counts records that are valid, repaired, quarantined or
 rejected. The only repairs are the ID rewrites and moving `imageStorageId`
-into its column. **The 22 fields are only proven against real data once the
-#106 export has been validated. Until then the contracts are verified
-against code-derived fixtures.**
+into its column. **The 22 fields were proven against real data when the #106
+export was validated.**
 
 Known test-fixture issue: `convex/review-boundaries.test.ts` and
 `convex/catStream.test.ts` write `catData: {}`. That passes, because every

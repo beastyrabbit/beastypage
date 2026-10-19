@@ -2,7 +2,7 @@
 
 How to run, migrate, back up and restore the BeastyPage database. The
 decisions behind this page are in [ADR 0001](adr-0001-postgresql.md).
-Convex stays production until the approved cutover (#116).
+The PostgreSQL cutover completed on 2026-10-18.
 
 ## Local development (one database per worktree)
 
@@ -21,16 +21,12 @@ pnpm --dir frontend run db:local destroy --yes   # delete container and volume
   near `54000 + hash`, and the password is random.
 - The settings go to `frontend/.env.database.local`: mode 0600, gitignored,
   never committed. Database scripts and tests read it whenever
-  `DATABASE_URL` is unset. The Next.js server never falls back to it.
+  `DATABASE_URL` is unset. The Next.js server does not read this file when
+  `DATABASE_URL` is unset.
 - To pin the port, set `DATABASE_LOCAL_PORT` before the first `up`.
 - `test:db` creates `beastypage_test_<random>` next to your database,
   migrates it with the production runner and drops it afterwards. Your own
   data is never touched.
-
-Worktree shortcut: `pnpm` in a fresh worktree re-runs the `prepare` script
-(`convex codegen`), which fails without Convex credentials. Call the binaries
-directly, for example `./node_modules/.bin/tsx scripts/db/migrate.ts` inside
-`frontend/`.
 
 ## Schema changes
 
@@ -49,11 +45,10 @@ directly, for example `./node_modules/.bin/tsx scripts/db/migrate.ts` inside
 ## CI
 
 The `database` job in `.github/workflows/validate.yml` runs on
-`arc-beastypage` with a `postgres:18.6-alpine` service container. It checks
-that the Convex inventory is current and that there is no schema drift,
-applies the migrations twice (the second run must be a no-op), checks schema
-compatibility, and runs `test:db`. No secrets are involved. The database
-password is a throwaway value for an ephemeral container.
+`arc-beastypage` with a `postgres:18.6-alpine` service container. It runs
+`db:drift`, applies `db:migrate` twice so the second run must be a no-op, runs
+`db:migrate --status`, and runs `test:db`. The database password is a
+throwaway value for an ephemeral container.
 
 ## How the migration runner fails safely
 
@@ -66,18 +61,15 @@ password is a throwaway value for an ephemeral container.
 - Verifies afterwards that the number of applied migrations equals the
   build's `SCHEMA_VERSION`, and records `version`, `compatible_from` and
   `app_version` in `beastypage_schema_version`.
-- The application checks the same row at startup
-  (`server/db/schema-version.ts`). The readiness probe
-  `/api/health/database` is gated on `DATA_BACKEND=postgres`; it returns a
-  clear 503 without opening a pool while Convex is selected. Once PostgreSQL
-  is selected it fails, and pods stay out of rotation, when
-  `db.version < SCHEMA_VERSION` or `SCHEMA_VERSION < db.compatible_from`.
+- The database health route reads the same schema-version row using
+  `server/db/schema-version.ts`. `/api/health/database` returns 503 when
+  `DATABASE_URL` is missing, the database is unreachable, or the schema is
+  incompatible. It returns 200 only when `checkCompatibility` succeeds for
+  the application schema and its `compatible_from` floor.
 - After migrations, the same owner-held run applies idempotent grants. It
   grants `beastypage_app` schema/table/sequence DML and default privileges.
   The role name is configurable with
-  `DATABASE_APP_ROLE` and a missing local role is logged and skipped. When
-  present, `beastypage_import` receives the same DML and `TRUNCATE` plus
-  sequence privileges so `import:convex --replace` can empty its tables.
+  `DATABASE_APP_ROLE` and a missing local role is logged and skipped.
   `server/db/pool.ts` and the live-event listener set `statement_timeout`,
   `lock_timeout` and `idle_in_transaction_session_timeout` on each
   application connection. Role-level settings are optional; only a superuser
@@ -98,8 +90,8 @@ password is a throwaway value for an ephemeral container.
 | Isolation | Clerk development instance. No Discord bot token. Its own Quick Share bucket. Egress to production hosts blocked by NetworkPolicy. |
 | Owner | The maintainer, who also deletes the scrubbed archive copies when staging is torn down. |
 
-Follow the exact [staging scrub procedure](staging.md) before restoring any
-archive into this namespace.
+The one-time staging scrub procedure was completed before the migration and is
+kept in the historical cutover record.
 
 Staging has one CNPG instance. Its cold volume-snapshot procedure therefore
 fences the only instance for the duration of a snapshot; use it for the timed
@@ -118,8 +110,7 @@ explicit approval.** Nothing in this repository applies them.
 - Roles:
   - `beastypage_owner`: bootstrap owner, used for migrations.
   - `beastypage_app`: DML only, connection limit 30.
-  - `beastypage_import`: `login: false` except during a rehearsal or the
-    cutover.
+  - `beastypage_import` is unused and pending removal from the cluster.
 - The migration runner applies these grants as the owner after every schema
   migration (the SQL is shown here for operator verification):
 
@@ -139,27 +130,6 @@ explicit approval.** Nothing in this repository applies them.
   the necessary authority; that optional setting is outside the owner-run
   grant step.
 
-- The import role needs the additional truncate privilege while its login is
-  enabled for a rehearsal or cutover:
-
-  ```sql
-  grant usage on schema public to beastypage_import;
-  grant select, insert, update, delete, truncate on all tables in schema public to beastypage_import;
-  grant usage, select on all sequences in schema public to beastypage_import;
-  ```
-
-  PostgreSQL permits `TRUNCATE` only to a table owner or a role with that
-  explicit table privilege; the importer role is therefore never assumed to
-  inherit it from DML grants.
-
-- `beastypage_import` is `login: false` in the CNPG template. For a rehearsal
-  or the cutover window, submit the normal kub-homelab Flux change that sets
-  its managed role to `login: true`, wait for the secret sync, and inject the
-  generated `DATABASE_IMPORT_URL` into the operator environment. After the
-  import and verification, submit the corresponding Flux change back to
-  `login: false` and wait for reconciliation. Do not toggle the role with a
-  direct `kubectl` command; kub-homelab owns that state.
-
 - TLS: CNPG issues the server certificate. Clients use
   `sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt`, with the
   certificate mounted from the `beastypage-postgres-ca` secret. CNPG's
@@ -176,20 +146,20 @@ explicit approval.** Nothing in this repository applies them.
 | Item | Target / setting |
 | --- | --- |
 | Backup method | CNPG `ScheduledBackup`, `method: volumeSnapshot`, class `longhorn-cnpg-backup`, cold (`online: false`), target `prefer-standby` (copied to Garage) |
-| Frequency | Every 6 hours, plus a manual backup before every contract migration and before the cutover |
-| Retention | 7 days of scheduled backups (homelab `cnpg-backup-prune`); manual backups are kept until deleted by hand |
+| Frequency | Every 6 hours, plus a manual backup before every contract migration or other planned schema-risk operation |
+| Retention | 7 days of scheduled backups maintained by the homelab backup-prune job; manual backups are kept until deleted by hand |
 | RPO | ≤ 6 hours (no WAL archiving, so no point-in-time recovery) |
 | RTO | ≤ 1 hour, including image bytes in `files` |
-| What one restore covers | Everything in PostgreSQL, image bytes included. Quick Share object bytes are in S3 and have their own retention; the restored metadata is reconciled against S3 with `quick-share:reconcile` (#110/#111). |
+| What one restore covers | Everything in PostgreSQL, image bytes included. Quick Share object bytes are in S3 and have their own retention; operators reconcile restored metadata against S3 as part of the Quick Share restore procedure. |
 
-Manual backup (for example before cutover):
+Manual backup (for example before a contract migration):
 
 ```bash
 # A cold snapshot fences the chosen standby. With synchronous `ANY 1` and
 # `dataDurability: required`, both standbys must be healthy first; otherwise a
 # cold backup can pause primary commits while the snapshot runs.
 kubectl -n webpage cnpg status beastypage-postgres
-BACKUP_NAME="beastypage-postgres-pre-cutover-$(date -u +%Y%m%dT%H%MZ)"
+BACKUP_NAME="beastypage-postgres-pre-migration-$(date -u +%Y%m%dT%H%MZ)"
 kubectl -n webpage cnpg backup beastypage-postgres --method volumeSnapshot \
   --online=false --backup-target prefer-standby \
   --backup-name "$BACKUP_NAME"
@@ -241,10 +211,9 @@ platform's reviewed orphaning procedure before proceeding.
 
 Restore is two reviewed Flux phases because CNPG evaluates `bootstrap` only
 when a Cluster is created, and one Flux change cannot delete and recreate the
-same Cluster name. Keep the frontend in maintenance and leave Convex paused
-throughout.
+same Cluster name. Keep the frontend in maintenance throughout.
 
-1. **Phase 1 — remove only the Cluster.** Submit a reviewed kub-homelab Flux
+1. **Phase 1: remove only the Cluster.** Submit a reviewed kub-homelab Flux
    change that removes the `beastypage-postgres` `Cluster` from the desired
    state. Leave `ScheduledBackup` and every `Backup` declaration untouched.
    The production template keeps `Cluster` and `ScheduledBackup` as separate
@@ -252,13 +221,13 @@ throughout.
    Flux, then confirm the Cluster and its PVCs are gone and the chosen Backup
    and its VolumeSnapshot still exist. Preserve either object through the
    platform's reviewed orphaning procedure if owner references would cascade.
-2. **Phase 2 — add the recovery Cluster.** Submit the complete production
+2. **Phase 2: add the recovery Cluster.** Submit the complete production
    `Cluster` manifest with `bootstrap.recovery.backup.name` set to the chosen
    Backup, reconcile Flux, and wait for `beastypage-postgres` to be `Ready`.
    Confirm the generated `beastypage-postgres-ca` secret contains `ca.crt`.
-3. Run `db:migrate --status` against the unchanged
+3. Run `pnpm --dir frontend run db:migrate --status` against the unchanged
    `beastypage-postgres-rw.webpage.svc` service, then run the verification
-   queries in the cutover runbook: row counts, file hashes and relationships.
+   queries in the restore runbook: row counts, file hashes and relationships.
 4. Restart the frontend so its `/etc/postgres-ca/ca.crt` projected volume and
    TLS connection use the replacement cluster. Do not edit the Infisical URL
    targets: they already point at the original service and are Flux-owned.
@@ -272,7 +241,7 @@ throughout.
 Restore test status:
 
 - [ ] Staging restore rehearsed and timed (#108 / #116 gate)
-- [ ] Production restore drill after cutover
+- [ ] Production restore drill
 
 If the measured restore misses the RTO, or a 6-hour RPO is not acceptable,
 add the CNPG Barman Cloud plugin with WAL archiving to Garage for

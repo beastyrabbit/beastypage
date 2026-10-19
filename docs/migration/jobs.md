@@ -1,14 +1,16 @@
 # PostgreSQL jobs
 
-The PostgreSQL `jobs` table replaces Convex schedulers and crons. The worker
-starts from `frontend/instrumentation.ts` when `DATA_BACKEND=postgres` and
-`JOBS_ENABLED` is not `0`. Convex remains the default backend, so the worker is
-inactive in the normal development and build paths.
+The `jobs` table stores asynchronous work. The worker is started from
+`frontend/instrumentation.ts` when the server runs on Node, is not in the
+production build phase, maintenance mode is off, and `JOBS_ENABLED` is not
+`"0"`. There is no backend switch. Set `JOBS_ENABLED=0` to disable the worker
+without changing the application routes.
 
 ## Adding a kind
 
-Create `frontend/server/jobs/kinds/<name>.ts` with a Zod object payload schema,
-a handler, a maximum attempt count, and a lease length. A handler receives the
+Create a module under `frontend/server/jobs/kinds/` with a Zod object payload
+schema, a handler, a maximum attempt count, and a lease length. A handler
+receives the
 validated payload and `{ db, jobId, kind, attempt, signal }`; return a small
 object of numeric counts for the run history. Add the definition to the array
 in `frontend/server/jobs/kinds/index.ts`.
@@ -17,9 +19,9 @@ Enqueue from the caller's Drizzle transaction:
 
 ```ts
 await enqueueJob(tx, {
-  kind: "example.work",
-  dedupeKey: `record:${recordId}`,
-  payload: { recordId },
+  kind: "catdex.thumbnail",
+  dedupeKey: catId,
+  payload: { id: catId, attempt: 1 },
   runAfter: new Date(Date.now() + 30_000),
 });
 ```
@@ -49,9 +51,9 @@ and removes `job_runs` older than 30 days.
 ## Operations
 
 `GET /api/internal/jobs/status` reports counts by kind and status, dead jobs
-with their last error, and the most recent run history. It requires a Clerk
-identity whose unchanged Convex-format token identifier (`issuer|subject`) is
-listed in `QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS`; comparisons are constant-time.
+with their last error, and the most recent run history. It requires an admin
+Clerk identity whose token identifier in `issuer|subject` form is listed in
+`QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS`; comparisons are constant-time.
 
 Set `JOBS_ENABLED=0` to stop workers without changing application data routes.
 Expired leases are recovered every ten minutes. A retry uses exponential

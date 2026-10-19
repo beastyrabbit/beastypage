@@ -1,34 +1,81 @@
-# Renderer Service (CatGenerator V3 backend)
+# Renderer service
 
-FastAPI service that reproduces the Lifegen sprite renderer for CatGenerator V3. It loads the canonical atlases from `frontend/public/sprites` in a checkout and exposes an API for rendering and inspecting layer diagnostics.
+FastAPI service that reproduces the Lifegen sprite renderer for CatGenerator V3. It loads canonical atlases and sprite metadata, then exposes endpoints for rendering cats and inspecting layer diagnostics.
 
 ## Project layout
 
 ```
 backend/renderer_service/
-├── pyproject.toml      # uv project metadata (uv is the Python package manager)
-├── README.md
+├── .dockerignore                         # Files excluded from the Docker build context
+├── CHANGELOG.md                           # Renderer release history
+├── Dockerfile                             # Two-stage image build with the canonical sprite assets
+├── README.md                              # This document
+├── lifegen/                               # Vendored Lifegen package
+│   ├── __init__.py                        # Vendored Lifegen package marker
+│   └── scripts.py                         # Imports lifegen_fullgen.scripts for package setup
+├── lifegen_bootstrap.py                   # Initializes pygame and Lifegen sprite/data environment variables
+├── package.json                            # Local renderer start scripts
+├── pyproject.toml                          # uv project metadata and Python dependencies
+├── pytest.ini                              # pytest test-path configuration
 ├── renderer_service/
-│   ├── __init__.py
-│   ├── assets.py       # sprite root discovery utilities
-│   ├── config.py       # pydantic-settings backed configuration
-│   ├── models.py       # request/response contracts
+│   ├── __init__.py                         # CatGenerator V3 renderer service package exports
 │   ├── app/
-│   │   ├── __init__.py
-│   │   └── main.py     # FastAPI application factory & routes
-│   └── renderer/
-│       ├── __init__.py
-│       ├── repository.py   # atlas loader + caching
-│       ├── v3_renderer.py  # compositor stages and blending
-│       └── pipeline.py     # API response and batch wrapper
-├── sprites/                # bundled Lifegen atlases (PNG)
-├── renderer_service/data/  # spritesIndex.json + spritesOffsetMap.json
-└── tests/
+│   │   ├── __init__.py                     # FastAPI factory, queue supervisor, middleware, and routes
+│   │   └── main.py                         # ASGI application export
+│   ├── assets.py                            # Sprite-root validation helper
+│   ├── config.py                            # Pydantic settings and CG3_ environment configuration
+│   ├── data/                                # Local renderer data root and palette directory
+│   │   └── palettes/                        # Experimental colour palette JSON files
+│   ├── game.py                              # Minimal Lifegen game settings and generation configuration
+│   ├── generated/
+│   │   ├── bundle-integrity.json            # Generated asset and artifact digest manifest
+│   │   ├── cat-document.schema.json         # Generated cat document JSON Schema
+│   │   ├── catalog-hash.txt                 # Generated catalog hash
+│   │   ├── compatibility.json               # Generated legacy trait compatibility manifest
+│   │   ├── public-cat-catalog.json          # Generated public catalog
+│   │   ├── render-plan.json                 # Generated ordered render operations and catalog
+│   │   └── render-strategies.manifest.json  # Generated render-strategy versions and schemas
+│   ├── models.py                            # Pydantic request, response, and render-budget models
+│   ├── render_contract.py                   # Generated render-strategy manifest checker
+│   ├── renderer/
+│   │   ├── __init__.py                      # Lazy renderer pipeline export
+│   │   ├── coat_patterns.py                 # Pose-aware coat markings from source pelt sprites
+│   │   ├── colors.py                         # Lifegen colour-name to RGBA mappings
+│   │   ├── contracts.py                      # Render-plan and cat-document contract models
+│   │   ├── document_schema.py                # Validator for the generated cat document schema
+│   │   ├── executor.py                       # Render-plan loading, validation, and execution
+│   │   ├── image_ops.py                      # RGBA, blend, mask, tint, and transparency operations
+│   │   ├── integrity.py                      # Generated bundle and asset integrity checks
+│   │   ├── legacy_adapter.py                 # Legacy parameter to cat-document compatibility adapter
+│   │   ├── patterns.py                       # Textile pattern tile generation and caching
+│   │   ├── pipeline.py                       # API response and batch-render wrapper
+│   │   ├── repository.py                     # Lifegen atlas loader and in-memory sprite caches
+│   │   ├── sprite_mapper.py                  # Cat-generation parameter to atlas-sprite mapping
+│   │   ├── strategies.py                     # Render strategy implementations and registry setup
+│   │   ├── strategy_registry.py               # Versioned render strategy registry and execution context
+│   │   └── v3_renderer.py                    # CatGenerator V3 composition stages
+│   └── resources.py                          # JSON file loader
+├── sprites/                                  # Fallback Lifegen sprite atlases
+├── tests/
+│   ├── fixtures/
+│   │   └── reference_cat.json                # Reference cat render request
+│   ├── test_accessory_mapping.py             # Accessory atlas mapping tests
+│   ├── test_coat_patterns.py                 # Coat-pattern and validation tests
+│   ├── test_render_contract.py               # Generated contract and API contract tests
+│   ├── test_render_smoke.py                  # Renderer and endpoint smoke tests
+│   ├── test_review_regressions.py            # Request-limit and review regression tests
+│   ├── test_sonar_complexity_regressions.py  # Renderer complexity regression tests
+│   └── test_workflow_gates.py                # Publication workflow dependency tests
+└── uv.lock                                   # Locked Python dependency versions
 ```
+
+The renderer prefers `frontend/public/sprites` and `frontend/public/sprite-data` in a checkout. It falls back to the service's `sprites/` and `renderer_service/data/` paths. The generated files under `renderer_service/generated/` are loaded when the service verifies and executes the render plan.
+
+Pattern tiles and atlas data use in-memory caches. The service does not cache completed render results.
 
 ## Implemented pipeline
 
-The backend renderer composes cats in this order:
+The generated render plan and `v3_renderer.py` compose cats in this order:
 
 1. Base pelt and tortie layers
 2. Derived coat pattern, with tortie layers recomposed above it
@@ -38,116 +85,62 @@ The backend renderer composes cats in this order:
 6. Vitiligo overlays
 7. Eyes and heterochromia overlays
 8. Primary scars
-9. Shading (multiply)
+9. Shading with multiply blending
 10. Lighting
-11. Dark Forest tint (multiply)
-12. Lineart (regular, dead, or Dark Forest)
+11. Dark Forest tint with multiply blending
+12. Lineart, using regular, dead, or Dark Forest sprites
 13. Skin tones
 14. Missing-part scars
-15. Accessories (collars, plant, and wild atlases)
+15. Accessories from the generated catalog
+16. Horizontal reversal when `reverse` is enabled
 
-Horizontal reversal is applied after composition so every recorded stage and
-the final canvas stay aligned.
-
-Every stage records diagnostics and (optionally) returns intermediate canvases when `collectLayers=true`.
+Each operation can record diagnostics and an intermediate image when `collectLayers=true`.
 
 ## Running locally
 
+From the repository root, use the configured Portless command:
+
+```sh
+pnpm dev:renderer
+```
+
+This command runs `.venv/bin/python -m uvicorn renderer_service.app.main:app` with reload enabled, exposes the application on port 8001, and registers it as `renderer.beastypage` through Portless. The Portless URL is printed by the command.
+
+For a direct service run:
+
 ```sh
 cd backend/renderer_service
-uv sync                                   # install dependencies once
+uv sync
 uv run uvicorn renderer_service.app.main:app --reload --host 127.0.0.1 --port 8001
 ```
 
-* Sprite discovery prefers `frontend/public/sprites`, then the bundled `sprites/` directory. Override with `CG3_SPRITE_ROOT`. Sprite and atlas caches are in memory. There is no render-result or disk cache.
-* `/health` returns a liveness probe plus queue metrics (`queue_size`, `circuit_open`, etc.). `/render` accepts Cat Generator V3 JSON payloads.
+The service reads these `CG3_` settings from `.env` or the environment:
 
-### Runtime observability
+| Variable | Meaning |
+| --- | --- |
+| `CG3_SPRITE_ROOT` | Sprite atlas directory override |
+| `CG3_DATA_ROOT` | Canonical sprite metadata directory override |
+| `CG3_DEFAULT_CANVAS_SIZE` | Render canvas size, between 32 and 200 pixels |
+| `CG3_MAX_QUEUE_SIZE` | Maximum queued render jobs |
+| `CG3_WORKER_COUNT` | Number of render workers |
+| `CG3_CIRCUIT_FAILURE_THRESHOLD` | Consecutive failures required to open the circuit |
+| `CG3_CIRCUIT_RESET_SECONDS` | Circuit reset interval |
+| `CG3_ALLOWED_ORIGINS` | Comma-separated CORS origins |
 
-The renderer throttles work using a bounded queue and a small worker pool. Key environment variables (`CG3_*`) you can tune:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CG3_MAX_QUEUE_SIZE` | `120` | Maximum number of enqueued render jobs before new requests receive HTTP 503. |
-| `CG3_WORKER_COUNT` | `4` | Number of background workers servicing the queue. |
-| `CG3_CIRCUIT_FAILURE_THRESHOLD` | `8` | Consecutive failures before the circuit breaker trips. |
-| `CG3_CIRCUIT_RESET_SECONDS` | `12` | Cooldown window before the circuit closes automatically. |
-
-Probe `/health` (or expose it through your reverse proxy) to let your process supervisor or load balancer watch the queue:
+`CAT_SYSTEM_CATALOG_HASH` optionally checks the generated catalog hash during application startup. The health endpoint is `GET /health`; rendering uses `POST /render` and `POST /render/batch`, and palette metadata uses `GET /palettes`.
 
 ```sh
 curl -s http://localhost:8001/health | jq
 ```
 
-When the queue approaches capacity or the circuit opens, FastAPI logs (`renderer.queue` logger) emit warnings that surface in your container/process logs.
-
-### During frontend development
-
-Use `pnpm dev` from the repository root for the configured full stack, or run the renderer separately with `pnpm dev:renderer`.
-`pnpm --dir frontend dev` starts only Next.js. See the [root setup guide](../../README.md).
+The request body limit is 2 MiB. Batch requests allow at most 256 frames and a 16 million pixel working budget. Batch tile sizes are limited to 1024 pixels. `expandVariants=true` is rejected because callers must send explicit variants.
 
 ## Testing
 
 ```sh
 uv run --project backend/renderer_service --frozen --extra dev pytest backend/renderer_service/tests
+uv run --project backend/renderer_service python -m renderer_service.render_contract --check
 pnpm --dir frontend exec vitest run --project renderer
 ```
 
-The frontend integration project owns an ephemeral-port renderer and verifies its catalog and manifest hashes. Unit tests do not start Python. No shared listener or lock file is reused.
-
-## Request limits and options
-
-Batches accept at most 256 total frames, tiles up to 1024 pixels, and a 16 million pixel working budget including sheet padding, source copies, and layer extraction. Validation runs before queue admission.
-Only PNG HTTP output is supported. `collectLayers` returns layers, `includeLayerImages` embeds their PNGs, and `diagnostics=false` suppresses per-layer notes and timing. Batch `params` merge over the base, then `overrides` win. Omitted values retain the base; empty lists and false explicitly clear traits.
-`expandVariants=true` is rejected. Callers must send explicit variants.
-
-## Deployment
-
-Run the API directly with `uv` / `uvicorn`:
-
-```sh
-uv run uvicorn renderer_service.app.main:app --host 0.0.0.0 --port 8001
-```
-
-Adjust the host/port or process supervisor configuration to match your production environment.
-
-### Quick load test recipe
-
-Use [k6](https://k6.io/) (or a similar tool such as `hey`) to validate queue behaviour before pushing to production:
-
-```sh
-# k6 example (10 s ramp up to 40 virtual users)
-k6 run scripts/render-load-test.js
-```
-
-Create `scripts/render-load-test.js` with a minimal payload:
-
-```js
-import http from 'k6/http';
-import { sleep } from 'k6';
-
-export const options = {
-  stages: [
-    { duration: '10s', target: 40 },
-    { duration: '20s', target: 40 },
-    { duration: '10s', target: 0 },
-  ],
-};
-
-export default function () {
-  const payload = JSON.stringify({
-    payload: { spriteNumber: 8, params: { colour: 'WHITE', peltName: 'SingleColour' } },
-    options: { collectLayers: false },
-  });
-  http.post('http://localhost:8001/render', payload, { headers: { 'Content-Type': 'application/json' } });
-  sleep(0.2);
-}
-```
-
-Monitor `/health` while the test runs to tune queue/worker settings and confirm the circuit breaker only trips once saturation is sustained.
-
-## TODO / Next steps
-
-- Tune Dark Forest tint to match the original palette export.
-- Expand accessory lookup for small-animal / insect atlases and seasonal packs.
-- Add caching/batching for repeated renders when the API is exercised in bulk.
+The renderer container listens on port 8001. Its Dockerfile copies the canonical frontend sprite atlases and sprite-data JSON files into the image and starts `uvicorn renderer_service.app.main:app`.

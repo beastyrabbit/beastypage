@@ -5,11 +5,15 @@ using the project ID, domain, environment, and path recorded in `package.json`.
 Use those scripts (`pnpm dev`, `pnpm dev:frontend`, `pnpm dev:media`, and related
 commands) instead of relying on an unqualified Infisical profile.
 
-The frontend uses PostgreSQL through Drizzle. Start a local PostgreSQL instance
-and configure `DATABASE_URL` plus the runtime values from the Infisical paths
+The frontend uses PostgreSQL through Drizzle. Run
+`pnpm --dir frontend run db:local up` to start the per-worktree PostgreSQL
+instance and write `frontend/.env.database.local` with its connection settings.
+The database scripts and tests read that file; the frontend process needs
+`DATABASE_URL` and its runtime values from the Infisical paths
 `/kubernetes/webpage/beastypage-postgres` and
-`/kubernetes/webpage/beastypage-frontend-runtime-config`. Run the frontend's
-Drizzle migrations before starting application routes that read the database.
+`/kubernetes/webpage/beastypage-frontend-runtime-config` in its environment.
+Run the frontend's Drizzle migrations before starting application routes that
+read the database.
 
 The renderer's virtual environment is ignored at `backend/renderer_service/.venv/`;
 `pnpm dev:renderer` expects its Uvicorn executable there and starts the app on

@@ -5,8 +5,6 @@
 
 A pixel-cat gacha site with generators, animated wheels, adoption tools, and a searchable Catdex.
 
-A pixel cat gacha platform featuring generators, wheels, and collection tools built with ClanGen sprites.
-
 ## Features
 
 - **Cat Generator** - Generate random pixel cats with customizable traits, accessories, tortie coats, and 20 derived coat patterns across gacha, builders, adoption, evolution, ancestry, streams, and Discord
@@ -60,6 +58,8 @@ runtime values come from Infisical paths
 ### Frontend only
 
 ```bash
+pnpm --dir frontend run db:local up
+pnpm --dir frontend run db:migrate
 pnpm --dir frontend dev
 ```
 
@@ -114,30 +114,35 @@ beastypage/
 │   ├── image_processing_service/
 │   ├── media_service/      # Quick Share media worker
 │   └── renderer_service/   # FastAPI cat renderer
+├── deploy/                 # PostgreSQL CNPG and Infisical sync templates
+├── docs/                   # Development, operations, migration and rollout docs
 ├── scripts/                 # Sprite import tooling
-└── .forgejo/workflows/     # Build and release pipelines
+└── .github/workflows/      # build-images.yml, validate.yml, sonarqube.yml
 ```
 
-See [review remediation and rollout notes](docs/review-remediation.md) for the new service credential, compatibility requirements, limits, and verification commands.
+Each backend service directory has its own README with run commands and environment variables.
 
 Additional operational notes:
 
 - [Stream overlay architecture and timing](docs/stream-overlays.md)
 - [Local development notes](docs/local-development.md)
+- [PostgreSQL operations](docs/migration/operations.md)
+- [PostgreSQL architecture decision record](docs/migration/adr-0001-postgresql.md)
+- [PostgreSQL migration record](docs/migration/status.md)
 - [Runtime TypeScript constraints](docs/runtime-typescript.md)
 - [Release verification](docs/release-verification.md)
 
 ## Container Images
 
-GitHub Actions builds GHCR images on `main` and version-tag pushes. The Forgejo workflow and registry path are retained for the migration; repository files alone do not establish whether that runner is active. Both paths gate publication on validation. A pull request runs validation only.
+GitHub Actions builds and publishes GHCR images from `.github/workflows/build-images.yml`. Version-tag pushes such as `v8.1.0` receive `X.Y.Z` and `X.Y` semver tags, main pushes receive `latest` and a commit SHA tag, and manual runs can receive a smoke tag. Publication jobs require their applicable validation checks to succeed. Pull requests run validation only.
 
-The retained Forgejo image names are:
+The published image names are:
 
-- `git.heerlab.com/beasty/beastypage-frontend`
-- `git.heerlab.com/beasty/beastypage-renderer`
-- `git.heerlab.com/beasty/beastypage-image-processing`
-- `git.heerlab.com/beasty/beastypage-media`
-- `git.heerlab.com/beasty/beastypage-discord-bot`
+- `ghcr.io/beastyrabbit/beastypage-frontend`
+- `ghcr.io/beastyrabbit/beastypage-renderer`
+- `ghcr.io/beastyrabbit/beastypage-image-processing`
+- `ghcr.io/beastyrabbit/beastypage-media`
+- `ghcr.io/beastyrabbit/beastypage-discord-bot`
 
 ### Cat-system release cutover
 
@@ -161,8 +166,15 @@ The frontend image connects to the PostgreSQL-backed API configured by its runti
 
 ```bash
 docker run -p 3000:3000 \
-  git.heerlab.com/beasty/beastypage-frontend:latest
+  -e DATABASE_URL=postgresql://user:password@db.example.com:5432/beastypage \
+  -e NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_replace_me \
+  -e CLERK_SECRET_KEY=sk_live_replace_me \
+  ghcr.io/beastyrabbit/beastypage-frontend:8.1.0
 ```
+
+The image includes the bundled migration runner at `/app/scripts/db/migrate.mjs`.
+The production Helm template invokes it as `node scripts/db/migrate.mjs` in an
+init container before starting the frontend container.
 
 ### Kubernetes Deployment
 
@@ -177,7 +189,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: git.heerlab.com/beasty/beastypage-frontend:latest
+          image: ghcr.io/beastyrabbit/beastypage-frontend:8.1.0
           env:
             - name: DATABASE_URL
               valueFrom:

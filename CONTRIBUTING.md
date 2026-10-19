@@ -21,12 +21,25 @@ Thank you for your interest in contributing! This document provides guidelines f
    ```
 3. Install dependencies:
    ```bash
-   cd frontend
-   pnpm install --ignore-scripts
+   pnpm install --frozen-lockfile
+   pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+   pnpm --dir backend/media_service install --frozen-lockfile
+   npm --prefix backend/discord-bot ci
+   pnpm --dir backend/image_processing_service install --frozen-lockfile
+   (cd backend/renderer_service && uv sync --frozen --extra dev)
+   lefthook install
    ```
 4. Start the development server:
    ```bash
-   pnpm run dev
+   pnpm dev
+   ```
+
+   For a frontend-only setup, start the per-worktree PostgreSQL database and
+   then run the frontend:
+   ```bash
+   pnpm --dir frontend run db:local up
+   pnpm --dir frontend run db:migrate
+   pnpm --dir frontend dev
    ```
 
    The frontend uses PostgreSQL through Drizzle. Database migrations are applied
