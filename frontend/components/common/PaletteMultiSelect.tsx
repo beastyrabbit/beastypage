@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import CheckedIcon from "@/components/ui/checked-icon";
 import DownChevron from "@/components/ui/down-chevron";
@@ -64,8 +71,10 @@ export function PaletteMultiSelect({
   });
 
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const dropdownId = useId();
 
   // Filter options by search
   const filteredOptions = useMemo(() => {
@@ -101,8 +110,8 @@ export function PaletteMultiSelect({
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
       if (
-        buttonRef.current &&
-        !buttonRef.current.contains(target) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(target) &&
         dropdownRef.current &&
         !dropdownRef.current.contains(target)
       ) {
@@ -113,6 +122,19 @@ export function PaletteMultiSelect({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setIsOpen(false);
+      setSearch("");
+      buttonRef.current?.focus();
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen]);
 
   const toggleOption = useCallback(
     (id: PaletteId) => {
@@ -144,6 +166,7 @@ export function PaletteMultiSelect({
       const newSelected = new Set(selected);
       newSelected.delete(id);
       onChange(newSelected);
+      buttonRef.current?.focus();
     },
     [selected, onChange],
   );
@@ -164,13 +187,20 @@ export function PaletteMultiSelect({
   return (
     <>
       {/* Trigger button */}
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/70 px-3 py-2 text-left text-sm transition hover:border-border ${className}`}
+      <div
+        ref={triggerRef}
+        className={`relative flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/70 px-3 py-2 text-left text-sm transition hover:border-border ${className}`}
       >
-        <div className="flex flex-1 flex-wrap items-center gap-1.5">
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-label={`Select palettes: ${displayText}`}
+          aria-expanded={isOpen}
+          aria-controls={isOpen ? dropdownId : undefined}
+          className="absolute inset-0 w-full rounded-lg border-0 bg-transparent p-0 text-inherit"
+        />
+        <div className="pointer-events-none relative flex flex-1 flex-wrap items-center gap-1.5">
           <PaintIcon size={16} className="text-muted-foreground" />
           {compact ? (
             <span className="text-foreground">{displayText}</span>
@@ -193,22 +223,14 @@ export function PaletteMultiSelect({
                           className="flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-foreground"
                         >
                           {opt?.label ?? id}
-                          <span
-                            role="button"
-                            tabIndex={0}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${opt?.label ?? id} palette`}
                             onClick={(e) => removeOption(id, e)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                removeOption(
-                                  id,
-                                  e as unknown as React.MouseEvent,
-                                );
-                              }
-                            }}
-                            className="cursor-pointer rounded-full hover:bg-primary/30"
+                            className="pointer-events-auto cursor-pointer rounded-full border-0 bg-transparent p-0 text-inherit hover:bg-primary/30"
                           >
                             <XIcon size={12} />
-                          </span>
+                          </button>
                         </span>
                       );
                     })}
@@ -229,15 +251,16 @@ export function PaletteMultiSelect({
         </div>
         <DownChevron
           size={16}
-          className={`shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`pointer-events-none shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
-      </button>
+      </div>
 
       {/* Dropdown via portal */}
       {isOpen &&
         createPortal(
           <div
             ref={dropdownRef}
+            id={dropdownId}
             className="fixed overflow-hidden rounded-lg border border-border/50 bg-card shadow-xl"
             style={{
               top: dropdownPosition.top,

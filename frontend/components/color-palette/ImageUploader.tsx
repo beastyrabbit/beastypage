@@ -126,8 +126,9 @@ export function ImageUploader({
   return (
     <div className="flex flex-col gap-6">
       {/* Drop zone */}
-      <div
-        className={`glass-card relative flex min-h-[320px] cursor-pointer flex-col items-center justify-center gap-4 p-8 transition-all duration-300 ${
+      <button
+        type="button"
+        className={`glass-card relative flex min-h-[320px] w-full cursor-pointer flex-col items-center justify-center gap-4 p-8 text-left text-inherit transition-all duration-300 ${
           isDragging
             ? "border-primary bg-primary/10 scale-[1.02]"
             : "hover:border-primary/50"
@@ -136,19 +137,16 @@ export function ImageUploader({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={handleClick}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === "Enter" && handleClick()}
         aria-label="Upload image"
       >
         {isLoading ? (
-          <div className="flex flex-col items-center gap-3">
+          <span className="flex flex-col items-center gap-3">
             <Loader2 className="size-12 animate-spin text-primary" />
-            <p className="text-muted-foreground">Loading image...</p>
-          </div>
+            <span className="text-muted-foreground">Loading image...</span>
+          </span>
         ) : (
           <>
-            <div
+            <span
               className={`rounded-2xl bg-primary/10 p-4 transition-transform duration-300 ${
                 isDragging ? "scale-110" : ""
               }`}
@@ -158,29 +156,28 @@ export function ImageUploader({
               ) : (
                 <ImageIcon className="size-10 text-primary" />
               )}
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-semibold text-foreground">
+            </span>
+            <span className="text-center">
+              <span className="block text-lg font-semibold text-foreground">
                 {isDragging
                   ? "Drop your image here"
                   : "Drop an image or click to upload"}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              </span>
+              <span className="mt-1 block text-sm text-muted-foreground">
                 PNG, JPEG, WebP, GIF (max 10MB)
-              </p>
-            </div>
+              </span>
+            </span>
           </>
         )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          className="hidden"
-          onChange={handleFileSelect}
-          disabled={isLoading}
-        />
-      </div>
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={handleFileSelect}
+        disabled={isLoading}
+      />
 
       {/* URL input */}
       <div className="glass-card p-6">

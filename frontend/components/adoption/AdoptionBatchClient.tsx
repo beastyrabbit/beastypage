@@ -3,7 +3,7 @@
 import { ArrowUpRight, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import XIcon from "@/components/ui/x-icon";
@@ -93,6 +93,20 @@ export function AdoptionBatchClient({
     label: string;
     url: string;
   } | null>(null);
+  const previewDialogRef = useRef<HTMLDialogElement>(null);
+  const previewCloseRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!focusedPreview) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const dialog = previewDialogRef.current;
+    dialog?.showModal();
+    previewCloseRef.current?.focus();
+    return () => {
+      dialog?.close();
+      previousFocus?.focus();
+    };
+  }, [focusedPreview]);
 
   const enrichedCats = useMemo(() => {
     if (!record?.cats?.length)
@@ -291,30 +305,25 @@ export function AdoptionBatchClient({
       </section>
 
       {focusedPreview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
-          role="button"
-          tabIndex={0}
-          onClick={(event) => {
-            if (event.target !== event.currentTarget) return;
+        <dialog
+          ref={previewDialogRef}
+          className="fixed inset-0 z-50 m-0 flex h-full max-h-none w-full max-w-none items-center justify-center border-0 bg-black/80 px-6 py-10 text-inherit backdrop:bg-transparent"
+          aria-labelledby="adoption-preview-title"
+          onCancel={(event) => {
+            event.preventDefault();
             setFocusedPreview(null);
           }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              setFocusedPreview(null);
-            }
-            if (
-              (event.key === "Enter" || event.key === " ") &&
-              event.target === event.currentTarget
-            ) {
-              event.preventDefault();
-              setFocusedPreview(null);
-            }
-          }}
         >
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Close preview"
+            className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+            onClick={() => setFocusedPreview(null)}
+          />
           <div className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
             <button
+              ref={previewCloseRef}
               type="button"
               onClick={() => setFocusedPreview(null)}
               aria-label="Close preview"
@@ -323,7 +332,10 @@ export function AdoptionBatchClient({
               <XIcon size={16} />
             </button>
             <div className="flex flex-col items-center gap-6">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2
+                id="adoption-preview-title"
+                className="text-xl font-semibold text-foreground"
+              >
                 {focusedPreview.label}
               </h2>
               <div className="w-full overflow-hidden rounded-2xl border border-border/40 bg-background/80">
@@ -338,7 +350,7 @@ export function AdoptionBatchClient({
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   );
