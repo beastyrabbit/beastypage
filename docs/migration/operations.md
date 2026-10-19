@@ -239,8 +239,17 @@ same Cluster name. Keep the frontend in maintenance throughout.
    loudly on a missing backup where `initdb` would silently start an empty
    database.
 
-After restoring a backup created before 2026-10-19, run
-`drop role if exists beastypage_import;` as the owner. The CloudNativePG
+After restoring a backup created before 2026-10-19, run the following command
+as the `postgres` superuser through the primary pod:
+
+```bash
+kubectl -n webpage exec "$(kubectl -n webpage get pod \
+  -l cnpg.io/cluster=beastypage-postgres,cnpg.io/instanceRole=primary \
+  -o jsonpath='{.items[0].metadata.name}')" -c postgres -- \
+  psql -U postgres -d beastypage -c 'drop role if exists beastypage_import;'
+```
+
+The CloudNativePG
 manifest no longer manages this retired role, and the migration runner only
 revokes its privileges.
 
