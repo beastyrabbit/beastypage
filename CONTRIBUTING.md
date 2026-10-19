@@ -46,12 +46,12 @@ Thank you for your interest in contributing! This document provides guidelines f
    `frontend/.env.database.local` into `frontend/.env.local` because Next.js
    does not load the helper's filename. Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
    and `CLERK_SECRET_KEY` there for signed-in flows. The root
-   `pnpm dev:frontend` script is the Infisical-backed alternative and injects
-   the database and runtime configuration for you.
+   `pnpm dev:frontend` script is the Infisical-backed alternative for injecting
+   Clerk and service runtime values; it does not provide `DATABASE_URL`.
 
    The frontend uses PostgreSQL through Drizzle. Database migrations are applied
-   by the frontend init container; local development reads database and runtime
-   settings from Infisical in the full development setup.
+   by the frontend init container; the full development setup reads runtime
+   settings from Infisical, while `DATABASE_URL` remains in `frontend/.env.local`.
 
 ## How to Contribute
 

@@ -10,8 +10,9 @@ environment paths `/frontend`, `/media`, and `/discord-bot` of the BeastyPage
 Infisical project. Run `pnpm --dir frontend run db:local up` to start the
 per-worktree PostgreSQL instance and write `frontend/.env.database.local`;
 the database scripts and tests read that file. The Next.js server itself needs
-`DATABASE_URL` in `frontend/.env.local`, or use `pnpm dev:frontend` to inject it
-through Infisical. The `/kubernetes/webpage/beastypage-postgres` and
+`DATABASE_URL` in `frontend/.env.local`; `pnpm dev:frontend` injects the Clerk
+and service runtime values through Infisical but does not provide the database
+URL. The `/kubernetes/webpage/beastypage-postgres` and
 `/kubernetes/webpage/beastypage-frontend-runtime-config` paths are production
 runtime paths. Run the frontend's Drizzle migrations before starting
 application routes that read the database.

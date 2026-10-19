@@ -69,8 +69,8 @@ Before the final command, copy the `DATABASE_URL` line from the gitignored
 `frontend/.env.database.local` into `frontend/.env.local` because Next.js does
 not load the helper's filename. Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
 `CLERK_SECRET_KEY` there for signed-in flows. The root `pnpm dev:frontend` script
-is the Infisical-backed alternative and injects the database and runtime
-configuration for you.
+is the Infisical-backed alternative for injecting Clerk and service runtime
+values; it does not provide `DATABASE_URL`.
 
 ### Renderer Service (Optional)
 
