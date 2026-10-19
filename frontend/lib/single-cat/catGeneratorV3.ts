@@ -167,7 +167,7 @@ function setLegacySlotParam(
   urlParams: URLSearchParams,
   key: string,
   values: unknown,
-  fallback: unknown,
+  fallback: string | undefined,
 ): void {
   const slots = Array.isArray(values) ? values : [];
   if (slots.length > 0) {
