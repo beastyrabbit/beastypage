@@ -63,7 +63,7 @@ describe("cat share codec", () => {
   );
 
   it.each([1, 2])(
-    "reads existing V%s links with coerced legacy slots",
+    "reads V%s scalar slots unchanged and defaults malformed slot fields",
     async (v) => {
       const stored = prepareCatShare({ params: { colour: "WHITE" } });
       const decoded = await decodeCatShare(
@@ -73,9 +73,12 @@ describe("cat share codec", () => {
             ? { params: stored.params }
             : { document: stored.document }),
           slots: {
-            accessories: [7, true, {}, ["FERN"], null, "  "],
+            accessories: [7, true, false, " FERN ", {}, ["FERN"], null, "  "],
+            scars: [{}, ["FACE"], " FACE "],
             tortie: [
-              { mask: ["ONE"], pattern: ["SingleColour"], colour: ["GINGER"] },
+              { mask: ["TWO"], pattern: ["Tabby"], colour: ["BLACK"] },
+              { mask: {}, pattern: {}, colour: {} },
+              { mask: "ONE", pattern: "SingleColour", colour: "BLACK" },
             ],
           },
           counts: {},
@@ -84,16 +87,36 @@ describe("cat share codec", () => {
       expect(decoded?.accessorySlots).toEqual([
         "7",
         "true",
-        "[object Object]",
+        "false",
         "FERN",
         "none",
         "none",
+        "none",
+        "none",
       ]);
+      expect(decoded?.scarSlots).toEqual(["none", "none", "FACE"]);
       expect(decoded?.tortieSlots).toEqual([
         { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
+        { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
+        { mask: "ONE", pattern: "SingleColour", colour: "BLACK" },
       ]);
     },
   );
+
+  it("uses tortie slot defaults without invoking object coercion", () => {
+    const malformed = {
+      toString: () => {
+        throw new Error("Must not coerce objects");
+      },
+    };
+    const stored = prepareCatShare({
+      params: { colour: "WHITE" },
+      tortieSlots: [{ mask: malformed, pattern: ["Tabby"], colour: malformed }],
+    });
+    expect(stored.slots.tortie).toEqual([
+      { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
+    ]);
+  });
 
   it("forwards the edit capability for slug updates", async () => {
     const fetchMock = vi.fn().mockResolvedValue(

@@ -52,14 +52,13 @@ describe("CatDocument", () => {
     expect(catParamsToLegacyPersistence(params)).toEqual(legacyCat);
   });
 
-  it.each([false, true])(
-    "preserves legacy array coercion for tortie fields, flat: %s",
-    (flat) => {
-      const fields = {
-        mask: ["ONE"],
-        pattern: ["SingleColour"],
-        colour: ["GINGER"],
-      };
+  describe.each([false, true])("legacy tortie fields, flat: %s", (flat) => {
+    type TortieFields = {
+      mask: unknown;
+      pattern: unknown;
+      colour: unknown;
+    };
+    function readTortie(fields: TortieFields) {
       const params = flat
         ? {
             isTortie: true,
@@ -68,11 +67,40 @@ describe("CatDocument", () => {
             tortieColour: fields.colour,
           }
         : { tortie: [fields] };
-      expect(
-        decodeCatDocumentLegacy({ ...legacyCat, ...params }).traits.tortie,
-      ).toEqual([{ mask: "ONE", pattern: "SingleColour", colour: "GINGER" }]);
-    },
-  );
+      return decodeCatDocumentLegacy({ ...legacyCat, ...params }).traits.tortie;
+    }
+
+    it("preserves valid scalar fields", () => {
+      const fields = {
+        mask: "ONE",
+        pattern: "SingleColour",
+        colour: "BLACK",
+      };
+      expect(readTortie(fields)).toEqual([fields]);
+    });
+
+    const malformedFields: TortieFields[] = [
+      { mask: ["TWO"], pattern: ["Tabby"], colour: ["BLACK"] },
+      { mask: {}, pattern: {}, colour: {} },
+      {
+        mask: {
+          toString: () => {
+            throw new Error("Must not coerce objects");
+          },
+        },
+        pattern: null,
+        colour: undefined,
+      },
+    ];
+    it.each(malformedFields)(
+      "uses existing defaults for malformed fields: %j",
+      (fields) => {
+        expect(readTortie(fields)).toEqual([
+          { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
+        ]);
+      },
+    );
+  });
 
   it("imports legacy params and writes a strict canonical document", () => {
     const document = decodeCatDocumentLegacy(legacyCat);

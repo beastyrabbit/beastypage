@@ -9,7 +9,22 @@ describe("builder trait labels", () => {
     ["  DARK_GINGER--COAT  ", "Dark Ginger Coat"],
     [0, "#0"],
     [8, "#8"],
-  ] as const)("formats %s as %s", (value, expected) => {
+    [true, "True"],
+    [false, "False"],
+    [BigInt(12), "12"],
+    [Symbol("DARK_GINGER"), "Symbol(Dark Ginger)"],
+    [{}, "None"],
+    [["GINGER"], "None"],
+    [[], "None"],
+    [
+      {
+        toString: () => {
+          throw new Error("Must not coerce objects");
+        },
+      },
+      "None",
+    ],
+  ] as const)("formats input case %#", (value, expected) => {
     expect(formatName(value)).toBe(expected);
   });
 });
