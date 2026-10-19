@@ -152,12 +152,12 @@ type PaletteDropdownProps = {
 
 function PaletteDropdown({ mode, onChange }: Readonly<PaletteDropdownProps>) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
       <PaletteSingleSelect
         value={mode}
         onChange={onChange}
         label="Palette:"
-        className="min-w-[200px]"
+        className="min-w-[min(200px,100%)] max-w-full sm:min-w-[200px] sm:max-w-none max-sm:[&>div]:min-w-0 max-sm:[&>div]:flex-wrap"
       />
     </div>
   );
@@ -1361,7 +1361,7 @@ export function VisualBuilderClient({
                   key={layerPrefix}
                   className="space-y-4 rounded-2xl border border-slate-800/70 bg-slate-900/60 p-5"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
                     <button
                       type="button"
                       onClick={() =>
@@ -2754,7 +2754,7 @@ export function VisualBuilderClient({
         </h1>
       </section>
 
-      <div className="grid gap-10 lg:grid-cols-[minmax(420px,480px)_minmax(0,1fr)] xl:grid-cols-[minmax(460px,520px)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(420px,480px)_minmax(0,1fr)] xl:grid-cols-[minmax(460px,520px)_minmax(0,1fr)]">
         <aside className="flex flex-col gap-6 self-start lg:sticky lg:top-24">
           <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6">
             <div className="flex items-center justify-between">

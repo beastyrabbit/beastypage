@@ -131,3 +131,53 @@ test("saved adoption batch and open preview fit narrow viewports", async ({
   await expect(page.getByRole("dialog", { name: "Sunfur" })).toBeVisible();
   await expectPageToFit(page, "batch-preview");
 });
+
+test("visual builder fits while editing tortie layers and exports the native image", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto(fixtureUrl("visual"));
+  const preview = page.getByRole("img", { name: "Cat preview", exact: true });
+  await expect(preview).toBeVisible({ timeout: 90_000 });
+  await expectPageToFit(page, "visual");
+  await page.setViewportSize({ width: 360, height: 844 });
+  await page
+    .getByRole("button", { name: "Enable tortie", exact: true })
+    .click();
+  await expectPageToFit(page, "visual-tortie");
+  await page.getByRole("button", { name: "Add layer", exact: true }).click();
+  await expectPageToFit(page, "visual-tortie-multiple");
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 });
+    await page
+      .locator("#tortie")
+      .getByRole("button", { name: "Classic", exact: true })
+      .click();
+    const search = page.getByPlaceholder("Search palettes...");
+    await expect(search).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+    const dropdown = search.locator("xpath=../../..");
+    const box = await dropdown.boundingBox();
+    if (!box) throw new Error("Palette dropdown has no bounds");
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    await page.screenshot({
+      path: `../.playwright-mcp/overflow-visual-palette-${width}.png`,
+    });
+    await page.keyboard.press("Escape");
+  }
+  const nativeSize = await preview.evaluate((image: HTMLImageElement) => [
+    image.naturalWidth,
+    image.naturalHeight,
+  ]);
+  expect(nativeSize).toEqual([450, 450]);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download PNG", exact: true }).click();
+  const download = await downloadPromise;
+  const downloadPath = await download.path();
+  if (!downloadPath) throw new Error("PNG download was not saved");
+  const png = await readFile(downloadPath);
+  expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual(nativeSize);
+});

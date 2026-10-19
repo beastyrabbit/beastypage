@@ -188,8 +188,9 @@ export function PaletteSingleSelect({
             className="fixed overflow-hidden rounded-lg border border-slate-700/50 bg-slate-900 shadow-xl"
             style={{
               top: dropdownPosition.top,
-              left: dropdownPosition.left,
+              left: `clamp(8px, ${dropdownPosition.left}px, calc(100vw - ${dropdownPosition.width}px - 8px))`,
               width: dropdownPosition.width,
+              maxWidth: "calc(100vw - 16px)",
               maxHeight: 360,
               zIndex: 9999,
             }}
