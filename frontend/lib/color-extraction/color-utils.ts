@@ -227,7 +227,9 @@ export function adjustHue(rgb: RGB, degrees: number): RGB {
  * Calculate color distance (Euclidean in RGB space)
  */
 export function colorDistance(c1: RGB, c2: RGB): number {
-  return Math.hypot(c1.r - c2.r, c1.g - c2.g, c1.b - c2.b);
+  return Math.sqrt(
+    (c1.r - c2.r) ** 2 + (c1.g - c2.g) ** 2 + (c1.b - c2.b) ** 2,
+  );
 }
 
 /**
