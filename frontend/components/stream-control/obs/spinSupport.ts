@@ -807,7 +807,7 @@ export function buildLayerOptionStrings(
     results.push("none");
   }
 
-  const dedup = new Set(allValues.filter((value) => Boolean(value)));
+  const dedup = new Set(allValues.filter(Boolean));
 
   const nonTargetValues = Array.from(dedup).filter(
     (value) => value !== normalizedTarget && value !== "none",
