@@ -580,11 +580,12 @@ export async function issueCatdexUploadUrl(
 ): Promise<string> {
   const now = Date.now();
   const since = new Date(now - 60 * 60 * 1000);
-  const rateKey = identity.tokenIdentifier
-    ? `identity:${identity.tokenIdentifier}`
-    : clientKey && /^[A-Za-z0-9_-]{16,80}$/.test(clientKey)
-      ? `client:${clientKey}`
-      : null;
+  let rateKey: string | null = null;
+  if (identity.tokenIdentifier) {
+    rateKey = `identity:${identity.tokenIdentifier}`;
+  } else if (clientKey && /^[A-Za-z0-9_-]{16,80}$/.test(clientKey)) {
+    rateKey = `client:${clientKey}`;
+  }
   if (!rateKey)
     throw new ServiceError("invalid_input", "A client key is required");
   const token = randomUUID();
