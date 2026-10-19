@@ -43,6 +43,10 @@ import {
   synchronizeBuilderParams,
   VISUAL_BUILDER_SPECIALIZED_TRAITS,
 } from "@/lib/cat-builder/genericTraitEditor";
+import {
+  createTortieLayer,
+  MAX_BUILDER_TORTIE_LAYERS as MAX_TORTIE_LAYERS,
+} from "@/lib/cat-builder/tortieLayers";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import {
   applyCoatChoice,
@@ -85,7 +89,6 @@ export const DEFAULT_PARAMS: CatParams = {
   whitePatchesTint: "none",
 };
 
-const MAX_TORTIE_LAYERS = 6;
 const DISPLAY_CANVAS_SIZE = 540;
 
 function getPoseCacheKey(params: Partial<CatParams>): string {
@@ -680,28 +683,12 @@ export function VisualBuilderClient({
   }, [getPaletteForMode, mapper, paletteColours, tortiePaletteMode]);
 
   const computeDefaultTortieLayer = useCallback(
-    (index: number, base: CatParams): TortieLayer => {
-      const pelts = options?.pelts ?? [];
-      const masks = options?.tortieMasks ?? [];
-      const colours = tortiePalette.length > 0 ? tortiePalette : paletteColours;
-      const defaultPattern = pelts.includes("SingleColour")
-        ? "SingleColour"
-        : (pelts[0] ?? base.peltName ?? "SingleColour");
-      const defaultColour = colours.includes("GINGER")
-        ? "GINGER"
-        : (colours[0] ?? base.colour ?? "GINGER");
-      const maskPreferences = ["ONE", "TWO", "THREE", "FOUR"];
-      const preferred = maskPreferences[index];
-      const defaultMask =
-        preferred && masks.includes(preferred)
-          ? preferred
-          : (masks[0] ?? "ONE");
-      return {
-        pattern: defaultPattern,
-        colour: defaultColour,
-        mask: defaultMask,
-      };
-    },
+    (layers: readonly TortieLayer[], base: CatParams) =>
+      createTortieLayer(layers, base, {
+        pelts: options?.pelts ?? [],
+        masks: options?.tortieMasks ?? [],
+        colours: tortiePalette.length > 0 ? tortiePalette : paletteColours,
+      }),
     [options?.pelts, options?.tortieMasks, paletteColours, tortiePalette],
   );
 
@@ -1026,7 +1013,8 @@ export function VisualBuilderClient({
         return;
       }
       const firstLayer =
-        tortieLayers[0] ?? computeDefaultTortieLayer(0, params);
+        tortieLayers[0] ?? computeDefaultTortieLayer([], params);
+      if (!firstLayer) return;
       applyTortieLayers([firstLayer], true);
       setExpandedLayer(0);
       markShareDirty();
@@ -1042,10 +1030,9 @@ export function VisualBuilderClient({
 
   const handleAddLayer = useCallback(() => {
     if (tortieLayers.length >= MAX_TORTIE_LAYERS) return;
-    const next = [
-      ...tortieLayers,
-      computeDefaultTortieLayer(tortieLayers.length, params),
-    ];
+    const layer = computeDefaultTortieLayer(tortieLayers, params);
+    if (!layer) return;
+    const next = [...tortieLayers, layer];
     applyTortieLayers(next, true);
     setExpandedLayer(next.length - 1);
     markShareDirty();
@@ -1078,13 +1065,14 @@ export function VisualBuilderClient({
 
   const handleUpdateLayer = useCallback(
     (index: number, mutator: (draft: TortieLayer) => void) => {
+      if (index < 0) return;
       const next = [...tortieLayers];
       while (next.length <= index) {
-        next.push(computeDefaultTortieLayer(next.length, params));
+        const layer = computeDefaultTortieLayer(next, params);
+        if (!layer) return;
+        next.push(layer);
       }
-      const draftLayer = {
-        ...(next[index] ?? computeDefaultTortieLayer(index, params)),
-      };
+      const draftLayer = { ...next[index] };
       mutator(draftLayer);
       next[index] = draftLayer;
       applyTortieLayers(next, next.length > 0);
@@ -1129,7 +1117,10 @@ export function VisualBuilderClient({
                 type="button"
                 onClick={handleAddLayer}
                 className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/60 px-3 py-1 text-sm text-neutral-200 transition hover:border-amber-300/70"
-                disabled={currentLayers.length >= MAX_TORTIE_LAYERS}
+                disabled={
+                  currentLayers.length >= MAX_TORTIE_LAYERS ||
+                  !computeDefaultTortieLayer(currentLayers, currentParams)
+                }
               >
                 <Plus className="size-3" /> Add layer
               </button>
@@ -1430,6 +1421,7 @@ export function VisualBuilderClient({
     );
   }, [
     buildTortiePreviewMutator,
+    computeDefaultTortieLayer,
     expandedLayer,
     expandedTortieSub,
     handleAddLayer,
