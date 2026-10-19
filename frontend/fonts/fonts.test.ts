@@ -3,12 +3,55 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { globSync } from "glob";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import sources from "./sources.json";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../..");
 
 describe("self-hosted fonts", () => {
+  it("uses valid CSS identifiers or quoted strings for fallback families", () => {
+    const fontFiles = globSync("app/**/*.{ts,tsx}", {
+      cwd: path.resolve(import.meta.dirname, ".."),
+    }).filter((file) =>
+      readFileSync(
+        path.resolve(import.meta.dirname, "..", file),
+        "utf8",
+      ).includes('from "next/font/local"'),
+    );
+    let checked = 0;
+    for (const file of fontFiles) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(path.resolve(import.meta.dirname, "..", file), "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      function visit(node: ts.Node) {
+        if (
+          ts.isPropertyAssignment(node) &&
+          node.name.getText(source) === "fallback" &&
+          ts.isArrayLiteralExpression(node.initializer)
+        ) {
+          for (const entry of node.initializer.elements) {
+            expect(ts.isStringLiteral(entry)).toBe(true);
+            if (!ts.isStringLiteral(entry)) continue;
+            const family = entry.text;
+            const quoted = /^(['"])[^'"\n]+\1$/.test(family);
+            const identifiers = family
+              .split(/\s+/)
+              .every((word) => /^-?[_a-z][-_a-z0-9]*$/i.test(word));
+            expect(quoted || identifiers, `${file}: ${family}`).toBe(true);
+            checked++;
+          }
+        }
+        ts.forEachChild(node, visit);
+      }
+      visit(source);
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it("keeps application sources independent of the Google Fonts loader and CDN", () => {
     const files = globSync("**/*.{ts,tsx,js,jsx,mjs,cjs,css}", {
       cwd: repositoryRoot,

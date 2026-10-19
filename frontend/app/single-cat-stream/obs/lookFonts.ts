@@ -91,7 +91,7 @@ const pixel = localFont({
   style: "normal",
   display: "swap",
   adjustFontFallback: false,
-  fallback: ["Press Start 2P Fallback"],
+  fallback: ["'Press Start 2P Fallback'"],
   variable: "--font-look-pixel",
 });
 
