@@ -3072,7 +3072,7 @@ export function SingleCatPlusClient({
   );
 
   return (
-    <div className="grid gap-10">
+    <div className="grid grid-cols-1 gap-10">
       <VariantBar<SingleCatSettings>
         variants={variants}
         snapshotConfig={snapshotConfig}
@@ -3081,7 +3081,7 @@ export function SingleCatPlusClient({
         showToast={showToast}
       />
       <div className="glass-card px-6 py-8">
-        <div className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] xl:items-start">
+        <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] xl:items-start">
           <div className="flex flex-col gap-6">
             <div className="relative flex flex-col items-center gap-4">
               <div className="flip-container w-full max-w-[700px]">
