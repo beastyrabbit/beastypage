@@ -18,9 +18,10 @@ have stable CSS family names so they can follow the Latin face in each stack.
 The original Arial fallback and its metrics remain last in the stack. This keeps
 Latin page loads small while retaining the other scripts. The six look fonts
 preload their full character maps on the overlay and its preview. Geist and Geist
-Mono retain the 100–900 variable range. The other families expose the same
-weights and normal/italic styles as before, with `display: "swap"` and the same
-CSS variables. `fallbacks.css` preserves the Google loader's fallback families
+Mono retain the 100–900 variable range. The other variable fonts declare ranges
+covering their previous weights: EB Garamond 400–600, Cormorant Garamond 500–700,
+and Caveat 500–600. Normal/italic styles remain as before, with `display: "swap"`
+and the same CSS variables. `fallbacks.css` preserves the Google loader's fallback families
 and metric overrides. Local automatic fallback calculation is disabled to avoid
 changing those metrics.
 

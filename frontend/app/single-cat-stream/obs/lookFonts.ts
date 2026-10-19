@@ -11,32 +11,12 @@ const book = localFont({
   src: [
     {
       path: "../../../fonts/ebgaramond/EBGaramond-Variable.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../../../fonts/ebgaramond/EBGaramond-Variable.woff2",
-      weight: "500",
-      style: "normal",
-    },
-    {
-      path: "../../../fonts/ebgaramond/EBGaramond-Variable.woff2",
-      weight: "600",
+      weight: "400 600",
       style: "normal",
     },
     {
       path: "../../../fonts/ebgaramond/EBGaramond-Italic-Variable.woff2",
-      weight: "400",
-      style: "italic",
-    },
-    {
-      path: "../../../fonts/ebgaramond/EBGaramond-Italic-Variable.woff2",
-      weight: "500",
-      style: "italic",
-    },
-    {
-      path: "../../../fonts/ebgaramond/EBGaramond-Italic-Variable.woff2",
-      weight: "600",
+      weight: "400 600",
       style: "italic",
     },
   ],
@@ -50,32 +30,12 @@ const display = localFont({
   src: [
     {
       path: "../../../fonts/cormorantgaramond/CormorantGaramond-Variable.woff2",
-      weight: "500",
-      style: "normal",
-    },
-    {
-      path: "../../../fonts/cormorantgaramond/CormorantGaramond-Variable.woff2",
-      weight: "600",
-      style: "normal",
-    },
-    {
-      path: "../../../fonts/cormorantgaramond/CormorantGaramond-Variable.woff2",
-      weight: "700",
+      weight: "500 700",
       style: "normal",
     },
     {
       path: "../../../fonts/cormorantgaramond/CormorantGaramond-Italic-Variable.woff2",
-      weight: "500",
-      style: "italic",
-    },
-    {
-      path: "../../../fonts/cormorantgaramond/CormorantGaramond-Italic-Variable.woff2",
-      weight: "600",
-      style: "italic",
-    },
-    {
-      path: "../../../fonts/cormorantgaramond/CormorantGaramond-Italic-Variable.woff2",
-      weight: "700",
+      weight: "500 700",
       style: "italic",
     },
   ],
@@ -115,18 +75,9 @@ const mono = localFont({
 });
 
 const hand = localFont({
-  src: [
-    {
-      path: "../../../fonts/caveat/Caveat-Variable.woff2",
-      weight: "500",
-      style: "normal",
-    },
-    {
-      path: "../../../fonts/caveat/Caveat-Variable.woff2",
-      weight: "600",
-      style: "normal",
-    },
-  ],
+  src: "../../../fonts/caveat/Caveat-Variable.woff2",
+  weight: "500 600",
+  style: "normal",
   display: "swap",
   adjustFontFallback: false,
   fallback: ["Caveat Fallback"],
