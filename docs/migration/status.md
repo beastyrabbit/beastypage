@@ -16,12 +16,11 @@ a separate contract migration removes them.
   `frontend/server/auth/identity.ts`; this requires a Clerk dashboard change.
 - Remove `CONVEX_DEPLOY_KEY` and `CONVEX_DEPLOYMENT` from Infisical prod and
   `/ci` if they still exist. This is outside the repository.
-- Deploy this release first so the frontend init container revokes the retired
-  role's privileges. Then merge the kub-homelab change in PR #579 (phase one:
-  `ensure: absent`). After it reconciles, delete the role entry, the orphaned
-  `beastypage-postgres-import-role` and `beastypage-postgres-import-url`
-  Secrets in namespace `webpage`, and the
-  `BEASTYPAGE_DB_IMPORT_PASSWORD` key in Infisical.
+
+The import role was dropped with kub-homelab #579 and #580, both merged on
+2026-10-19; its orphaned Secrets and the Infisical key
+`BEASTYPAGE_DB_IMPORT_PASSWORD` were removed. The only remaining decommission
+items are the Clerk JWT template rename and the importer bookkeeping tables.
 
 See the historical records in [ADR 0001](adr-0001-postgresql.md), the
 [cutover runbook](cutover.md), and the [data contract](data-contract.md).

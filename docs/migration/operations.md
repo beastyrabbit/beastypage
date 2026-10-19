@@ -110,8 +110,8 @@ explicit approval.** Nothing in this repository applies them.
 - Roles:
   - `beastypage_owner`: bootstrap owner, used for migrations.
   - `beastypage_app`: DML only, connection limit 30.
-  - `beastypage_import` is retired; the migration runner revokes its legacy
-    privileges before the CNPG tombstone removes it from the cluster.
+  - `beastypage_import` was dropped; the migration runner's legacy privilege
+    revoke step is a no-op when the role is absent.
 - The migration runner applies these grants as the owner after every schema
   migration (the SQL is shown here for operator verification):
 

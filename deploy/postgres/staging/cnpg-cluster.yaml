@@ -22,10 +22,6 @@ spec:
       wal_compression: "zstd"
   managed:
     roles:
-      # Deploy the release that revokes the role's privileges before merging
-      # this tombstone; then delete the entry, orphaned Secrets and Infisical key.
-      - name: beastypage_import
-        ensure: absent
       - name: beastypage_app
         ensure: present
         login: true
