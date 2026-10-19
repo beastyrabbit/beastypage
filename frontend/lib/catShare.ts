@@ -164,7 +164,16 @@ function buildSlots(data: EncodePayload, document: CatDocument): CatShareSlots {
       traitId === "tortie" ? null : "none",
     );
   }
+  repairTortieSlots(slots);
   return slots;
+}
+
+function repairTortieSlots(slots: CatShareSlots): void {
+  if (!Array.isArray(slots.tortie)) return;
+  const repaired = deduplicateTortieLayers(sanitizeTortieArray(slots.tortie));
+  if (repaired.length !== slots.tortie.length) {
+    slots.tortie = repaired as JsonValue[];
+  }
 }
 
 export interface CatShareStoredPayloadV1 {
@@ -297,19 +306,8 @@ function projectPayload(
   try {
     const document = readCatDocument(documentInput);
     const slots = normalizeSlots(slotsInput);
+    repairTortieSlots(slots);
     const counts = normalizeCounts(countsInput, slots);
-    if (Array.isArray(slots.tortie)) {
-      const repaired = deduplicateTortieLayers(
-        sanitizeTortieArray(slots.tortie),
-      );
-      if (repaired.length !== slots.tortie.length) {
-        counts.tortie = Math.max(
-          0,
-          counts.tortie - (slots.tortie.length - repaired.length),
-        );
-        slots.tortie = repaired as JsonValue[];
-      }
-    }
     return {
       document,
       params: catDocumentToLegacyParams(document),

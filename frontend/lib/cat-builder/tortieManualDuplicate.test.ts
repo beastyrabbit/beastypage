@@ -4,7 +4,7 @@ import {
   parseCatDocumentStrict,
   readCatDocument,
 } from "@/lib/cat-system";
-import { decodeCatShare } from "@/lib/catShare";
+import { decodeCatShare, prepareCatShare } from "@/lib/catShare";
 import { hydrateBuilderParams } from "./genericTraitEditor";
 
 const first = { mask: "ONE", pattern: "SingleColour", colour: "GINGER" };
@@ -13,6 +13,23 @@ const duplicate = { colour: "GINGER", pattern: "SingleColour", mask: "ONE" };
 const tortie = [first, second, duplicate];
 
 describe("stored duplicate tortie layers", () => {
+  it.each(["params", "document"])(
+    "never persists duplicate share slots supplied with %s",
+    (source) => {
+      const payload = prepareCatShare({
+        ...(source === "params"
+          ? { params: { spriteNumber: 8, isTortie: true, tortie } }
+          : { document: { schemaVersion: 1, traits: { tortie } } }),
+        tortieSlots: [first, null, second, duplicate],
+        counts: { tortie: 4 },
+      });
+      expect(payload.document.traits.tortie).toEqual([first, second]);
+      expect(payload.params.tortie).toEqual([first, second]);
+      expect(payload.slots.tortie).toEqual([first, null, second]);
+      expect(payload.counts.tortie).toBe(3);
+    },
+  );
+
   it("repairs legacy cats without mutating their stored input", () => {
     const input = {
       spriteNumber: 8,
