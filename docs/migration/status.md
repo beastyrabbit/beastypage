@@ -14,8 +14,6 @@ a separate contract migration removes them.
 - Rename the Clerk JWT template `convex`, used by
   `frontend/components/quick-share/*Client.tsx` and
   `frontend/server/auth/identity.ts`; this requires a Clerk dashboard change.
-- Remove `CONVEX_DEPLOY_KEY` and `CONVEX_DEPLOYMENT` from Infisical prod and
-  `/ci` if they still exist. This is outside the repository.
 
 The import role was dropped with kub-homelab #579 and #580, both merged on
 2026-10-19; its orphaned Secrets and the Infisical key
