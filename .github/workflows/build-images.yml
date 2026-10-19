@@ -10,7 +10,6 @@ on:
     # workflow was added. Mixed commits still run and are filtered below.
     paths-ignore:
       - ".github/workflows/build-images.yml"
-      - ".forgejo/workflows/build-images.yml"
   workflow_dispatch:
     inputs:
       build_frontend:
@@ -100,7 +99,7 @@ jobs:
           set_output image_processing '^backend/image_processing_service/'
           set_output media '^backend/media_service/'
           set_output discord_bot '^(backend/discord-bot/|frontend/lib/cat-system/|frontend/lib/cat-v3/(coatPatterns|poseOptions)\.ts|frontend/scripts/generate-cat-system\.ts|frontend/public/(cat-system|sprite-data|sprites)/)'
-          set_output cat_system '^(frontend/|backend/renderer_service/|backend/discord-bot/|package\.json$|pnpm-lock\.yaml$|\.dockerignore$|\.(github|forgejo)/workflows/build-images\.yml$)'
+          set_output cat_system '^(frontend/|backend/renderer_service/|backend/discord-bot/|package\.json$|pnpm-lock\.yaml$|\.dockerignore$|\.github/workflows/build-images\.yml$)'
 
   cat-system-contract:
     needs: changes

@@ -1,10 +1,10 @@
 import "server-only";
 
 import { sql } from "drizzle-orm";
-import { inspectFile } from "../../scripts/migration/import/files";
 import type { Database } from "../db/pool";
 import { files } from "../db/schema";
 import type { Transaction } from "../db/transaction";
+import { inspectFile } from "../files/inspect";
 
 export interface FileMeta {
   id: string;

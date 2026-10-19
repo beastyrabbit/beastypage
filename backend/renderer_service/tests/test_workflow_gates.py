@@ -1,15 +1,11 @@
 from pathlib import Path
 
-import pytest
 import yaml
 
 
-@pytest.mark.parametrize("provider", ["github", "forgejo"])
-def test_publication_requires_successful_application_checks(provider):
+def test_publication_requires_successful_application_checks():
     root = Path(__file__).resolve().parents[3]
-    workflow = yaml.safe_load(
-        (root / f".{provider}/workflows/build-images.yml").read_text()
-    )
+    workflow = yaml.safe_load((root / ".github/workflows/build-images.yml").read_text())
     jobs = workflow["jobs"]
     for publish, check in [
         ("build-image-processing", "check-image-processing"),

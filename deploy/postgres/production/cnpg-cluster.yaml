@@ -36,13 +36,10 @@ spec:
         connectionLimit: 30
         passwordSecret:
           name: beastypage-postgres-app-role
+      # Phase one: keep this tombstone so CNPG drops the PostgreSQL role.
+      # Delete the entry entirely after reconciliation confirms the role is gone.
       - name: beastypage_import
-        # Enabled only during a rehearsal or the cutover window.
-        ensure: present
-        login: false
-        connectionLimit: 4
-        passwordSecret:
-          name: beastypage-postgres-import-role
+        ensure: absent
 
   affinity:
     enablePodAntiAffinity: true

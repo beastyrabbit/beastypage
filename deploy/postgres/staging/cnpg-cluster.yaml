@@ -22,12 +22,10 @@ spec:
       wal_compression: "zstd"
   managed:
     roles:
+      # Phase one: keep this tombstone so CNPG drops the PostgreSQL role.
+      # Delete the entry entirely after reconciliation confirms the role is gone.
       - name: beastypage_import
-        ensure: present
-        login: true
-        connectionLimit: 4
-        passwordSecret:
-          name: beastypage-staging-postgres-import-role
+        ensure: absent
       - name: beastypage_app
         ensure: present
         login: true

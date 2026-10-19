@@ -25,8 +25,6 @@ export interface MigrationResult {
 export interface MigrationOptions {
   /** Role used by the frontend. Defaults to the documented app role. */
   appRole?: string;
-  /** Role used for imports. Defaults to the documented import role. */
-  importRole?: string;
   log?: (line: string) => void;
 }
 
@@ -37,7 +35,6 @@ function quoteIdentifier(identifier: string): string {
 async function grantRole(
   client: pg.PoolClient,
   role: string,
-  options: { truncate: boolean },
   log: (line: string) => void,
 ): Promise<void> {
   const present = await client.query<{ present: boolean }>(
@@ -56,23 +53,21 @@ async function grantRole(
   );
   await client.query(`grant usage on schema public to ${target}`);
   await client.query(
-    `grant select, insert, update, delete${options.truncate ? ", truncate" : ""} on all tables in schema public to ${target}`,
+    `grant select, insert, update, delete on all tables in schema public to ${target}`,
   );
   await client.query(
     `grant usage, select on all sequences in schema public to ${target}`,
   );
   await client.query(
-    `alter default privileges for role ${owner} in schema public grant select, insert, update, delete${options.truncate ? ", truncate" : ""} on tables to ${target}`,
+    `alter default privileges for role ${owner} in schema public grant select, insert, update, delete on tables to ${target}`,
   );
   await client.query(
     `alter default privileges for role ${owner} in schema public grant usage, select on sequences to ${target}`,
   );
-  log(
-    `[db:migrate] grants applied for ${role}${options.truncate ? " (including truncate for imports)" : ""}`,
-  );
+  log(`[db:migrate] grants applied for ${role}`);
 }
 
-/** Apply the owner-run privileges required by the app and import roles. */
+/** Apply the owner-run privileges required by the app. */
 export async function applyRoleGrants(
   client: pg.PoolClient,
   options: MigrationOptions = {},
@@ -81,15 +76,6 @@ export async function applyRoleGrants(
   await grantRole(
     client,
     options.appRole ?? process.env.DATABASE_APP_ROLE ?? "beastypage_app",
-    { truncate: false },
-    log,
-  );
-  await grantRole(
-    client,
-    options.importRole ??
-      process.env.DATABASE_IMPORT_ROLE ??
-      "beastypage_import",
-    { truncate: true },
     log,
   );
 }

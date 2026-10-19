@@ -63,23 +63,18 @@ describe("migration runner", () => {
     const suffix = randomBytes(4).toString("hex");
     const ownerRole = `beastypage_grant_owner_${suffix}`;
     const appRole = `beastypage_grant_app_${suffix}`;
-    const importRole = `beastypage_grant_import_${suffix}`;
     const ownerPassword = randomBytes(12).toString("hex");
     const appPassword = randomBytes(12).toString("hex");
-    const importPassword = randomBytes(12).toString("hex");
     const database = `beastypage_grant_${suffix}`;
-    const roles = [ownerRole, appRole, importRole];
+    const roles = [ownerRole, appRole];
     const createdRoles: string[] = [];
     let ownerPool: pg.Pool | undefined;
     let appPool: pg.Pool | undefined;
-    let importPool: pg.Pool | undefined;
     try {
       await createLoginRole(ownerRole, ownerPassword);
       createdRoles.push(ownerRole);
       await createLoginRole(appRole, appPassword);
       createdRoles.push(appRole);
-      await createLoginRole(importRole, importPassword);
-      createdRoles.push(importRole);
       const ownerAttributes = await pool.query<{
         rolsuper: boolean;
         rolcreaterole: boolean;
@@ -101,9 +96,6 @@ describe("migration runner", () => {
       const appUrl = new URL(ownerUrl);
       appUrl.username = appRole;
       appUrl.password = appPassword;
-      const importUrl = new URL(ownerUrl);
-      importUrl.username = importRole;
-      importUrl.password = importPassword;
       ownerPool = createPool(
         readDatabaseConfig("migrate", {
           DATABASE_URL: ownerUrl.toString(),
@@ -113,25 +105,13 @@ describe("migration runner", () => {
       appPool = createPool(
         readDatabaseConfig("app", { DATABASE_URL: appUrl.toString() }),
       );
-      importPool = createPool(
-        readDatabaseConfig("import", {
-          DATABASE_IMPORT_URL: importUrl.toString(),
-        }),
-      );
 
       const ownerClientPool = ownerPool;
       const appClientPool = appPool;
-      const importClientPool = importPool;
       const owner = await ownerClientPool.connect();
       try {
-        await runMigrations(owner, "grant-test", {
-          appRole,
-          importRole,
-        });
-        await runMigrations(owner, "grant-test-rerun", {
-          appRole,
-          importRole,
-        });
+        await runMigrations(owner, "grant-test", { appRole });
+        await runMigrations(owner, "grant-test-rerun", { appRole });
       } finally {
         owner.release();
       }
@@ -149,20 +129,8 @@ describe("migration runner", () => {
         [id],
       );
       await appClientPool.query("delete from live_events where id = $1", [id]);
-      await appClientPool.query(
-        "insert into live_events (topic, revision) values ('grant-import', 1)",
-      );
-      await importClientPool.query("truncate live_events");
-      const remaining = await importClientPool.query<{ count: string }>(
-        "select count(*)::text as count from live_events",
-      );
-      expect(remaining.rows[0]?.count).toBe("0");
     } finally {
-      await Promise.allSettled([
-        ownerPool?.end(),
-        appPool?.end(),
-        importPool?.end(),
-      ]);
+      await Promise.allSettled([ownerPool?.end(), appPool?.end()]);
       await pool.query(
         `drop database if exists ${quoteIdentifier(database)} with (force)`,
       );
