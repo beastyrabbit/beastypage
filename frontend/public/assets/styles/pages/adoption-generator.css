@@ -193,7 +193,7 @@
 .adoption-generator .cat-grid {
   display: grid;
   gap: 24px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
 }
 
 .adoption-generator .cat-card {
@@ -747,6 +747,7 @@ body.overlay-open {
 
 .quick-preview-content {
   position: relative;
+  max-width: calc(100% - 48px);
   background: rgba(15, 23, 42, 0.95);
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 20px;
@@ -757,6 +758,8 @@ body.overlay-open {
 
 .quick-preview-canvas {
   display: block;
+  max-width: 100%;
+  height: auto;
   image-rendering: pixelated;
   border-radius: 12px;
 }

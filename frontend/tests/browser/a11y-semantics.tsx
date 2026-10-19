@@ -10,6 +10,7 @@ import { ImageUploader } from "../../components/color-palette/ImageUploader";
 import { PaletteMultiSelect } from "../../components/common/PaletteMultiSelect";
 import { EvolutionTree } from "../../components/evolution/EvolutionTree";
 import { SingleCatPlusClient } from "../../components/single-cat/SingleCatPlusClient";
+import { VisualBuilderClient } from "../../components/visual-builder/VisualBuilderClient";
 import { BackendAuthProvider } from "../../lib/data";
 import { ADDITIONAL_PALETTES, type PaletteId } from "../../lib/palettes";
 import "../../app/globals.css";
@@ -135,6 +136,7 @@ else if (view === "batch")
 else if (view === "adoption") content = <AdoptionGeneratorClient />;
 else if (view === "single")
   content = <SingleCatPlusClient defaultMode="calm" />;
+else if (view === "visual") content = <VisualBuilderClient />;
 else if (view === "evolution")
   content = (
     <EvolutionTree
