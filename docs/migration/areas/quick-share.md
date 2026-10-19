@@ -1,63 +1,40 @@
 # Quick Share
 
 Quick Share keeps media bytes in the media service's S3 bucket. PostgreSQL
-stores the control plane metadata, upload parts, worker queue, usage windows
-and moderation bans. The PostgreSQL implementation is selected only when
-`DATA_BACKEND=postgres`; the existing Convex implementation remains the
-default.
+stores control-plane metadata, upload parts, the worker queue, usage windows,
+and moderation bans.
 
-Public collections select the newest eligible `collectionMaxItems` rows and
-return that window oldest-to-newest. Rows without all three public media
-fields are excluded in SQL. Internal state mutations preserve Convex's `null`
-response bodies.
+Public collections select the newest eligible rows up to
+`QUICK_SHARE_POLICY.collectionMaxItems` and return that window oldest to newest.
+Rows without all required public media fields are excluded by the repository.
 
-## Mapping
+## Operations
 
-| Convex operation | PostgreSQL implementation |
-| --- | --- |
-| `quickShare.createUpload` | `server/services/quickShare.createUpload` and `quick_share_uploads` |
-| `getUpload`, `getPublicUpload`, `getPublicCollection`, `accountUploads` | `handleQuickShareOperation` read operations and repository queries |
-| `recordPart`, `markComplete`, `finishImport`, `failImport`, `extendUpload` | Service state transitions and `quick_share_parts` / `quick_share_usage` |
-| `claimJob`, `finishProcessJob`, `finishDeleteJob` | Media worker action operations and `quick_share_jobs` |
-| `adminList`, `adminGet`, `banIp`, `unbanIp`, `removeUpload` | Admin action operations, with the configured token-identifier allowlist |
-| `revokeIpBatch` | `quick-share.revoke-ip` job |
-| `recoverJobLease` | `quick-share.recover-lease` job |
-| `queueRetentionDeletes` | `quick-share.queue-retention` job |
-| `redispatchPendingJobs` | `quick-share.redispatch` job |
-| `maintenance` / `quick-share-retention` | recurring `quick-share.retention` job |
-| `quickShareHttp.dispatchJob` | `quick-share.dispatch` job; retries use the same 1s, 5s, 15s, 60s, 5m, 15m and 30m delays |
+The internal protocol is exposed at `POST /api/internal/quick-share`. The body
+contains `{ op, ...payload }`. The route checks
+`QUICK_SHARE_INTERNAL_TOKEN` with a constant-time comparison and dispatches to
+`handleQuickShareOperation` in `frontend/server/services/quickShare.ts`.
+Supported operations are `policy`, `create`, `getUpload`, `recordPart`,
+`complete`, `finishImport`, `failImport`, `public`, `publicCollection`,
+`accountList`, `extend`, `claimJob`, `finishProcess`, `finishDelete`,
+`adminList`, `adminGet`, `adminBan`, `adminUnban`, and `adminRemove`.
 
-The internal action protocol is exposed at `POST /api/internal/quick-share`.
-It accepts the same `{ op, ...payload }` body, checks
-`QUICK_SHARE_INTERNAL_TOKEN` with a constant-time comparison, and preserves
-the Convex response shapes and status codes. The route returns 404 while
-`DATA_BACKEND` is not `postgres`.
+The media service calls this route through its required `CONTROL_PLANE_URL`.
+The value is the complete endpoint URL. The media configuration has no fallback
+URL.
 
-The media service has a `CONTROL_PLANE_URL` setting. It is the full internal
-endpoint URL and defaults to `${CONVEX_SITE_URL}/quick-share/internal`, so the
-cutover does not require a media image change.
+## Jobs and limits
 
-## Concurrency and limits
+`quick-share.dispatch` sends media jobs to the worker and retries at 1 second,
+5 seconds, 15 seconds, 60 seconds, 5 minutes, 15 minutes, and 30 minutes.
+`quick-share.recover-lease` recovers a media lease,
+`quick-share.revoke-ip` applies an IP ban, `quick-share.queue-retention`
+queues expired deletes, and `quick-share.redispatch` sends pending jobs again.
+The recurring `quick-share.retention` job runs hourly and calls
+`maintainQuickShare`.
 
 Upload admission runs in a serializable transaction with bounded retries for
-serialization failures. Active uploads and each hourly/daily usage row are
-locked before they are checked and updated. Upload, part and job state checks
-are performed in the same transaction as their transition. Job IDs remain
-opaque UUID strings at the media boundary.
-
-## Cutover order
-
-1. Before the window, deploy the media release that reads
-   `CONTROL_PLANE_URL` with the variable unset, so it still calls Convex.
-   Do not point it at the PostgreSQL route yet: `/api/internal/quick-share`
-   answers 404 while the frontend runs with `DATA_BACKEND=convex`.
-2. Import Quick Share metadata and open usage windows, return leased jobs to
-   pending, and run the S3 verification script.
-3. Start the frontend job worker and verify a fake media endpoint accepts
-   dispatches, retries and lease recovery.
-4. Inside the window, set `DATA_BACKEND=postgres` on the frontend and
-   `CONTROL_PLANE_URL` on the media service together, then perform create,
-   multipart, public-read, account and admin smoke checks.
-5. Drain old Convex/media workers, take the final backup, then lift the
-   maintenance gate. PostgreSQL is the write source after this point; Convex
-   is not written again.
+serialization failures. Active uploads and hourly and daily usage rows are
+locked before they are checked and updated. Upload, part, and job state checks
+run in the same transaction as their state transition. Media job IDs remain
+opaque UUID strings at the service boundary.

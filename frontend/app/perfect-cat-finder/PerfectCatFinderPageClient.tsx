@@ -73,7 +73,7 @@ type MatchupResponse = {
   needsSeed: number;
   totalCats: number;
   totalCatsCapped?: boolean;
-  matchupToken?: string;
+  matchupToken: string;
 };
 
 function matchupLoadErrorMessage(error: unknown): string {
@@ -407,7 +407,7 @@ export default function PerfectCatFinderPage() {
 
   const handleVote = useCallback(
     async (winner: MatchupCat) => {
-      if (!clientId || matchup.length < 2) return;
+      if (!clientId || !matchupToken || matchup.length < 2) return;
       const loser = matchup.find((cat) => cat.id !== winner.id);
       if (!loser) return;
       setVoteBusy(true);
@@ -418,7 +418,7 @@ export default function PerfectCatFinderPage() {
           clientId,
           winnerId: winner.id as never,
           loserId: loser.id as never,
-          ...(matchupToken ? { matchupToken } : {}),
+          matchupToken,
         });
         voteSucceeded = true;
       } catch (err) {

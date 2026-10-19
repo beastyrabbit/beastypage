@@ -1,8 +1,8 @@
 # Live updates
 
-Live updates preserve Convex's latest-state semantics for PostgreSQL-backed
-aggregates. A write bumps the aggregate revision, inserts one `live_events`
-row, and calls `pg_notify('beastypage_live', topic)` in the same transaction.
+Live updates publish the latest state of PostgreSQL-backed aggregates. A write
+bumps the aggregate revision, inserts one `live_events` row, and calls
+`pg_notify('beastypage_live', topic)` in the same transaction.
 PostgreSQL delivers the notification only after commit. The notification
 contains the topic only; snapshots and other data stay in PostgreSQL.
 

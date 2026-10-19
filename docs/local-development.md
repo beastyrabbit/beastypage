@@ -5,11 +5,17 @@ using the project ID, domain, environment, and path recorded in `package.json`.
 Use those scripts (`pnpm dev`, `pnpm dev:frontend`, `pnpm dev:media`, and related
 commands) instead of relying on an unqualified Infisical profile.
 
-The frontend uses PostgreSQL through Drizzle. Start a local PostgreSQL instance
-and configure `DATABASE_URL` plus the runtime values from the Infisical paths
-`/kubernetes/webpage/beastypage-postgres` and
-`/kubernetes/webpage/beastypage-frontend-runtime-config`. Run the frontend's
-Drizzle migrations before starting application routes that read the database.
+The frontend uses PostgreSQL through Drizzle. The root scripts inject the `dev`
+environment paths `/frontend`, `/media`, and `/discord-bot` of the BeastyPage
+Infisical project. Run `pnpm --dir frontend run db:local up` to start the
+per-worktree PostgreSQL instance and write `frontend/.env.database.local`;
+the database scripts and tests read that file. The Next.js server itself needs
+`DATABASE_URL` in `frontend/.env.local`; `pnpm dev:frontend` injects the Clerk
+and service runtime values through Infisical but does not provide the database
+URL. The `/kubernetes/webpage/beastypage-postgres` and
+`/kubernetes/webpage/beastypage-frontend-runtime-config` paths are production
+runtime paths. Run the frontend's Drizzle migrations before starting
+application routes that read the database.
 
 The renderer's virtual environment is ignored at `backend/renderer_service/.venv/`;
 `pnpm dev:renderer` expects its Uvicorn executable there and starts the app on

@@ -27,19 +27,6 @@ describe("database config", () => {
     expect(config.statementTimeoutMs).toBe(0);
   });
 
-  it("only permits the import role to fall back on loopback", () => {
-    expect(
-      readDatabaseConfig("import", {
-        DATABASE_URL: "postgresql://app@127.0.0.1/db",
-      }).url,
-    ).toContain("127.0.0.1");
-    expect(() =>
-      readDatabaseConfig("import", {
-        DATABASE_URL: "postgresql://app@db.internal/db",
-      }),
-    ).toThrow(/DATABASE_IMPORT_URL/);
-  });
-
   it("uses the app budget of 6 connections per replica", () => {
     expect(
       readDatabaseConfig("app", { DATABASE_URL: "postgresql://a@localhost/db" })

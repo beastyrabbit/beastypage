@@ -1,11 +1,15 @@
 # Convex to PostgreSQL cutover runbook
 
+> [!NOTE]
+> This procedure was completed on 2026-10-18 and is kept as the historical
+> record. The scripts, pod manifest and cleanup script referenced below were
+> removed after decommission when the Convex project was deleted.
+
 This is the forward-only procedure for issue #116. It is written for the
-maintainer and the platform, media and data owners. Production remains on
-Convex until every approval marked **[APPROVAL REQUIRED]** is recorded in the
-change ticket. Once step 8 starts, PostgreSQL is the only write source:
-failures mean staying in maintenance, restoring PostgreSQL, or applying a
-forward fix. Never write to Convex again.
+maintainer and the platform, media and data owners. It records the window in
+which production moved from Convex to PostgreSQL. Once step 8 started,
+PostgreSQL was the only write source: failures meant staying in maintenance,
+restoring PostgreSQL, or applying a forward fix. Convex was not written again.
 
 The commands below are run from a checked-out release of this repository. Set
 `FRONTEND` to its absolute `frontend/` directory and keep `ARCHIVE` and every
@@ -33,15 +37,14 @@ report directory on encrypted storage outside the repository.
    - the staging restore drill is complete and its measured time is at most
      one hour, with the backup name and verification output attached;
    - the staging rehearsal has a maintainer sign-off;
-   - the media release that reads `CONTROL_PLANE_URL` is deployed with the
-     variable still unset, so it keeps calling Convex, and Quick Share works
-     unchanged. Do not point it at `/api/internal/quick-share` yet: that route
-     answers 404 until the frontend runs with `DATA_BACKEND=postgres`. See
-     [Quick Share](areas/quick-share.md);
+   - the media release that reads `CONTROL_PLANE_URL` was deployed with the
+     variable unset during the pre-cutover rollout, so it kept calling Convex
+     and Quick Share worked unchanged. The route answered 404 until the
+     PostgreSQL frontend release was active. See [Quick Share](areas/quick-share.md);
    - the frontend environment contains `CLERK_SECRET_KEY` (synced from
      Infisical `/kubernetes/webpage/beastypage-clerk-secret`; check the name,
-     never the value). With `DATA_BACKEND=postgres` the proxy mounts
-     `clerkMiddleware()`, which needs it for every API request;
+     never the value). The PostgreSQL release mounted `clerkMiddleware()` in
+     the proxy, which needed it for every API request;
    - the release contains the same schema version as the target cluster and
      `pnpm exec biome check` and the migration test suite are green.
 
@@ -147,9 +150,10 @@ report directory on encrypted storage outside the repository.
    ```
 
    **Expected output:** the write is HTTP 503 with `code: "unavailable"` and a
-   `Retry-After` header. The database health route intentionally returns 503
-   while Convex is selected; check it after step 8, once PostgreSQL is active. The
-   site-wide banner is visible. Existing reads are still served. This gate
+   `Retry-After` header. The database health route intentionally returned 503
+   while the pre-cutover Convex backend was selected; it was checked after
+   step 8, once PostgreSQL was active. The site-wide banner was visible.
+   Existing reads were still served. This gate
    also covers `/i/api/**`, so media uploads stop.
 
    **Failure action:** keep maintenance enabled, repair the deployment or
@@ -370,8 +374,8 @@ report directory on encrypted storage outside the repository.
    The deployments are managed by Flux, so change the values in Infisical,
    never with `kubectl set env` (Flux would revert it):
 
-   - frontend secret: `DATA_BACKEND=postgres`, `JOBS_ENABLED=1`, the
-     `DATABASE_URL` for `beastypage_app`;
+   - frontend secret selected the PostgreSQL backend, with `JOBS_ENABLED=1`
+     and the `DATABASE_URL` for `beastypage_app`;
    - media secret (`beastypage-media-secret`):
      `CONTROL_PLANE_URL=https://<public-host>/api/internal/quick-share`.
 
@@ -391,12 +395,12 @@ report directory on encrypted storage outside the repository.
 
    Media switches its control plane here, inside the window, because the
    PostgreSQL route only answers once the frontend runs on PostgreSQL.
-   Convex-mode browser writes use Convex's websocket and therefore cannot be
-   stopped by the frontend gate alone; pausing Convex in step 5 is mandatory.
+   Browser writes through Convex's websocket could not be stopped by the
+   frontend gate alone; pausing Convex in step 5 was mandatory.
 
-   **Expected output:** every replica reports `DATA_BACKEND=postgres`, the
-   database readiness endpoint is HTTP 200, and media health plus the dispatch
-   probe succeed. `MAINTENANCE_MODE=1` deliberately keeps the jobs worker
+   **Expected output:** every replica reported the PostgreSQL backend, the
+   database readiness endpoint was HTTP 200, and media health plus the dispatch
+   probe succeeded. `MAINTENANCE_MODE=1` deliberately kept the jobs worker
    stopped even though `JOBS_ENABLED=1`; verify the worker only after the gate
    is lifted in step 10.
 
@@ -482,7 +486,7 @@ report directory on encrypted storage outside the repository.
 - [ ] Convex is paused; media is drained; `FREEZE_AT` and the no-write log query
   are recorded.
 - [ ] Final import used `--expected-issuer`; `verify:import` is `OK`.
-- [ ] `DATA_BACKEND=postgres` and `JOBS_ENABLED=1` are live on every frontend
+- [ ] The PostgreSQL backend and `JOBS_ENABLED=1` are live on every frontend
   replica, media health and dispatch checks pass, and media uses the
   PostgreSQL `CONTROL_PLANE_URL`.
 - [ ] `smoke:cutover` is `OK` with the maintenance write assertion.

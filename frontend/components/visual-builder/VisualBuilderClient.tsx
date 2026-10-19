@@ -58,6 +58,13 @@ import type { PaletteMode } from "@/lib/palettes";
 import { getPaletteIds } from "@/lib/palettes";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
+import {
+  createPreviewBatcher,
+  type PreviewBatchItem,
+  preparePreviewBatchParams,
+  VISUAL_BUILDER_PREVIEW_BATCH_SIZE,
+  VISUAL_BUILDER_PREVIEW_CONCURRENCY,
+} from "./previewBatcher";
 
 export const VALID_PALETTE_IDS: PaletteMode[] = ["off", ...getPaletteIds()];
 
@@ -284,6 +291,8 @@ export function VisualBuilderClient({
   const [params, setParams] = useState<CatParams>(() =>
     synchronizeBuilderParams(DEFAULT_PARAMS),
   );
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
   const [tortieLayers, setTortieLayers] = useState<TortieLayer[]>([]);
   const [experimentalColourMode, setExperimentalColourMode] =
     useState<PaletteMode>("off");
@@ -420,9 +429,6 @@ export function VisualBuilderClient({
 
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const previewCacheRef = useRef<Map<string, string>>(new Map());
-  const previewPendingRef = useRef<Map<string, Promise<string | null>>>(
-    new Map(),
-  );
   const previewRequestRef = useRef(0);
 
   const createMapperRecord = useCatCreate();
@@ -724,42 +730,87 @@ export function VisualBuilderClient({
     [ensureTortieSync, markShareDirty],
   );
 
-  const requestPreview = useCallback(
+  const renderBatchPreviews = useCallback(
     async (
-      key: string,
-      mutator: (draft: CatParams) => void,
-    ): Promise<string | null> => {
-      const cached = previewCacheRef.current.get(key);
-      if (cached) return cached;
+      items: readonly PreviewBatchItem<CatParams>[],
+    ): Promise<ReadonlyMap<string, string>> => {
+      const generatorInstance = generatorRef.current;
+      if (!rendererReady || !generatorInstance?.generateVariantSheet) {
+        throw new Error("Batch renderer is not available");
+      }
+
+      const variantIds = items.map((_, index) => `visual-preview-${index}`);
+      const result = await generatorInstance.generateVariantSheet(
+        paramsRef.current,
+        items.map((item, index) => ({
+          id: variantIds[index] as string,
+          params: preparePreviewBatchParams(item.value),
+        })),
+        {
+          includeSources: true,
+          includeBase: false,
+          frameMode: "composed",
+          priority: "auto",
+        },
+      );
+      const sourceById = new Map(
+        (result.sources ?? []).map((source) => [
+          source.id,
+          source.imageDataUrl,
+        ]),
+      );
+      return new Map(
+        items.flatMap((item, index) => {
+          const preview = sourceById.get(variantIds[index] as string);
+          return preview ? [[item.key, preview] as const] : [];
+        }),
+      );
+    },
+    [rendererReady],
+  );
+
+  const renderSinglePreview = useCallback(
+    async (item: PreviewBatchItem<CatParams>): Promise<string | null> => {
       const generatorInstance = generatorRef.current;
       if (!rendererReady || !generatorInstance) return null;
-      const pending = previewPendingRef.current.get(key);
-      if (pending) return pending;
-      const promise = (async () => {
-        try {
-          const draft = mutateBuilderParams(params, mutator);
-          const result = await generatorInstance.generateCat(
-            draft as unknown as Record<string, unknown>,
-          );
-          let preview = result.imageDataUrl ?? null;
-          if (!preview && result.canvas) {
-            preview = canvasToDataUrl(result.canvas as HTMLCanvasElement);
-          }
-          if (preview) {
-            previewCacheRef.current.set(key, preview);
-          }
-          return preview ?? null;
-        } catch (error) {
-          console.warn("Preview generation failed", error);
-          return null;
-        } finally {
-          previewPendingRef.current.delete(key);
-        }
-      })();
-      previewPendingRef.current.set(key, promise);
-      return promise;
+      const result = await generatorInstance.generateCat(item.value);
+      let preview = result.imageDataUrl ?? null;
+      if (!preview && result.canvas) {
+        preview = canvasToDataUrl(result.canvas as HTMLCanvasElement);
+      }
+      return preview;
     },
-    [params, rendererReady],
+    [rendererReady],
+  );
+
+  const previewBatcher = useMemo(
+    () =>
+      createPreviewBatcher<CatParams>({
+        batchSize: VISUAL_BUILDER_PREVIEW_BATCH_SIZE,
+        concurrency: VISUAL_BUILDER_PREVIEW_CONCURRENCY,
+        getCached: (key) => previewCacheRef.current.get(key),
+        setCached: (key, value) => previewCacheRef.current.set(key, value),
+        renderBatch: renderBatchPreviews,
+        renderSingle: renderSinglePreview,
+        onBatchError: (error) => {
+          console.warn(
+            "Preview batch failed, falling back to individual renders",
+            error,
+          );
+        },
+      }),
+    [renderBatchPreviews, renderSinglePreview],
+  );
+
+  const requestPreview = useCallback(
+    (key: string, mutator: (draft: CatParams) => void) => {
+      if (!rendererReady) return Promise.resolve(null);
+      return previewBatcher.request(
+        key,
+        mutateBuilderParams(paramsRef.current, mutator),
+      );
+    },
+    [previewBatcher, rendererReady],
   );
 
   const getCachedPreview = useCallback(

@@ -21,17 +21,37 @@ Thank you for your interest in contributing! This document provides guidelines f
    ```
 3. Install dependencies:
    ```bash
-   cd frontend
-   pnpm install --ignore-scripts
+   pnpm install --frozen-lockfile
+   pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+   pnpm --dir backend/media_service install --frozen-lockfile
+   npm --prefix backend/discord-bot ci
+   pnpm --dir backend/image_processing_service install --frozen-lockfile
+   (cd backend/renderer_service && uv sync --frozen --extra dev)
+   lefthook install
    ```
 4. Start the development server:
    ```bash
-   pnpm run dev
+   pnpm dev
    ```
 
+   For a frontend-only setup, start the per-worktree PostgreSQL database and
+   then run the frontend:
+   ```bash
+   pnpm --dir frontend run db:local up
+   pnpm --dir frontend run db:migrate
+   pnpm --dir frontend dev
+   ```
+
+   Before the final command, copy the `DATABASE_URL` line from the gitignored
+   `frontend/.env.database.local` into `frontend/.env.local` because Next.js
+   does not load the helper's filename. Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   and `CLERK_SECRET_KEY` there for signed-in flows. The root
+   `pnpm dev:frontend` script is the Infisical-backed alternative for injecting
+   Clerk and service runtime values; it does not provide `DATABASE_URL`.
+
    The frontend uses PostgreSQL through Drizzle. Database migrations are applied
-   by the frontend init container; local development reads database and runtime
-   settings from Infisical.
+   by the frontend init container; the full development setup reads runtime
+   settings from Infisical, while `DATABASE_URL` remains in `frontend/.env.local`.
 
 ## How to Contribute
 

@@ -140,34 +140,16 @@ export async function lockUploadByToken(tx: Transaction, token: string) {
   return row ?? null;
 }
 
-export async function lockUploadByFileId(tx: Transaction, fileId: string) {
-  const [row] = await tx
-    .select()
-    .from(catdexUploads)
-    .where(eq(catdexUploads.fileId, fileId))
-    .for("update")
-    .limit(1);
-  return row ?? null;
-}
-
-export async function countRecentUploads(
-  db: Db,
-  rateKey: string | null,
-  since: Date,
-) {
-  const where = rateKey
-    ? and(
-        eq(catdexUploads.rateKey, rateKey),
-        sql`${catdexUploads.createdAt} > ${since}`,
-      )
-    : and(
-        sql`${catdexUploads.rateKey} is null`,
-        sql`${catdexUploads.createdAt} > ${since}`,
-      );
+export async function countRecentUploads(db: Db, rateKey: string, since: Date) {
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(catdexUploads)
-    .where(where);
+    .where(
+      and(
+        eq(catdexUploads.rateKey, rateKey),
+        sql`${catdexUploads.createdAt} > ${since}`,
+      ),
+    );
   return Number(row?.count ?? 0);
 }
 

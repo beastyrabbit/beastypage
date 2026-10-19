@@ -44,8 +44,13 @@ frontend/
 │   ├── jobs/               # PostgreSQL job worker and job kinds
 │   └── live/               # LISTEN/NOTIFY live updates
 ├── drizzle/                # SQL migrations
-├── lib/                    # Utilities and helpers (lib/data = client data hooks)
-└── public/                 # Static assets (sprites, images)
+├── lib/                    # Utilities and helpers
+│   ├── data/               # Client data hooks
+│   └── live/               # Live updates over SSE
+├── scripts/                # Development and build scripts
+│   └── db/                 # Local PostgreSQL and Drizzle migration tools
+├── public/                 # Static assets (sprites, images)
+└── proxy.ts                # Clerk middleware, maintenance gate and routing
 ```
 
 ## Development Commands

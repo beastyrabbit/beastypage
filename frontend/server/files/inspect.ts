@@ -1,44 +1,12 @@
 import { createHash } from "node:crypto";
 import sharp from "sharp";
 
-/** One line of `_storage/documents.jsonl`. */
 export interface StorageMeta {
   id: string;
   creationTime: number | null;
   sha256Hex: string | null;
   size: number | null;
   contentType: string | null;
-}
-
-/** Convex documents sha256 as hex; accept base64 too until #106 confirms the export encoding. */
-function normalizeSha256(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  if (/^[0-9a-f]{64}$/i.test(value)) return value.toLowerCase();
-  if (/^[A-Za-z0-9+/]{43}=$/.test(value)) {
-    const hex = Buffer.from(value, "base64").toString("hex");
-    return hex.length === 64 ? hex : null;
-  }
-  return null;
-}
-
-export function parseStorageMeta(document: unknown): StorageMeta | string {
-  if (!document || typeof document !== "object")
-    return "storage metadata is not an object";
-  const record = document as Record<string, unknown>;
-  if (typeof record._id !== "string" || record._id === "")
-    return "storage metadata has no _id";
-  const sha256Hex = normalizeSha256(record.sha256);
-  if (record.sha256 !== undefined && !sha256Hex)
-    return "storage sha256 is not hex or base64";
-  return {
-    id: record._id,
-    creationTime:
-      typeof record._creationTime === "number" ? record._creationTime : null,
-    sha256Hex,
-    size: typeof record.size === "number" ? record.size : null,
-    contentType:
-      typeof record.contentType === "string" ? record.contentType : null,
-  };
 }
 
 const MIME_BY_FORMAT: Record<string, string> = {
@@ -89,9 +57,9 @@ async function decodeImage(bytes: Buffer): Promise<{
 }
 
 /**
- * Hashes and decodes the image header; returns problems instead of throwing.
- * A declared raster type that differs from the decoded one is corrected to the
- * decoded type and reported as a repair; any other declared type is a problem.
+ * Hashes and decodes an image header, returning validation problems instead of
+ * throwing. A declared raster type that differs from the decoded one is
+ * corrected to the decoded type and reported as a repair.
  */
 export async function inspectFile(
   bytes: Buffer,

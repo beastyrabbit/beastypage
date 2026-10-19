@@ -161,6 +161,17 @@ describe("catalog routes on PostgreSQL", () => {
   });
 
   it("covers public, owner, pending, moderation, and item Catdex routes", async () => {
+    const missingUploadToken = await catdexRoute.POST(
+      jsonRequest("http://localhost/api/catdex", "POST", {
+        twitchUserName: "route-owner",
+        catName: "Missing token",
+        seasonId,
+        rarityId,
+        defaultCard: { storageId: uploadFileId, fileName: "route.png" },
+      }),
+    );
+    expect(missingUploadToken.status).toBe(400);
+
     const publicResponse = await catdexRoute.GET(
       new NextRequest("http://localhost/api/catdex?pageSize=999"),
     );

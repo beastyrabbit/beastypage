@@ -98,6 +98,11 @@ describe("Catdex PostgreSQL upload routes", () => {
     );
     expect(invalidUploadUrlBody.status).toBe(400);
 
+    const missingClientKey = await uploadUrlRoute.POST(
+      jsonRequest("http://localhost/api/catdex/upload-url", {}),
+    );
+    expect(missingClientKey.status).toBe(400);
+
     const token = await issueToken("upload-media-case-1234");
     const unsupported = await uploadRoute.POST(
       uploadRequest(token, "plain text", "text/plain"),

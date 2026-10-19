@@ -5,8 +5,6 @@
 
 A pixel-cat gacha site with generators, animated wheels, adoption tools, and a searchable Catdex.
 
-A pixel cat gacha platform featuring generators, wheels, and collection tools built with ClanGen sprites.
-
 ## Features
 
 - **Cat Generator** - Generate random pixel cats with customizable traits, accessories, tortie coats, and 20 derived coat patterns across gacha, builders, adoption, evolution, ancestry, streams, and Discord
@@ -50,18 +48,29 @@ the frontend, renderer, media service, Discord bot, and palette watcher, then
 opens the worktree-specific Portless URL after every service is ready. The exact
 URL is printed in the terminal; it is intentionally not hard-coded.
 
-The frontend uses PostgreSQL through the Drizzle data layer. The production CNPG
-cluster is `beastypage-postgres` in the `webpage` namespace; migrations run in
-the frontend init container before the application starts. Local database and
-runtime values come from Infisical paths
-`/kubernetes/webpage/beastypage-postgres` and
-`/kubernetes/webpage/beastypage-frontend-runtime-config`.
+The frontend uses PostgreSQL through the Drizzle data layer. In production, it
+runs against the `beastypage-postgres` CNPG cluster in the `webpage` namespace,
+with migrations in the frontend init container; production runtime values come
+from Infisical paths `/kubernetes/webpage/beastypage-postgres` and
+`/kubernetes/webpage/beastypage-frontend-runtime-config`. The local full
+development setup instead injects the `dev` environment paths `/frontend`,
+`/media`, and `/discord-bot` in the BeastyPage Infisical project through the
+root scripts; see [Local development notes](docs/local-development.md).
 
 ### Frontend only
 
 ```bash
+pnpm --dir frontend run db:local up
+pnpm --dir frontend run db:migrate
 pnpm --dir frontend dev
 ```
+
+Before the final command, copy the `DATABASE_URL` line from the gitignored
+`frontend/.env.database.local` into `frontend/.env.local` because Next.js does
+not load the helper's filename. Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
+`CLERK_SECRET_KEY` there for signed-in flows. The root `pnpm dev:frontend` script
+is the Infisical-backed alternative for injecting Clerk and service runtime
+values; it does not provide `DATABASE_URL`.
 
 ### Renderer Service (Optional)
 
@@ -114,30 +123,35 @@ beastypage/
 │   ├── image_processing_service/
 │   ├── media_service/      # Quick Share media worker
 │   └── renderer_service/   # FastAPI cat renderer
+├── deploy/                 # PostgreSQL CNPG and Infisical sync templates
+├── docs/                   # Development, operations, migration and rollout docs
 ├── scripts/                 # Sprite import tooling
-└── .forgejo/workflows/     # Build and release pipelines
+└── .github/workflows/      # build-images.yml, validate.yml, sonarqube.yml
 ```
 
-See [review remediation and rollout notes](docs/review-remediation.md) for the new service credential, compatibility requirements, limits, and verification commands.
+Each backend service directory has its own README with run commands and environment variables.
 
 Additional operational notes:
 
 - [Stream overlay architecture and timing](docs/stream-overlays.md)
 - [Local development notes](docs/local-development.md)
+- [PostgreSQL operations](docs/migration/operations.md)
+- [PostgreSQL architecture decision record](docs/migration/adr-0001-postgresql.md)
+- [PostgreSQL migration record](docs/migration/status.md)
 - [Runtime TypeScript constraints](docs/runtime-typescript.md)
 - [Release verification](docs/release-verification.md)
 
 ## Container Images
 
-GitHub Actions builds GHCR images on `main` and version-tag pushes. The Forgejo workflow and registry path are retained for the migration; repository files alone do not establish whether that runner is active. Both paths gate publication on validation. A pull request runs validation only.
+GitHub Actions builds and publishes GHCR images from `.github/workflows/build-images.yml`. Version-tag pushes such as `v8.1.0` receive `X.Y.Z` and `X.Y` semver tags, main pushes receive `latest` and a commit SHA tag, and manual runs can receive a smoke tag. Publication jobs require their applicable validation checks to succeed. Pull requests run validation only.
 
-The retained Forgejo image names are:
+The published image names are:
 
-- `git.heerlab.com/beasty/beastypage-frontend`
-- `git.heerlab.com/beasty/beastypage-renderer`
-- `git.heerlab.com/beasty/beastypage-image-processing`
-- `git.heerlab.com/beasty/beastypage-media`
-- `git.heerlab.com/beasty/beastypage-discord-bot`
+- `ghcr.io/beastyrabbit/beastypage-frontend`
+- `ghcr.io/beastyrabbit/beastypage-renderer`
+- `ghcr.io/beastyrabbit/beastypage-image-processing`
+- `ghcr.io/beastyrabbit/beastypage-media`
+- `ghcr.io/beastyrabbit/beastypage-discord-bot`
 
 ### Cat-system release cutover
 
@@ -160,9 +174,27 @@ legacy renderer does not advertise a catalog hash.
 The frontend image connects to the PostgreSQL-backed API configured by its runtime environment:
 
 ```bash
-docker run -p 3000:3000 \
-  git.heerlab.com/beasty/beastypage-frontend:latest
+docker run --rm \
+  -v /absolute/path/to/ca.crt:/etc/postgres-ca/ca.crt:ro \
+  -e NODE_ENV=production \
+  -e DATABASE_MIGRATION_URL='postgresql://owner:owner_password@db.example.com:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt' \
+  -e DATABASE_APP_ROLE=beastypage_app \
+  ghcr.io/beastyrabbit/beastypage-frontend:8.1.0 \
+  node scripts/db/migrate.mjs
+
+docker run --rm -p 3000:3000 \
+  -v /absolute/path/to/ca.crt:/etc/postgres-ca/ca.crt:ro \
+  -e NODE_ENV=production \
+  -e DATABASE_URL='postgresql://app:app_password@db.example.com:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt' \
+  -e NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_replace_me \
+  -e CLERK_SECRET_KEY=sk_live_replace_me \
+  ghcr.io/beastyrabbit/beastypage-frontend:8.1.0
 ```
+
+The first command applies the schema with the owner URL before the app starts;
+the second uses the app URL for serving requests. For a throwaway local setup,
+`DATABASE_ALLOW_INSECURE=1` is the documented override for a non-verified
+connection.
 
 ### Kubernetes Deployment
 
@@ -177,7 +209,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: git.heerlab.com/beasty/beastypage-frontend:latest
+          image: ghcr.io/beastyrabbit/beastypage-frontend:8.1.0
           env:
             - name: DATABASE_URL
               valueFrom:

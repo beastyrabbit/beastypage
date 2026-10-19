@@ -4,11 +4,7 @@ import { getRequestIdentity } from "@/server/auth/identity";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody, parseSearchParams } from "@/server/request";
-import {
-  listCollection,
-  listCollectionLegacy,
-  setCollectionFocus,
-} from "@/server/services/catalog";
+import { listCollection, setCollectionFocus } from "@/server/services/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +15,8 @@ export async function GET(request: NextRequest) {
       z.object({
         cursor: z.string().optional(),
         pageSize: z.coerce.number().int().positive().optional(),
-        limit: z.coerce.number().int().positive().optional(),
       }),
     );
-    if (params.limit !== undefined && params.cursor === undefined) {
-      return NextResponse.json(
-        await listCollectionLegacy(getDb(), params.limit),
-      );
-    }
     const result = await listCollection(getDb(), {
       cursor: params.cursor,
       pageSize: params.pageSize,

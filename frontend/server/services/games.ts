@@ -76,9 +76,9 @@ function hashCatParams(params: unknown): string {
   return hash.toString(16);
 }
 
-function validClientId(value: string | undefined): string {
-  const normalized = value?.trim() || `anonymous:${randomUUID()}`;
-  if (normalized.length > 128 || (value !== undefined && normalized !== value))
+function validClientId(value: string): string {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 128 || normalized !== value)
     throw new ServiceError("invalid_input", "A valid client ID is required");
   return normalized;
 }
@@ -168,10 +168,7 @@ export async function registerPerfectCats(
   });
 }
 
-export async function requestPerfectMatchup(
-  db: Database,
-  clientValue?: string,
-) {
+export async function requestPerfectMatchup(db: Database, clientValue: string) {
   const clientId = validClientId(clientValue);
   return withTransaction(
     db,
@@ -231,7 +228,7 @@ export async function submitPerfectVote(
     clientId: string;
     winnerId: string;
     loserId: string;
-    matchupToken?: string;
+    matchupToken: string;
   },
 ) {
   const clientId = validClientId(args.clientId);
@@ -255,7 +252,7 @@ export async function submitPerfectVote(
         matchup.expiresAt < now ||
         pairKey(matchup.catAId, matchup.catBId) !==
           pairKey(winner.id, loser.id) ||
-        (args.matchupToken !== undefined && args.matchupToken !== matchup.token)
+        args.matchupToken !== matchup.token
       )
         throw new ServiceError(
           "forbidden",

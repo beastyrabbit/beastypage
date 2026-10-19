@@ -36,13 +36,10 @@ spec:
         connectionLimit: 30
         passwordSecret:
           name: beastypage-postgres-app-role
+      # Deploy the release that revokes the role's privileges before merging
+      # this tombstone; then delete the entry, orphaned Secrets and Infisical key.
       - name: beastypage_import
-        # Enabled only during a rehearsal or the cutover window.
-        ensure: present
-        login: false
-        connectionLimit: 4
-        passwordSecret:
-          name: beastypage-postgres-import-role
+        ensure: absent
 
   affinity:
     enablePodAntiAffinity: true

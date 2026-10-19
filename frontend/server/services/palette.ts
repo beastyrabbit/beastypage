@@ -86,6 +86,6 @@ export async function storeDiscordImage(
     });
     if (!row)
       throw new ServiceError("unavailable", "Failed to store palette image");
-    return { slug: chosen, storageId: file.id };
+    return { slug: chosen };
   });
 }

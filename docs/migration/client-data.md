@@ -1,46 +1,55 @@
 # Client data foundation
 
-The client keeps the Convex API shape while each migrated area gains a
-PostgreSQL route. `DATA_BACKEND` is read on the server in the root layout and
-provided to client components through `DataBackendProvider`. Components use
-`useDataBackend()` only when they need to render backend-specific details;
-data access should use the dual-path hooks.
+Browser data access uses TanStack Query hooks in `frontend/lib/data`. Each
+area file builds a stable key with `dataQueryKeys` and fetches a Next.js API
+route with `fetchJson`. For example, the cat hooks in
+`frontend/lib/data/cats.ts` use this pattern:
 
 ```tsx
-const settings = useDataQuery(api.dashSettings.get, { slug }, {
-  queryKey: dataQueryKeys.detail("dash-settings", slug),
+const profile = useDataQuery(slugOrId ? { slugOrId } : "skip", {
+  queryKey: dataQueryKeys.detail("cat-profile", slugOrId ?? "none"),
   queryFn: (args, signal) =>
-    fetchJson(`/api/dash-settings?slug=${encodeURIComponent(args.slug)}`, {
-      signal,
-    }),
+    fetchJson(
+      `/api/cats/profile?slugOrId=${encodeURIComponent(args.slugOrId)}`,
+      { signal, nullable: true },
+    ),
 });
 
-const save = useDataMutation(api.dashSettings.save, {
+const save = useDataMutation({
   mutationFn: (args, signal) =>
-    fetchJson("/api/dash-settings", { method: "POST", body: args, signal }),
-  invalidate: [dataQueryKeys.detail("dash-settings", slug)],
+    fetchJson("/api/cats/profile", {
+      method: "PATCH",
+      body: args,
+      signal,
+    }),
+  invalidate: [dataQueryKeys.detail("cat-profile", slugOrId)],
 });
 ```
 
-`useDataQuery` always calls both underlying hooks so the Rules of Hooks remain
-valid. The Convex hook receives `"skip"` while PostgreSQL is selected; the
-TanStack query is disabled while Convex is selected. Query results are
-`undefined` until the first response, matching Convex. Mutations return the
-same async function shape as `useMutation` and invalidate the keys listed in
-`invalidate` after a PostgreSQL success.
+`useDataQuery` takes the arguments or `"skip"` and a
+`DataQueryOptions` object. It runs a TanStack query when enabled and returns
+`undefined` until the first response. `useDataMutation` returns an async
+function and invalidates the keys listed in `invalidate` after success.
 
-Use `useDataPaginatedQuery` for lists. Its PostgreSQL fetcher receives the
-current opaque cursor and returns `{ results, nextCursor }`; the hook exposes
-Convex's `{ results, status, loadMore, isLoading }` contract. Route handlers
-should use `encodeCursor`/`decodeCursor` and order by `(created_at, id)`.
+Use `useDataPaginatedQuery` for lists. Its fetcher receives the current opaque
+cursor and returns `{ results, nextCursor }`. The hook exposes
+`{ results, status, loadMore, isLoading }`. Route handlers use
+`encodeCursor` and `decodeCursor` and order pages by creation time and ID.
 
-Authentication follows the selected backend through `useBackendAuth()`. In
-Convex mode it preserves `useConvexAuth()` state; in PostgreSQL mode it uses
-Clerk's loaded and signed-in state, so client pages do not wait for a paused
-Convex deployment. PostgreSQL mode still mounts a plain `ConvexProvider` for
-dual-path hooks that call Convex with `"skip"`; Convex mode keeps
-`ConvexProviderWithClerk`.
+`dataQueryKeys` provides the shared `all`, `query`, `list`, and `detail` key
+builders. Keys intentionally omit a trailing `undefined` so TanStack prefix
+invalidation matches the stored queries.
 
-`fetchJson` sends and receives JSON and throws `ApiError` with `status`, `code`
-and `message` for the server error contract. Pass its `signal` through to
-support cancellation when TanStack Query abandons a request.
+The `frontend/lib/data/index.ts` barrel exports the auth, hook, and key
+modules for client components.
+
+`useBackendAuth()` now reports Clerk's loading and signed-in state. It also
+resets the TanStack Query cache when the Clerk user changes, preventing data
+from the previous user from being shown.
+
+`frontend/app/layout.tsx` renders `AppProviders` from
+`frontend/components/providers.tsx`. The provider tree mounts `ClerkProvider`,
+`QueryClientProvider`, and `BackendAuthProvider`. The query client uses a
+30-second stale time, avoids refetching on window focus, and retries transient
+errors. `fetchJson` sends and receives JSON and throws `ApiError` with
+`status`, `code`, and `message`; pass its `signal` through for cancellation.

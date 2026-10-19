@@ -9,8 +9,10 @@ import {
 import { primaryId, tstz } from "./columns";
 
 /**
- * Importer bookkeeping (#111). Rejected records never enter the database;
- * they go to the private quarantine report next to the archive.
+ * Importer bookkeeping (#111). The importer code was removed; these tables are
+ * retained bookkeeping pending a contract migration. Rejected records never
+ * enter the database; they go to the private quarantine report next to the
+ * archive.
  */
 export const importRuns = pgTable("import_runs", {
   id: primaryId(),
