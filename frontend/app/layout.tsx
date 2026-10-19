@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import { MaintenanceBanner } from "@/components/common/MaintenanceBanner";
 import { AppProviders } from "@/components/providers";
@@ -7,18 +7,29 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { isMaintenanceMode } from "@/server/maintenance";
 import "./globals.css";
+import "../fonts/fallbacks.css";
 
 // Maintenance mode is read from the runtime environment.
 export const dynamic = "force-dynamic";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: "../fonts/geist/Geist-Variable.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
+  adjustFontFallback: false,
+  fallback: ["Geist Fallback"],
   variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "../fonts/geistmono/GeistMono-Variable.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
+  adjustFontFallback: false,
+  fallback: ["Geist Mono Fallback"],
   variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {

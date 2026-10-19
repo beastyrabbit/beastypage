@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
-import { Press_Start_2P } from "next/font/google";
+import localFont from "next/font/local";
 import { EvolutionBatchClient } from "@/components/evolution/EvolutionBatchClient";
 
-const pixelFont = Press_Start_2P({
+const pixelFont = localFont({
+  src: "../../../fonts/pressstart2p/PressStart2P-Regular.woff2",
   weight: "400",
-  subsets: ["latin"],
+  style: "normal",
+  display: "swap",
+  adjustFontFallback: false,
+  fallback: ["Press Start 2P Fallback"],
   variable: "--font-pixel",
 });
 

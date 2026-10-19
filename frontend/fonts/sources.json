@@ -1,0 +1,68 @@
+[
+  {
+    "file": "geist/Geist-Variable.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/geist/Geist%5Bwght%5D.ttf",
+    "sourceSha256": "73894e0448cae90a92b6c2f8732b7bb9acb7b94c418bff559dad4a18e1de9659",
+    "sha256": "f29d30c534d8c300bc5dca843b080e0768669cb0a4111dcc4734c2fe2dbb0f2f"
+  },
+  {
+    "file": "geistmono/GeistMono-Variable.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/geistmono/GeistMono%5Bwght%5D.ttf",
+    "sourceSha256": "d00e590b8eb3a59acc329b2d044fd143ae935090b7da33199ebee27cc7de8196",
+    "sha256": "4f4b6a2844805255515a089a6f0b496fdc8432571008a5947600fb800406753d"
+  },
+  {
+    "file": "ebgaramond/EBGaramond-Variable.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf",
+    "sourceSha256": "ef9512f92f6d579e5dc75af59a5a4b1b8b47d2eda89e00b954d44520e5369027",
+    "sha256": "cb99d884b133a7154e144f0d661d197dee76528286695f183e594cd1dae0aab4"
+  },
+  {
+    "file": "ebgaramond/EBGaramond-Italic-Variable.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ebgaramond/EBGaramond-Italic%5Bwght%5D.ttf",
+    "sourceSha256": "bba2c4499c93c9612b90b9825d32b07da52fce2fe57562a1eb6b833553f93c4e",
+    "sha256": "0bd0bed6572fcd8f07cceec2af5b1c3f751161cc8c5c47562b51fc833a2e5d6d"
+  },
+  {
+    "file": "cormorantgaramond/CormorantGaramond-Variable.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf",
+    "sourceSha256": "b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0",
+    "sha256": "21baf96301703d44028241cdbc8865ebb8123260dc987e416d7245cb7e793b3f"
+  },
+  {
+    "file": "cormorantgaramond/CormorantGaramond-Italic-Variable.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/cormorantgaramond/CormorantGaramond-Italic%5Bwght%5D.ttf",
+    "sourceSha256": "0f48ea6abb2084537854f7174c470991a463b13036309e3b50a81511611c530d",
+    "sha256": "6662ca9d1c6f295a862592765a0d717b6c27797804ea954cdc395e44082aa14a"
+  },
+  {
+    "file": "pressstart2p/PressStart2P-Regular.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/pressstart2p/PressStart2P-Regular.ttf",
+    "sourceSha256": "034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
+    "sha256": "a0d01f2b321d256ed9d5675a6ea1a719f6b928854d0349fb004b43860418f3ad"
+  },
+  {
+    "file": "ibmplexmono/IBMPlexMono-Regular.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+    "sourceSha256": "6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46",
+    "sha256": "ea6550f1b5ed7c6ce7fdbe02c051f6bcca9ed69a30afe737f633eff33eb3d1e6"
+  },
+  {
+    "file": "ibmplexmono/IBMPlexMono-Medium.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexmono/IBMPlexMono-Medium.ttf",
+    "sourceSha256": "a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755",
+    "sha256": "ecfa9328639ec540e06a0cc1feba0fbe440485bb0311f37a3378705f5ee54037"
+  },
+  {
+    "file": "caveat/Caveat-Variable.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/caveat/Caveat%5Bwght%5D.ttf",
+    "sourceSha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988",
+    "sha256": "82ea60e416521ed7215bba703cde3df0142d8e9484ba3b590b2a99a2d8f85980"
+  },
+  {
+    "file": "specialelite/SpecialElite-Regular.woff2",
+    "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/apache/specialelite/SpecialElite-Regular.ttf",
+    "sourceSha256": "a776fcb4ceb8bdf03e2967688ebdad42680de5b91a7e62c17e718ae212d14bc4",
+    "sha256": "5912bdbfd9857be79428ed09a0fc824e09cbb2ee21e282d819e3fc98276bcf59"
+  }
+]
