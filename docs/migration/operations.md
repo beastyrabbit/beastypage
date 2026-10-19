@@ -239,14 +239,15 @@ same Cluster name. Keep the frontend in maintenance throughout.
    loudly on a missing backup where `initdb` would silently start an empty
    database.
 
-After any restore, run the following command as the `postgres` superuser
-through the primary pod; it is a no-op when the role is already absent:
+After any restore, run the following block as the `postgres` superuser through
+the primary pod to revoke the restored grants and drop the role; it is a no-op
+when the role is absent:
 
 ```bash
 kubectl -n webpage exec "$(kubectl -n webpage get pod \
   -l cnpg.io/cluster=beastypage-postgres,cnpg.io/instanceRole=primary \
   -o jsonpath='{.items[0].metadata.name}')" -c postgres -- \
-  psql -U postgres -d beastypage -c 'drop role if exists beastypage_import;'
+  psql -U postgres -d beastypage -c "do \$\$ begin if exists (select 1 from pg_roles where rolname = 'beastypage_import') then execute 'drop owned by beastypage_import'; execute 'drop role beastypage_import'; end if; end \$\$;"
 ```
 
 The CloudNativePG
