@@ -24,6 +24,10 @@ import type {
   CatGeneratorApi,
 } from "@/components/cat-builder/types";
 import {
+  buildCatShareUrl,
+  ensureLegacyShareEncoding,
+} from "@/components/single-cat/shareUrl";
+import {
   type BatchStreamCommand,
   parseBatchStreamCommand,
 } from "@/lib/adoption/streamBatch";
@@ -133,7 +137,6 @@ import {
   getParameterRawValue,
   getParameterValueForDisplay,
   getSpeedSettings,
-  type Id,
   INSTANT_PARAMS,
   LAYER_GROUPS,
   LAYER_PARAM_IDS,
@@ -376,21 +379,6 @@ function siteUrl(path: string): string {
   return origin ? `${origin}${path}` : path;
 }
 
-/** The cat's legacy share encoding, encoding it now when missing. */
-function ensureLegacyEncoded(
-  existing: string | null | undefined,
-  payload: ReturnType<typeof buildSharePayload>,
-): string | null {
-  const current = existing ?? null;
-  if (current) return current;
-  try {
-    return encodeCatShare(payload);
-  } catch (err) {
-    console.warn("Failed to encode share payload", err);
-    return current;
-  }
-}
-
 /** Gold fireworks celebration for a finished spin. */
 async function celebrateSpin(): Promise<void> {
   try {
@@ -541,8 +529,8 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
 
   const [initializing, setInitializing] = useState(true);
   const [initialError, setInitialError] = useState<string | null>(null);
-  const [_isGenerating, setIsGenerating] = useState(false);
-  const [_error, setError] = useState<string | null>(null);
+  const [_isGenerating, set_isGenerating] = useState(false);
+  const [_error, set_error] = useState<string | null>(null);
 
   const [mode, setMode] = useState<"flashy" | "calm">(initialSettings.mode);
   const [accessoryRange, setAccessoryRange] = useState<LayerRange>(
@@ -583,7 +571,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     removeVariant: (_id: string) => {},
     renameVariant: (_id: string, _name: string) => {},
   };
-  const [_lastTimingSnapshot, setLastTimingSnapshot] =
+  const [_lastTimingSnapshot, set_lastTimingSnapshot] =
     useState<TimingSnapshot | null>(null);
   const [speedMultiplier, setSpeedMultiplier] = useState(
     initialSettings.speedMultiplier,
@@ -734,7 +722,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   const [rollerActiveValue, setRollerActiveValue] = useState<string | null>(
     null,
   );
-  const [_rollerHighlight, setRollerHighlight] = useState(false);
+  const [_rollerHighlight, set_rollerHighlight] = useState(false);
   const [paramRows, setParamRows] = useState<ParamRow[]>([]);
   const [activeParamId, setActiveParamId] = useState<ParamId | null>(null);
   const [activeParamStartedAt, setActiveParamStartedAt] = useState<
@@ -761,13 +749,13 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       LAYER_GROUPS.map((definition) => [definition.layerKey, []]),
     ),
   );
-  const [_rollSummary, setRollSummary] = useState<string | null>(null);
-  const [_shareLink, setShareLink] = useState<string | null>(null);
-  const [_hasTint, setHasTint] = useState(false);
-  const [_toast, setToast] = useState<string | null>(null);
+  const [_rollSummary, set_rollSummary] = useState<string | null>(null);
+  const [_shareLink, set_shareLink] = useState<string | null>(null);
+  const [_hasTint, set_hasTint] = useState(false);
+  const [_toast, set_toast] = useState<string | null>(null);
   const [flashParamId, setFlashParamId] = useState<ParamId | null>(null);
   const [flashLayerKey, setFlashLayerKey] = useState<string | null>(null);
-  const [_rollerExpanded, setRollerExpanded] = useState(false);
+  const [_rollerExpanded, set_rollerExpanded] = useState(false);
   const defaultCreatorName = sessionSettings?.creatorName ?? "";
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
   const [creatorNameDraft, setCreatorNameDraft] = useState(
@@ -839,12 +827,12 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   );
 
   const showToast = useCallback((message: string) => {
-    setToast(message);
+    set_toast(message);
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
     }
     toastTimerRef.current = window.setTimeout(() => {
-      setToast(null);
+      set_toast(null);
       toastTimerRef.current = null;
     }, 2400);
   }, []);
@@ -1120,14 +1108,14 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       },
     ) => {
       if (!options?.skipHighlight) {
-        setRollerHighlight(true);
+        set_rollerHighlight(true);
       }
       await wait(ROLLER_REVEAL_HOLD);
       if (generationIdRef.current !== token) {
         return;
       }
       if (!options?.skipHighlight) {
-        setRollerHighlight(false);
+        set_rollerHighlight(false);
       }
       if (!options?.keepValue) {
         setRollerActiveValue(null);
@@ -1464,7 +1452,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       setFlashLayerKey(null);
       setActiveParamId(null);
       setActiveParamStartedAt(null);
-      setHasTint(Boolean(params.darkForest || params.darkMode || params.dead));
+      set_hasTint(Boolean(params.darkForest || params.darkMode || params.dead));
 
       catStateRef.current = {
         ...catStateRef.current,
@@ -2721,7 +2709,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           catShareSlug: shareSlug,
           shareUrl: fallbackUrl,
         };
-        setShareLink(fallbackUrl);
+        set_shareLink(fallbackUrl);
       } else if (legacyEncoded) {
         const fallbackUrl = siteUrl(`/view?cat=${legacyEncoded}`);
         catStateRef.current = {
@@ -2729,7 +2717,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           legacyEncoded,
           shareUrl: fallbackUrl,
         };
-        setShareLink(fallbackUrl);
+        set_shareLink(fallbackUrl);
       }
     },
     [],
@@ -2769,7 +2757,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
             shareUrl: url,
             catShareSlug: shareSlug ?? catStateRef.current.catShareSlug ?? null,
           };
-          setShareLink(url);
+          set_shareLink(url);
         }
       } catch (err) {
         console.warn("Failed to persist mapper record", err);
@@ -2807,7 +2795,11 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         };
       }
 
-      const legacyEncoded = ensureLegacyEncoded(state.legacyEncoded, payload);
+      const legacyEncoded = ensureLegacyShareEncoding(
+        state.legacyEncoded,
+        payload,
+        encodeCatShare,
+      );
       if (generationIdRef.current !== token) return;
       if (legacyEncoded && catStateRef.current) {
         catStateRef.current = { ...catStateRef.current, legacyEncoded };
@@ -2840,7 +2832,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         catStateRef.current,
       );
       resetMetaDrafts();
-      setShareLink(null);
+      set_shareLink(null);
       setMetaSaving(false);
 
       logTimingReport(
@@ -2851,7 +2843,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         actualDurationsRef.current,
         totalActualRef.current,
       );
-      setLastTimingSnapshot({
+      set_lastTimingSnapshot({
         counts: { ...adjustedOptionCounts },
         estimated: { ...estimatedTotals.perKey },
         estimatedTotal: estimatedTotals.total,
@@ -2859,7 +2851,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         actualTotal: totalActualRef.current,
         timestamp: now(),
       });
-      setIsGenerating(false);
+      set_isGenerating(false);
       setSpinDone(true);
       scheduleAutoClear(token);
 
@@ -2876,7 +2868,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       });
       window.setTimeout(() => {
         if (generationIdRef.current === token) {
-          setRollerExpanded(false);
+          set_rollerExpanded(false);
         }
       }, 500);
 
@@ -2904,32 +2896,32 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     };
     activeTimingRef.current = timingProfile;
 
-    setError(null);
-    setShareLink(null);
+    set_error(null);
+    set_shareLink(null);
     initBoardRows();
     setRollerLabel(null);
     setRollerActiveValue(null);
-    setRollerHighlight(false);
-    setRollSummary(null);
+    set_rollerHighlight(false);
+    set_rollSummary(null);
     setActiveParamId(null);
     setActiveParamStartedAt(null);
-    setHasTint(false);
+    set_hasTint(false);
     setSpinDone(false);
     resetWheelOverlay();
     if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
     clearMirror();
     drawPlaceholder();
-    setRollerExpanded(true);
+    set_rollerExpanded(true);
 
     const token = ++generationIdRef.current;
-    setIsGenerating(true);
+    set_isGenerating(true);
 
     try {
       const prepared = await claimPreparedSpin(token);
       if (generationIdRef.current !== token) return;
       if (!prepared) {
-        setIsGenerating(false);
-        setRollerExpanded(false);
+        set_isGenerating(false);
+        set_rollerExpanded(false);
         return;
       }
       const { loader, plan, params } = prepared;
@@ -2944,10 +2936,10 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         tortie: tortieSlots.length,
       };
 
-      setRollSummary(
+      set_rollSummary(
         `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`,
       );
-      setHasTint(Boolean(params.darkForest || params.dead));
+      set_hasTint(Boolean(params.darkForest || params.dead));
       initBoardRows();
 
       const revealed = await runSpinReveal(prepared, hasRollerOptions, token);
@@ -2969,15 +2961,15 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       if (err instanceof SpinLoaderDisposedError) return;
       console.error("Failed to generate cat", err);
       if (generationIdRef.current !== token) return;
-      setError("Failed to generate cat. Please try again.");
+      set_error("Failed to generate cat. Please try again.");
       setRollerActiveValue(null);
       setRollerLabel(null);
-      setRollerHighlight(false);
+      set_rollerHighlight(false);
       setFlashParamId(null);
       setFlashLayerKey(null);
-      setIsGenerating(false);
+      set_isGenerating(false);
       window.setTimeout(() => {
-        setRollerExpanded(false);
+        set_rollerExpanded(false);
       }, 300);
     }
   }, [
@@ -3048,120 +3040,22 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           : `Copied cat (${FULL_EXPORT_SIZE}×${FULL_EXPORT_SIZE})!`,
         options?.noTint ? "cat-no-tint" : "cat",
         showToast,
-        (message) => setError(message),
+        (message) => set_error(message),
       );
     },
     [showToast],
   );
 
-  const buildShareUrl = useCallback(async () => {
-    const state = catStateRef.current;
-    if (!state) return null;
-    if (state.shareUrl) return state.shareUrl;
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-
-    let shareSlug: string | null = state.catShareSlug ?? null;
-
-    const slugCandidate = state.mapperSlug ?? state.profileId ?? null;
-    if (slugCandidate) {
-      const url = origin
-        ? `${origin}/view/${slugCandidate}`
-        : `/view/${slugCandidate}`;
-      catStateRef.current = { ...state, shareUrl: url };
-      setShareLink(url);
-      return url;
-    }
-
-    const payload = buildSharePayload(state);
-    let legacyEncoded = state.legacyEncoded ?? null;
-    if (!legacyEncoded) {
-      try {
-        legacyEncoded = encodeCatShare(payload);
-      } catch (err) {
-        console.warn("Failed to encode share payload", err);
-      }
-    }
-
-    try {
-      const result = await createMapper({
-        catData: catDataToLegacyPersistence(
-          shareSlug ? { ...payload, shareSlug } : payload,
-        ),
-        catName: state.catName ?? undefined,
-        creatorName: state.creatorName ?? undefined,
-      });
-      if (result) {
-        const shareToken =
-          (result as { shareToken?: string }).shareToken ??
-          result.slug ??
-          result.id;
-        const url = origin
-          ? `${origin}/view/${shareToken}`
-          : `/view/${shareToken}`;
-        catStateRef.current = {
-          ...state,
-          profileId: result.id,
-          mapperSlug: shareToken,
-          editToken: result.editToken ?? state.editToken ?? null,
-          legacyEncoded,
-          shareUrl: url,
-          catShareSlug: shareSlug ?? state.catShareSlug ?? null,
-        };
-        setShareLink(url);
-        return url;
-      }
-    } catch (err) {
-      console.warn("Failed to persist share payload to PostgreSQL", err);
-    }
-
-    if (!shareSlug) {
-      const shareRecord = await createCatShare({
-        params: payload.params,
-        accessorySlots: payload.accessorySlots,
-        scarSlots: payload.scarSlots,
-        tortieSlots: payload.tortieSlots,
-        counts: payload.counts,
-      });
-      if (shareRecord?.slug) {
-        shareSlug = shareRecord.slug;
-        if (catStateRef.current) {
-          catStateRef.current = {
-            ...catStateRef.current,
-            catShareSlug: shareSlug,
-          };
-        }
-      }
-    }
-
-    if (shareSlug) {
-      const url = origin
-        ? `${origin}/visual-builder?share=${shareSlug}`
-        : `/visual-builder?share=${shareSlug}`;
-      if (catStateRef.current) {
-        catStateRef.current = {
-          ...catStateRef.current,
-          catShareSlug: shareSlug,
-          shareUrl: url,
-          legacyEncoded:
-            catStateRef.current.legacyEncoded ?? legacyEncoded ?? null,
-        };
-      }
-      setShareLink(url);
-      return url;
-    }
-
-    if (legacyEncoded) {
-      const url = origin
-        ? `${origin}/view?cat=${legacyEncoded}`
-        : `/view?cat=${legacyEncoded}`;
-      catStateRef.current = { ...state, legacyEncoded, shareUrl: url };
-      setShareLink(url);
-      return url;
-    }
-
-    setError("Unable to build share link right now.");
-    return null;
-  }, [createMapper]);
+  const buildShareUrl = useCallback(
+    () =>
+      buildCatShareUrl(
+        catStateRef,
+        { createMapper, createShare: createCatShare, encode: encodeCatShare },
+        set_shareLink,
+        set_error,
+      ),
+    [createMapper],
+  );
 
   const _handleCopyShareLink = useCallback(async () => {
     const url = await buildShareUrl();
@@ -3221,7 +3115,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       showToast("Saved to history!");
     } catch (err) {
       console.error("Failed to update mapper meta", err);
-      setError("Unable to save history entry. Please try again.");
+      set_error("Unable to save history entry. Please try again.");
     } finally {
       setMetaSaving(false);
     }
@@ -3497,32 +3391,8 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     setSpinVisible(false);
   }, [obsPhase]);
 
-  useEffect(() => {
-    if (!session?.currentCommand) return;
-    const cmd = session.currentCommand;
-    const cmdSeq = typeof cmd.seq === "number" ? cmd.seq : 0;
-
-    const decision = decideCommandAction({
-      type: cmd.type,
-      seq: cmdSeq,
-      timestamp: cmd.timestamp,
-      lastSeq: lastSeqRef.current,
-      initialized: initializedSeqRef.current,
-      generationDisabled,
-      initializing,
-      resultAutoClearEnabled: resultAutoClearEnabledRef.current,
-      resultAutoClearSeconds: resultAutoClearSecondsRef.current,
-      now: Date.now(),
-    });
-
-    if (decision === "ignore" || decision === "defer") return;
-
-    initializedSeqRef.current = true;
-    lastSeqRef.current = cmdSeq;
-
-    if (decision === "skip") return;
-
-    if (decision === "restore") {
+  const restoreCommand = useCallback(
+    (cmd: NonNullable<ObsLiveCommand>) => {
       // Overlay (re)loaded with auto-clear off — show the final result
       // without replaying the spin animation.
       resetCommandState();
@@ -3561,6 +3431,328 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           setObsPhase("idle");
           drawPlaceholder();
         });
+    },
+    [resetCommandState, drawPlaceholder, primeOverlayFromCommand],
+  );
+
+  const handleSpinCommand = useCallback(
+    (cmd: NonNullable<ObsLiveCommand>) => {
+      resetCommandState();
+      const commandToken = generationIdRef.current;
+      // Store the params from the control page so generateCatPlus uses them
+      const override = { params: cmd.params, slots: cmd.slots };
+      overrideParamsRef.current = override;
+      // Roll the plan and start loading every frame now, so the
+      // countdown doubles as preload time.
+      // A failed preparation is retried by generateCatPlus.
+      preparedSpinRef.current = prepareSpin(override).catch(() => null);
+      set_rollerHighlight(false);
+      setActiveParamId(null);
+      setActiveParamStartedAt(null);
+
+      const cdSeconds = (cmd as Record<string, unknown>).countdownSeconds as
+        | number
+        | undefined;
+      if (cdSeconds && cdSeconds > 0) {
+        setObsPhase("countdown");
+        setCountdownValue(cdSeconds);
+        setCountdownPreview(null);
+        setSpinBoardVisible(false);
+        let remaining = cdSeconds;
+
+        // Rich full-screen fireworks
+        const fireConfetti = async () => {
+          if (generationIdRef.current !== commandToken) return;
+          try {
+            const confetti = (await import("canvas-confetti")).default;
+            if (generationIdRef.current !== commandToken) return;
+            const colors = [
+              "#f59e0b",
+              "#ef4444",
+              "#3b82f6",
+              "#22c55e",
+              "#a855f7",
+              "#ec4899",
+              "#fbbf24",
+            ];
+            // Center burst
+            confetti({
+              particleCount: 80,
+              spread: 100,
+              origin: { x: 0.5, y: 0.5 },
+              colors,
+              zIndex: 10000,
+              startVelocity: 35,
+            });
+            // Left side sprayer
+            confetti({
+              angle: 60,
+              spread: 55,
+              origin: { x: 0, y: 0.6 },
+              particleCount: 50,
+              colors,
+              zIndex: 10000,
+              startVelocity: 45,
+            });
+            // Right side sprayer
+            confetti({
+              angle: 120,
+              spread: 55,
+              origin: { x: 1, y: 0.6 },
+              particleCount: 50,
+              colors,
+              zIndex: 10000,
+              startVelocity: 45,
+            });
+            // Top burst with stars
+            confetti({
+              spread: 360,
+              ticks: 60,
+              startVelocity: 30,
+              particleCount: 40,
+              origin: {
+                x: 0.3 + Math.random() * 0.4,
+                y: Math.random() * 0.4,
+              },
+              colors,
+              shapes: ["star"],
+              zIndex: 10000,
+            });
+            // Random scatter
+            confetti({
+              particleCount: 30,
+              spread: 120,
+              origin: { x: Math.random(), y: Math.random() * 0.5 },
+              colors,
+              zIndex: 10000,
+            });
+          } catch {
+            /* confetti unavailable */
+          }
+        };
+        fireConfetti();
+
+        // Cat preview cycling every 250ms
+        const genRef = generatorRef.current;
+        if (genRef?.generateRandomCat) {
+          const cycle = async () => {
+            if (generationIdRef.current !== commandToken) return;
+            try {
+              const r = await genRef.generateRandomCat?.({
+                accessoryCount: computeLayerCount(accessoryRange),
+                scarCount: computeLayerCount(scarRange),
+                tortieCount: computeLayerCount(tortieRange),
+                exactLayerCounts,
+                experimentalColourMode:
+                  extendedModesArray.length > 0
+                    ? extendedModesArray
+                    : undefined,
+                includeBaseColours,
+                includeNewSprites,
+              });
+              if (
+                generationIdRef.current === commandToken &&
+                r?.canvas instanceof HTMLCanvasElement
+              ) {
+                setCountdownPreview(r.canvas.toDataURL("image/png"));
+              }
+            } catch {
+              /* skip */
+            }
+          };
+          cycle();
+          previewIntervalRef.current = setInterval(cycle, 250);
+        }
+
+        const tick = () => {
+          if (generationIdRef.current !== commandToken) return;
+          remaining--;
+          if (remaining <= 0) {
+            // "GO!" flash — big finale burst, hold 800ms then start spin
+            setCountdownValue(0);
+            if (previewIntervalRef.current) {
+              clearInterval(previewIntervalRef.current);
+              previewIntervalRef.current = null;
+            }
+            // Massive finale — triple burst
+            fireConfetti();
+            setTimeout(() => {
+              if (generationIdRef.current === commandToken) fireConfetti();
+            }, 150);
+            setTimeout(() => {
+              if (generationIdRef.current === commandToken) fireConfetti();
+            }, 300);
+            countdownTimerRef.current = setTimeout(() => {
+              if (generationIdRef.current !== commandToken) return;
+              setCountdownPreview(null);
+              setObsPhase("active");
+              generateCatPlus();
+            }, 800);
+          } else {
+            setCountdownValue(remaining);
+            fireConfetti();
+            // Last 3 seconds — extra bursts + start fading in the spin board
+            if (remaining <= 3) {
+              setTimeout(() => {
+                if (generationIdRef.current === commandToken) fireConfetti();
+              }, 400);
+              setTimeout(() => {
+                if (generationIdRef.current === commandToken) fireConfetti();
+              }, 700);
+              setSpinBoardVisible(true);
+            }
+            countdownTimerRef.current = setTimeout(tick, 1000);
+          }
+        };
+        countdownTimerRef.current = setTimeout(tick, 1000);
+      } else {
+        setObsPhase("active");
+        generateCatPlus();
+      }
+    },
+    [
+      resetCommandState,
+      prepareSpin,
+      generateCatPlus,
+      accessoryRange,
+      scarRange,
+      tortieRange,
+      exactLayerCounts,
+      extendedModesArray,
+      includeBaseColours,
+      includeNewSprites,
+    ],
+  );
+
+  const dispatchCommand = useCallback(
+    (cmd: NonNullable<ObsLiveCommand>, cmdSeq: number) => {
+      switch (cmd.type) {
+        case "spin":
+          if (!generationDisabled) {
+            handleSpinCommand(cmd);
+          }
+          break;
+        case "wheel": {
+          const wheelSpin = parseStreamWheelSpin(
+            (cmd as Record<string, unknown>).wheelSpin,
+          );
+          if (!wheelSpin) {
+            break;
+          }
+          handleWheelCommand(wheelSpin, cmd.params, cmd.slots).catch((err) => {
+            console.error("[ObsOverlayClient] Wheel command failed", err);
+            resetCommandState();
+            drawPlaceholder();
+          });
+          break;
+        }
+        case "evolution": {
+          const evolution = parseEvolutionStreamCommand(
+            (cmd as Record<string, unknown>).evolution,
+          );
+          if (!evolution) {
+            break;
+          }
+          resetCommandState();
+          // After an overlay reload the ceremony may already be over (or
+          // skipped) — jump straight to the lineage + QR instead of replaying.
+          setEvolutionInitialPhase(
+            ceremonyPhaseForReload(
+              evolution,
+              cmdSeq,
+              cmd.timestamp,
+              session?.evolutionState ?? null,
+              Date.now(),
+            ),
+          );
+          setEvolutionCommand({
+            ...evolution,
+            seq: cmdSeq,
+            timestamp: cmd.timestamp,
+          });
+          setObsPhase("evolution");
+          break;
+        }
+        case "batch": {
+          const batch = parseBatchStreamCommand(
+            (cmd as Record<string, unknown>).batch,
+          );
+          if (!batch) {
+            break;
+          }
+          resetCommandState();
+          // Elimination progress lives in session.batchState, so the scene
+          // resumes mid-show on its own after an overlay reload.
+          setBatchCommand({ ...batch, seq: cmdSeq });
+          setObsPhase("batch");
+          break;
+        }
+        case "clear":
+          resetCommandState();
+          if (
+            obsPhase === "active" ||
+            obsPhase === "countdown" ||
+            obsPhase === "brb" ||
+            obsPhase === "evolution" ||
+            obsPhase === "batch"
+          ) {
+            setObsPhase("fading");
+          } else {
+            setObsPhase("idle");
+          }
+          drawPlaceholder();
+          break;
+        case "lobby":
+          resetCommandState();
+          setObsPhase("lobby");
+          break;
+        case "brb":
+          resetCommandState();
+          setObsPhase("brb");
+          break;
+        case "test":
+          // No-op — test mode rendering is handled by the session.testMode early-return above
+          break;
+      }
+    },
+    [
+      generationDisabled,
+      handleSpinCommand,
+      handleWheelCommand,
+      resetCommandState,
+      drawPlaceholder,
+      session?.evolutionState,
+      obsPhase,
+    ],
+  );
+
+  useEffect(() => {
+    if (!session?.currentCommand) return;
+    const cmd = session.currentCommand;
+    const cmdSeq = typeof cmd.seq === "number" ? cmd.seq : 0;
+
+    const decision = decideCommandAction({
+      type: cmd.type,
+      seq: cmdSeq,
+      timestamp: cmd.timestamp,
+      lastSeq: lastSeqRef.current,
+      initialized: initializedSeqRef.current,
+      generationDisabled,
+      initializing,
+      resultAutoClearEnabled: resultAutoClearEnabledRef.current,
+      resultAutoClearSeconds: resultAutoClearSecondsRef.current,
+      now: Date.now(),
+    });
+
+    if (decision === "ignore" || decision === "defer") return;
+
+    initializedSeqRef.current = true;
+    lastSeqRef.current = cmdSeq;
+
+    if (decision === "skip") return;
+
+    if (decision === "restore") {
+      restoreCommand(cmd);
       return;
     }
 
@@ -3571,286 +3763,15 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       return;
     }
 
-    switch (cmd.type) {
-      case "spin":
-        if (!generationDisabled) {
-          resetCommandState();
-          const commandToken = generationIdRef.current;
-          // Store the params from the control page so generateCatPlus uses them
-          const override = { params: cmd.params, slots: cmd.slots };
-          overrideParamsRef.current = override;
-          // Roll the plan and start loading every frame now, so the
-          // countdown doubles as preload time.
-          // A failed preparation is retried by generateCatPlus.
-          preparedSpinRef.current = prepareSpin(override).catch(() => null);
-          setRollerHighlight(false);
-          setActiveParamId(null);
-          setActiveParamStartedAt(null);
-
-          const cdSeconds = (cmd as Record<string, unknown>).countdownSeconds as
-            | number
-            | undefined;
-          if (cdSeconds && cdSeconds > 0) {
-            setObsPhase("countdown");
-            setCountdownValue(cdSeconds);
-            setCountdownPreview(null);
-            setSpinBoardVisible(false);
-            let remaining = cdSeconds;
-
-            // Rich full-screen fireworks
-            const fireConfetti = async () => {
-              if (generationIdRef.current !== commandToken) return;
-              try {
-                const confetti = (await import("canvas-confetti")).default;
-                if (generationIdRef.current !== commandToken) return;
-                const colors = [
-                  "#f59e0b",
-                  "#ef4444",
-                  "#3b82f6",
-                  "#22c55e",
-                  "#a855f7",
-                  "#ec4899",
-                  "#fbbf24",
-                ];
-                // Center burst
-                confetti({
-                  particleCount: 80,
-                  spread: 100,
-                  origin: { x: 0.5, y: 0.5 },
-                  colors,
-                  zIndex: 10000,
-                  startVelocity: 35,
-                });
-                // Left side sprayer
-                confetti({
-                  angle: 60,
-                  spread: 55,
-                  origin: { x: 0, y: 0.6 },
-                  particleCount: 50,
-                  colors,
-                  zIndex: 10000,
-                  startVelocity: 45,
-                });
-                // Right side sprayer
-                confetti({
-                  angle: 120,
-                  spread: 55,
-                  origin: { x: 1, y: 0.6 },
-                  particleCount: 50,
-                  colors,
-                  zIndex: 10000,
-                  startVelocity: 45,
-                });
-                // Top burst with stars
-                confetti({
-                  spread: 360,
-                  ticks: 60,
-                  startVelocity: 30,
-                  particleCount: 40,
-                  origin: {
-                    x: 0.3 + Math.random() * 0.4,
-                    y: Math.random() * 0.4,
-                  },
-                  colors,
-                  shapes: ["star"],
-                  zIndex: 10000,
-                });
-                // Random scatter
-                confetti({
-                  particleCount: 30,
-                  spread: 120,
-                  origin: { x: Math.random(), y: Math.random() * 0.5 },
-                  colors,
-                  zIndex: 10000,
-                });
-              } catch {
-                /* confetti unavailable */
-              }
-            };
-            fireConfetti();
-
-            // Cat preview cycling every 250ms
-            const genRef = generatorRef.current;
-            if (genRef?.generateRandomCat) {
-              const cycle = async () => {
-                if (generationIdRef.current !== commandToken) return;
-                try {
-                  const r = await genRef.generateRandomCat?.({
-                    accessoryCount: computeLayerCount(accessoryRange),
-                    scarCount: computeLayerCount(scarRange),
-                    tortieCount: computeLayerCount(tortieRange),
-                    exactLayerCounts,
-                    experimentalColourMode:
-                      extendedModesArray.length > 0
-                        ? extendedModesArray
-                        : undefined,
-                    includeBaseColours,
-                    includeNewSprites,
-                  });
-                  if (
-                    generationIdRef.current === commandToken &&
-                    r?.canvas instanceof HTMLCanvasElement
-                  ) {
-                    setCountdownPreview(r.canvas.toDataURL("image/png"));
-                  }
-                } catch {
-                  /* skip */
-                }
-              };
-              cycle();
-              previewIntervalRef.current = setInterval(cycle, 250);
-            }
-
-            const tick = () => {
-              if (generationIdRef.current !== commandToken) return;
-              remaining--;
-              if (remaining <= 0) {
-                // "GO!" flash — big finale burst, hold 800ms then start spin
-                setCountdownValue(0);
-                if (previewIntervalRef.current) {
-                  clearInterval(previewIntervalRef.current);
-                  previewIntervalRef.current = null;
-                }
-                // Massive finale — triple burst
-                fireConfetti();
-                setTimeout(() => {
-                  if (generationIdRef.current === commandToken) fireConfetti();
-                }, 150);
-                setTimeout(() => {
-                  if (generationIdRef.current === commandToken) fireConfetti();
-                }, 300);
-                countdownTimerRef.current = setTimeout(() => {
-                  if (generationIdRef.current !== commandToken) return;
-                  setCountdownPreview(null);
-                  setObsPhase("active");
-                  generateCatPlus();
-                }, 800);
-              } else {
-                setCountdownValue(remaining);
-                fireConfetti();
-                // Last 3 seconds — extra bursts + start fading in the spin board
-                if (remaining <= 3) {
-                  setTimeout(() => {
-                    if (generationIdRef.current === commandToken)
-                      fireConfetti();
-                  }, 400);
-                  setTimeout(() => {
-                    if (generationIdRef.current === commandToken)
-                      fireConfetti();
-                  }, 700);
-                  setSpinBoardVisible(true);
-                }
-                countdownTimerRef.current = setTimeout(tick, 1000);
-              }
-            };
-            countdownTimerRef.current = setTimeout(tick, 1000);
-          } else {
-            setObsPhase("active");
-            generateCatPlus();
-          }
-        }
-        break;
-      case "wheel": {
-        const wheelSpin = parseStreamWheelSpin(
-          (cmd as Record<string, unknown>).wheelSpin,
-        );
-        if (!wheelSpin) {
-          break;
-        }
-        handleWheelCommand(wheelSpin, cmd.params, cmd.slots).catch((err) => {
-          console.error("[ObsOverlayClient] Wheel command failed", err);
-          resetCommandState();
-          drawPlaceholder();
-        });
-        break;
-      }
-      case "evolution": {
-        const evolution = parseEvolutionStreamCommand(
-          (cmd as Record<string, unknown>).evolution,
-        );
-        if (!evolution) {
-          break;
-        }
-        resetCommandState();
-        // After an overlay reload the ceremony may already be over (or
-        // skipped) — jump straight to the lineage + QR instead of replaying.
-        setEvolutionInitialPhase(
-          ceremonyPhaseForReload(
-            evolution,
-            cmdSeq,
-            cmd.timestamp,
-            session?.evolutionState ?? null,
-            Date.now(),
-          ),
-        );
-        setEvolutionCommand({
-          ...evolution,
-          seq: cmdSeq,
-          timestamp: cmd.timestamp,
-        });
-        setObsPhase("evolution");
-        break;
-      }
-      case "batch": {
-        const batch = parseBatchStreamCommand(
-          (cmd as Record<string, unknown>).batch,
-        );
-        if (!batch) {
-          break;
-        }
-        resetCommandState();
-        // Elimination progress lives in session.batchState, so the scene
-        // resumes mid-show on its own after an overlay reload.
-        setBatchCommand({ ...batch, seq: cmdSeq });
-        setObsPhase("batch");
-        break;
-      }
-      case "clear":
-        resetCommandState();
-        if (
-          obsPhase === "active" ||
-          obsPhase === "countdown" ||
-          obsPhase === "brb" ||
-          obsPhase === "evolution" ||
-          obsPhase === "batch"
-        ) {
-          setObsPhase("fading");
-        } else {
-          setObsPhase("idle");
-        }
-        drawPlaceholder();
-        break;
-      case "lobby":
-        resetCommandState();
-        setObsPhase("lobby");
-        break;
-      case "brb":
-        resetCommandState();
-        setObsPhase("brb");
-        break;
-      case "test":
-        // No-op — test mode rendering is handled by the session.testMode early-return above
-        break;
-    }
+    dispatchCommand(cmd, cmdSeq);
   }, [
     session?.currentCommand,
-    session?.evolutionState,
     generationDisabled,
     initializing,
-    handleWheelCommand,
-    generateCatPlus,
-    prepareSpin,
-    primeOverlayFromCommand,
+    restoreCommand,
+    dispatchCommand,
     drawPlaceholder,
     resetCommandState,
-    exactLayerCounts,
-    obsPhase,
-    extendedModesArray,
-    includeBaseColours,
-    includeNewSprites,
-    accessoryRange,
-    scarRange,
-    tortieRange,
   ]);
 
   // Memoize lobby settings so OBSLobby doesn't restart animations on every render
