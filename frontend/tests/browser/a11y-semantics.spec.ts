@@ -201,7 +201,7 @@ for (const viewport of [
         ) =>
           schedule(
             handler,
-            Math.min(delay ?? 0, 10),
+            delay === 2400 ? delay : Math.min(delay ?? 0, 10),
             ...args,
           )) as typeof window.setTimeout;
       });
@@ -223,6 +223,33 @@ for (const viewport of [
         await expect(trigger).toBeEnabled({ timeout: 90_000 });
         await trigger.press("Enter");
         await verifyModal(page, dialog);
+        if (dialogName === "Sprite Gallery") {
+          await page.evaluate(() =>
+            Object.defineProperty(navigator, "clipboard", {
+              configurable: true,
+              value: { write: async () => {} },
+            }),
+          );
+          await dialog
+            .getByRole("button", { name: /Copy .* at 120 by 120 pixels/ })
+            .first()
+            .click();
+          const confirmation = dialog.getByText(/^Copied .* \(120×120\)!$/);
+          await expect(confirmation).toBeVisible();
+          expect(
+            await confirmation.evaluate((element) => {
+              const rect = element.getBoundingClientRect();
+              const hit = document.elementFromPoint(
+                rect.x + rect.width / 2,
+                rect.y + rect.height / 2,
+              );
+              return hit === element || element.contains(hit);
+            }),
+          ).toBe(true);
+          await page.screenshot({
+            path: `../.playwright-mcp/a11y-${viewport.width}-gallery-copy.png`,
+          });
+        }
         await page.keyboard.press("Escape");
         await expect(dialog).toHaveCount(0);
         await expect(trigger).toBeFocused();

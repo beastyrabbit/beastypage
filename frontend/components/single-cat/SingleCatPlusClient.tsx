@@ -3183,6 +3183,11 @@ export function SingleCatPlusClient({
   const viewerSlug = currentState?.mapperSlug ?? null;
 
   const generationDisabled = initializing || !!initialError;
+  const toastMessage = toast && (
+    <div className="fixed bottom-6 right-6 z-50 rounded-full border border-border/40 bg-background/90 px-4 py-2 text-sm text-foreground shadow-lg shadow-primary/10">
+      {toast}
+    </div>
+  );
 
   return (
     <div className="grid gap-10">
@@ -3836,6 +3841,7 @@ export function SingleCatPlusClient({
               )}
             </div>
           </div>
+          {toastMessage}
         </dialog>
       )}
 
@@ -4054,11 +4060,7 @@ export function SingleCatPlusClient({
         </dialog>
       )}
 
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-full border border-border/40 bg-background/90 px-4 py-2 text-sm text-foreground shadow-lg shadow-primary/10">
-          {toast}
-        </div>
-      )}
+      {!spriteGalleryOpen && toastMessage}
     </div>
   );
 }
