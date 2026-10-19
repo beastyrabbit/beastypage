@@ -345,6 +345,37 @@ def legacy_tile(
     )
 
 
+def adapted_pose_tile(
+    old_sheet: Image.Image,
+    old_entry: dict[str, Any],
+    reference_sheet: Image.Image,
+    reference: dict[str, Any],
+    pose: str,
+    legacy_pose_to_number: dict[str, int],
+    legacy_pose_names: list[str],
+    offsets: dict[str, dict[str, int]],
+    layout: list[int],
+) -> Image.Image:
+    if pose in legacy_pose_to_number:
+        return legacy_tile(old_sheet, old_entry, legacy_pose_to_number[pose])
+
+    translation = best_reference_translation(
+        reference_sheet,
+        int(reference["col"]),
+        int(reference["row"]),
+        pose,
+        legacy_pose_names,
+        offsets,
+        layout,
+    )
+    if translation is None:
+        return Image.new("RGBA", (TILE_SIZE, TILE_SIZE))
+
+    source_pose, dx, dy = translation
+    source = legacy_tile(old_sheet, old_entry, legacy_pose_to_number[source_pose])
+    return shift_tile(source, dx, dy)
+
+
 def build_adapted_sheet(
     old_index: dict[str, Any],
     groups: OrderedDict[str, dict[str, Any]],
@@ -392,26 +423,17 @@ def build_adapted_sheet(
         reference_sheet = load_sheet(LIFEGEN_UPSTREAM, str(reference["spritesheet"]))
 
         for pose in poses:
-            if pose in legacy_pose_to_number:
-                tile = legacy_tile(old_sheet, old_entry, legacy_pose_to_number[pose])
-            else:
-                translation = best_reference_translation(
-                    reference_sheet,
-                    int(reference["col"]),
-                    int(reference["row"]),
-                    pose,
-                    legacy_pose_names,
-                    offsets,
-                    layout,
-                )
-                if translation is None:
-                    tile = Image.new("RGBA", (TILE_SIZE, TILE_SIZE))
-                else:
-                    source_pose, dx, dy = translation
-                    source = legacy_tile(
-                        old_sheet, old_entry, legacy_pose_to_number[source_pose]
-                    )
-                    tile = shift_tile(source, dx, dy)
+            tile = adapted_pose_tile(
+                old_sheet,
+                old_entry,
+                reference_sheet,
+                reference,
+                pose,
+                legacy_pose_to_number,
+                legacy_pose_names,
+                offsets,
+                layout,
+            )
 
             target = offsets[pose]
             target_x = group_col * layout[0] * TILE_SIZE + target["x"] * TILE_SIZE

@@ -4,11 +4,11 @@ from __future__ import annotations
 import json
 import shutil
 from collections import OrderedDict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from PIL import Image
-
 
 ROOT = Path(__file__).resolve().parents[1]
 UPSTREAM = ROOT / ".ref" / "clangen" / "sprites"
@@ -233,7 +233,9 @@ def build_legacy_pose_map(
         )
         if match is None:
 
-            def score(candidate: tuple[str, bytes], previous_crop: bytes = old_crop) -> int:
+            def score(
+                candidate: tuple[str, bytes], previous_crop: bytes = old_crop
+            ) -> int:
                 _pose, crop = candidate
                 return sum(abs(a - b) for a, b in zip(previous_crop, crop))
 
@@ -286,6 +288,26 @@ def copy_upstream_assets() -> None:
         shutil.copy2(src, frontend_dicts / src.name)
 
 
+def legacy_collar_styles(old: str, new_colour: str) -> tuple[str, str, str, str]:
+    style = "LEATHER_GRADIENT" if new_colour == "rainbow" else "LEATHER"
+    if old == "SPIKES":
+        style = "LEATHER_SPIKE"
+
+    bell_style = "LEATHER_BELL_GRADIENT" if new_colour == "rainbow" else "LEATHER_BELL"
+    if old == "SPIKES":
+        bell_style = "LEATHER_BELL_SPIKE"
+
+    bow_style = "BOW_GRADIENT" if new_colour == "rainbow" else "BOW"
+    if old == "SPIKES":
+        bow_style = "BOW_FOIL"
+
+    nylon_style = "NYLON_GRADIENT" if new_colour == "rainbow" else "NYLON"
+    if old == "SPIKES":
+        nylon_style = "NYLON"
+
+    return style, bell_style, bow_style, nylon_style
+
+
 def build_collar_entries(
     index: OrderedDict[str, dict[str, Any]],
     collar_data: dict[str, Any],
@@ -328,29 +350,82 @@ def build_collar_entries(
         alias_to_key[f"COLLARS{alias}".upper()] = target
 
     for old, new_colour in LEGACY_COLLAR_COLOURS.items():
-        style = "LEATHER_GRADIENT" if new_colour == "rainbow" else "LEATHER"
-        if old == "SPIKES":
-            style = "LEATHER_SPIKE"
-        alias(old, style, new_colour)
-
-        bell_style = (
-            "LEATHER_BELL_GRADIENT" if new_colour == "rainbow" else "LEATHER_BELL"
+        style, bell_style, bow_style, nylon_style = legacy_collar_styles(
+            old, new_colour
         )
-        if old == "SPIKES":
-            bell_style = "LEATHER_BELL_SPIKE"
+        alias(old, style, new_colour)
         alias(f"{old}BELL", bell_style, new_colour)
-
-        bow_style = "BOW_GRADIENT" if new_colour == "rainbow" else "BOW"
-        if old == "SPIKES":
-            bow_style = "BOW_FOIL"
         alias(f"{old}BOW", bow_style, new_colour)
-
-        nylon_style = "NYLON_GRADIENT" if new_colour == "rainbow" else "NYLON"
-        if old == "SPIKES":
-            nylon_style = "NYLON"
         alias(f"{old}NYLON", nylon_style, new_colour)
 
     return dedupe(collars), alias_to_key
+
+
+def add_pelt_entries(
+    index: OrderedDict[str, dict[str, Any]], dicts: Path, layout: list[int]
+) -> None:
+    pelt_data = read_json(dicts / "pelt_sprite_data.json")
+    pelt_prefix = {
+        "SingleColour": "single",
+        "TwoColour": "single",
+        "Tabby": "tabby",
+        "Marbled": "marbled",
+        "Rosette": "rosette",
+        "Smoke": "smoke",
+        "Ticked": "ticked",
+        "Speckled": "speckled",
+        "Bengal": "bengal",
+        "Mackerel": "mackerel",
+        "Classic": "classic",
+        "Sokoke": "sokoke",
+        "Agouti": "agouti",
+        "Singlestripe": "singlestripe",
+        "Masked": "masked",
+    }
+    colour_positions = flatten_sprite_list(pelt_data["sprite_list"])
+    for sheet, pelt_names in pelt_data["spritesheet"].items():
+        for pelt_name in pelt_names:
+            prefix = pelt_prefix[pelt_name]
+            for col, row, colour in colour_positions:
+                add_group(index, f"{prefix}{colour}", sheet, col, row, layout)
+
+
+def add_white_patch_entries(
+    index: OrderedDict[str, dict[str, Any]], dicts: Path, layout: list[int]
+) -> None:
+    for file_name in (
+        "white_patches_mostly_sprite_data.json",
+        "white_patches_high_sprite_data.json",
+        "white_patches_mid_sprite_data.json",
+        "white_patches_little_sprite_data.json",
+        "white_patches_points_sprite_data.json",
+        "white_patches_vitiligo_sprite_data.json",
+    ):
+        data = read_json(dicts / file_name)
+        for col, row, patch in flatten_sprite_list(data["sprite_list"]):
+            add_group(index, f"white{patch}", data["spritesheet"], col, row, layout)
+
+
+def preserve_legacy_entries(
+    index: OrderedDict[str, dict[str, Any]],
+    old_index: dict[str, Any],
+    upstream_sheets: set[str],
+) -> None:
+    generated_keys = set(index)
+    for key, value in old_index.items():
+        if key in generated_keys:
+            continue
+        sheet = value.get("spritesheet")
+        replacement = OLD_TO_NEW_SHEETS.get(sheet, "__keep__")
+        if replacement is None:
+            continue
+        kept = dict(value)
+        if replacement != "__keep__":
+            kept["spritesheet"] = replacement
+        sheet = kept.get("spritesheet")
+        if sheet and sheet not in upstream_sheets and "poseLayout" not in kept:
+            kept["poseLayout"] = "legacy"
+        index[key] = kept
 
 
 def build_sprite_index(
@@ -387,30 +462,7 @@ def build_sprite_index(
         for col in range(3):
             add_group(index, f"{prefix}{col}", fade_sheet, col, 0, layout)
 
-    pelt_data = read_json(dicts / "pelt_sprite_data.json")
-    pelt_prefix = {
-        "SingleColour": "single",
-        "TwoColour": "single",
-        "Tabby": "tabby",
-        "Marbled": "marbled",
-        "Rosette": "rosette",
-        "Smoke": "smoke",
-        "Ticked": "ticked",
-        "Speckled": "speckled",
-        "Bengal": "bengal",
-        "Mackerel": "mackerel",
-        "Classic": "classic",
-        "Sokoke": "sokoke",
-        "Agouti": "agouti",
-        "Singlestripe": "singlestripe",
-        "Masked": "masked",
-    }
-    colour_positions = flatten_sprite_list(pelt_data["sprite_list"])
-    for sheet, pelt_names in pelt_data["spritesheet"].items():
-        for pelt_name in pelt_names:
-            prefix = pelt_prefix[pelt_name]
-            for col, row, colour in colour_positions:
-                add_group(index, f"{prefix}{colour}", sheet, col, row, layout)
+    add_pelt_entries(index, dicts, layout)
 
     eye_data = read_json(dicts / "eye_sprite_data.json")
     for col, row, colour in flatten_sprite_list(eye_data["sprite_list"]):
@@ -435,17 +487,7 @@ def build_sprite_index(
             index, f"tortiemask{mask}", tortie_data["spritesheet"], col, row, layout
         )
 
-    for file_name in (
-        "white_patches_mostly_sprite_data.json",
-        "white_patches_high_sprite_data.json",
-        "white_patches_mid_sprite_data.json",
-        "white_patches_little_sprite_data.json",
-        "white_patches_points_sprite_data.json",
-        "white_patches_vitiligo_sprite_data.json",
-    ):
-        data = read_json(dicts / file_name)
-        for col, row, patch in flatten_sprite_list(data["sprite_list"]):
-            add_group(index, f"white{patch}", data["spritesheet"], col, row, layout)
+    add_white_patch_entries(index, dicts, layout)
 
     plant_data = read_json(dicts / "plant_sprite_data.json")
     for col, row, accessory in flatten_sprite_list(plant_data["sprite_list"]):
@@ -468,21 +510,7 @@ def build_sprite_index(
     collar_data = read_json(dicts / "collar_sprite_data.json")
     _collars, alias_to_key = build_collar_entries(index, collar_data, layout)
 
-    generated_keys = set(index)
-    for key, value in old_index.items():
-        if key in generated_keys:
-            continue
-        sheet = value.get("spritesheet")
-        replacement = OLD_TO_NEW_SHEETS.get(sheet, "__keep__")
-        if replacement is None:
-            continue
-        kept = dict(value)
-        if replacement != "__keep__":
-            kept["spritesheet"] = replacement
-        sheet = kept.get("spritesheet")
-        if sheet and sheet not in upstream_sheets and "poseLayout" not in kept:
-            kept["poseLayout"] = "legacy"
-        index[key] = kept
+    preserve_legacy_entries(index, old_index, upstream_sheets)
 
     return index, alias_to_key
 
@@ -647,7 +675,10 @@ def main() -> None:
     ):
         write_json(target, sprite_index)
 
-    for target in (FRONTEND_DATA / PELT_INFO_FILENAME, BACKEND_DATA / PELT_INFO_FILENAME):
+    for target in (
+        FRONTEND_DATA / PELT_INFO_FILENAME,
+        BACKEND_DATA / PELT_INFO_FILENAME,
+    ):
         write_json(target, pelt_info)
 
     for src_name, dst_names in (
