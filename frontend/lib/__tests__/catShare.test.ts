@@ -17,8 +17,83 @@ function decodeStoredPayload(encoded: string): Record<string, unknown> {
   >;
 }
 
+// Captured from the pre-cleanup encoder. Keep this fixed to detect wire changes.
+const existingHybridShare =
+  "eyJ2IjoxLCJkb2N1bWVudCI6eyJzY2hlbWFWZXJzaW9uIjoxLCJ0cmFpdHMiOnsicG9zZSI6ImFkdWx0X3Nob3J0MiIsInBlbHQiOiJTaW5nbGVDb2xvdXIiLCJjb2xvdXIiOiJXSElURSIsInRvcnRpZSI6W10sInRpbnQiOiJub25lIiwiZXllQ29sb3VyIjoiQkxVRSIsInNjYXJzIjpbXSwic2hhZGluZyI6ZmFsc2UsImxpZ2h0aW5nIjpmYWxzZSwiZGFya0ZvcmVzdCI6ZmFsc2UsImRlYWQiOmZhbHNlLCJza2luQ29sb3VyIjoiUElOSyIsImFjY2Vzc29yaWVzIjpbXSwicmV2ZXJzZSI6ZmFsc2V9LCJ1bmtub3duVHJhaXRzIjp7ImZ1dHVyZSI6eyJsYWJlbCI6Ik3DpHVzZSDwn5CIIiwibmVzdGVkIjpbbnVsbCx0cnVlLDNdfSwic3ByaXRlTnVtYmVyIjo4fX0sInBhcmFtcyI6eyJmdXR1cmUiOnsibGFiZWwiOiJNw6R1c2Ug8J+QiCIsIm5lc3RlZCI6W251bGwsdHJ1ZSwzXX0sInNwcml0ZU51bWJlciI6OCwicG9zZU5hbWUiOiJhZHVsdF9zaG9ydDIiLCJwZWx0TmFtZSI6IlNpbmdsZUNvbG91ciIsImNvbG91ciI6IldISVRFIiwidG9ydGllIjpbXSwiaXNUb3J0aWUiOmZhbHNlLCJ0aW50Ijoibm9uZSIsImV5ZUNvbG91ciI6IkJMVUUiLCJzY2FycyI6W10sInNoYWRpbmciOmZhbHNlLCJsaWdodGluZyI6ZmFsc2UsImRhcmtGb3Jlc3QiOmZhbHNlLCJkYXJrTW9kZSI6ZmFsc2UsImRlYWQiOmZhbHNlLCJza2luQ29sb3VyIjoiUElOSyIsImFjY2Vzc29yaWVzIjpbXSwicmV2ZXJzZSI6ZmFsc2V9LCJzbG90cyI6eyJmdXR1cmUiOlt7Im5lc3RlZCI6WyLDqSIsbnVsbCxmYWxzZSwzXX1dLCJhY2Nlc3NvcmllcyI6WyJGRVJOIiwibm9uZSJdLCJzY2FycyI6WyJGQUNFIl0sInRvcnRpZSI6W3sibWFzayI6Ik9ORSIsInBhdHRlcm4iOiJTaW5nbGVDb2xvdXIiLCJjb2xvdXIiOiJHSU5HRVIifV19LCJjb3VudHMiOnsiZnV0dXJlIjoxLCJhY2Nlc3NvcmllcyI6Miwic2NhcnMiOjEsInRvcnRpZSI6MX19";
+
 describe("cat share codec", () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it.each([false, true])(
+    "keeps existing share bytes and Unicode data, without structuredClone: %s",
+    async (withoutStructuredClone) => {
+      if (withoutStructuredClone) vi.stubGlobal("structuredClone", undefined);
+      const input = {
+        params: {
+          spriteNumber: 8,
+          peltName: "SingleColour",
+          colour: "WHITE",
+          eyeColour: "BLUE",
+          skinColour: "PINK",
+          future: { label: "Mäuse 🐈", nested: [null, true, 3] },
+        },
+        accessorySlots: ["FERN", null],
+        scarSlots: ["FACE"],
+        tortieSlots: [
+          { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
+        ],
+        traitSlots: { future: [{ nested: ["é", null, false, 3] }] },
+      };
+      expect(encodeCatShare(input)).toBe(existingHybridShare);
+      const decoded = await decodeCatShare(existingHybridShare);
+      expect(decoded?.params).toMatchObject(input.params);
+      expect(decoded?.traitSlots.future).toEqual(input.traitSlots.future);
+      expect(decoded?.accessorySlots).toEqual(["FERN", "none"]);
+      expect(decoded?.tortieSlots).toEqual(input.tortieSlots);
+      expect(decoded).not.toBeNull();
+      if (!decoded) throw new Error("Existing share must decode");
+      expect(encodeCatShare(decoded)).toBe(existingHybridShare);
+
+      const prepared = prepareCatShare(input);
+      input.traitSlots.future[0].nested.push("changed");
+      expect(prepared.slots.future).toEqual([
+        { nested: ["é", null, false, 3] },
+      ]);
+    },
+  );
+
+  it.each([1, 2])(
+    "reads existing V%s links with coerced legacy slots",
+    async (v) => {
+      const stored = prepareCatShare({ params: { colour: "WHITE" } });
+      const decoded = await decodeCatShare(
+        encodeLegacyV1({
+          v,
+          ...(v === 1
+            ? { params: stored.params }
+            : { document: stored.document }),
+          slots: {
+            accessories: [7, true, {}, ["FERN"], null, "  "],
+            tortie: [
+              { mask: ["ONE"], pattern: ["SingleColour"], colour: ["GINGER"] },
+            ],
+          },
+          counts: {},
+        }),
+      );
+      expect(decoded?.accessorySlots).toEqual([
+        "7",
+        "true",
+        "[object Object]",
+        "FERN",
+        "none",
+        "none",
+      ]);
+      expect(decoded?.tortieSlots).toEqual([
+        { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
+      ]);
+    },
+  );
 
   it("forwards the edit capability for slug updates", async () => {
     const fetchMock = vi.fn().mockResolvedValue(

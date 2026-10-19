@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   catDataToLegacyPersistence,
   catDocumentToLegacyParams,
@@ -25,6 +25,55 @@ const legacyCat = {
 };
 
 describe("CatDocument", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([false, true])(
+    "preserves JSON document and persistence roundtrips with structuredClone unavailable: %s",
+    (withoutStructuredClone) => {
+      if (withoutStructuredClone) vi.stubGlobal("structuredClone", undefined);
+      const params = {
+        ...legacyCat,
+        future: { label: "Mäuse 🐈", nested: [null, true, 3] },
+        tortie: [{ mask: "ONE", pattern: "SingleColour", colour: "GINGER" }],
+      };
+      const stored = JSON.stringify(decodeCatDocumentLegacy(params));
+      const restored = decodeCatDocumentLegacy(JSON.parse(stored));
+      expect(JSON.stringify(restored)).toBe(stored);
+      const persisted = catParamsToLegacyPersistence(params);
+      expect(persisted).toEqual(params);
+      expect(persisted.future).not.toBe(params.future);
+      expect(catDocumentToLegacyParams(restored)).toMatchObject(params);
+    },
+  );
+
+  it("keeps the JSON fallback for non-cloneable persistence metadata", () => {
+    const params = { ...legacyCat, transient: () => "not persisted" };
+    expect(() => structuredClone(params)).toThrow();
+    expect(catParamsToLegacyPersistence(params)).toEqual(legacyCat);
+  });
+
+  it.each([false, true])(
+    "preserves legacy array coercion for tortie fields, flat: %s",
+    (flat) => {
+      const fields = {
+        mask: ["ONE"],
+        pattern: ["SingleColour"],
+        colour: ["GINGER"],
+      };
+      const params = flat
+        ? {
+            isTortie: true,
+            tortieMask: fields.mask,
+            tortiePattern: fields.pattern,
+            tortieColour: fields.colour,
+          }
+        : { tortie: [fields] };
+      expect(
+        decodeCatDocumentLegacy({ ...legacyCat, ...params }).traits.tortie,
+      ).toEqual([{ mask: "ONE", pattern: "SingleColour", colour: "GINGER" }]);
+    },
+  );
+
   it("imports legacy params and writes a strict canonical document", () => {
     const document = decodeCatDocumentLegacy(legacyCat);
 

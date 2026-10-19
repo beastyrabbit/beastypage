@@ -1,10 +1,10 @@
 import type { SpriteMapperApi } from "./types";
 
-export function formatName(value: unknown): string {
+export function formatName(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "None";
   if (typeof value === "number") return `#${value}`;
   return (
-    String(value)
+    value
       .replace(/[_-]/g, " ")
       .replace(/\s+/g, " ")
       .trim()
