@@ -253,56 +253,59 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
 
   // v2 payload: v === 2 with "mode" and "timing" required; other keys fall back to defaults
   if (data.v === 2 && "mode" in data && "timing" in data) {
-    const modes = data.extendedModes;
-    return {
-      v: 2,
-      mode: data.mode === "calm" ? "calm" : "flashy",
-      timing: sanitizeTiming(data.timing),
-      speedMultiplier:
-        typeof data.speedMultiplier === "number" &&
-        Number.isFinite(data.speedMultiplier)
-          ? Math.min(10, Math.max(0.1, data.speedMultiplier))
-          : 1.0,
-      accessoryRange: isValidRange(data.accessoryRange)
-        ? (data.accessoryRange as LayerRange)
-        : DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange,
-      scarRange: isValidRange(data.scarRange)
-        ? (data.scarRange as LayerRange)
-        : DEFAULT_SINGLE_CAT_SETTINGS.scarRange,
-      tortieRange: isValidRange(data.tortieRange)
-        ? (data.tortieRange as LayerRange)
-        : DEFAULT_SINGLE_CAT_SETTINGS.tortieRange,
-      exactLayerCounts:
-        typeof data.exactLayerCounts === "boolean"
-          ? data.exactLayerCounts
-          : true,
-      afterlifeMode: isAfterlifeOption(data.afterlifeMode)
-        ? data.afterlifeMode
-        : DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
-      extendedModes: Array.isArray(modes)
-        ? [
-            ...new Set(
-              (modes as string[]).filter((m): m is ExtendedMode =>
-                EXTENDED_MODE_VALUES.has(m),
-              ),
-            ),
-          ].sort(compareCodeUnits)
-        : [],
-      includeBaseColours:
-        typeof data.includeBaseColours === "boolean"
-          ? data.includeBaseColours
-          : true,
-      includeNewSprites: true,
-      catName:
-        typeof data.catName === "string" ? data.catName.slice(0, 100) : "",
-      creatorName:
-        typeof data.creatorName === "string"
-          ? data.creatorName.slice(0, 100)
-          : "",
-    };
+    return parseV2SingleCatSettings(data);
   }
 
   return { ...DEFAULT_SINGLE_CAT_SETTINGS };
+}
+
+function parseV2SingleCatSettings(
+  data: Record<string, unknown>,
+): SingleCatSettings {
+  const modes = data.extendedModes;
+  return {
+    v: 2,
+    mode: data.mode === "calm" ? "calm" : "flashy",
+    timing: sanitizeTiming(data.timing),
+    speedMultiplier:
+      typeof data.speedMultiplier === "number" &&
+      Number.isFinite(data.speedMultiplier)
+        ? Math.min(10, Math.max(0.1, data.speedMultiplier))
+        : 1.0,
+    accessoryRange: isValidRange(data.accessoryRange)
+      ? (data.accessoryRange as LayerRange)
+      : DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange,
+    scarRange: isValidRange(data.scarRange)
+      ? (data.scarRange as LayerRange)
+      : DEFAULT_SINGLE_CAT_SETTINGS.scarRange,
+    tortieRange: isValidRange(data.tortieRange)
+      ? (data.tortieRange as LayerRange)
+      : DEFAULT_SINGLE_CAT_SETTINGS.tortieRange,
+    exactLayerCounts:
+      typeof data.exactLayerCounts === "boolean" ? data.exactLayerCounts : true,
+    afterlifeMode: isAfterlifeOption(data.afterlifeMode)
+      ? data.afterlifeMode
+      : DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
+    extendedModes: Array.isArray(modes)
+      ? [
+          ...new Set(
+            (modes as string[]).filter((m): m is ExtendedMode =>
+              EXTENDED_MODE_VALUES.has(m),
+            ),
+          ),
+        ].sort(compareCodeUnits)
+      : [],
+    includeBaseColours:
+      typeof data.includeBaseColours === "boolean"
+        ? data.includeBaseColours
+        : true,
+    includeNewSprites: true,
+    catName: typeof data.catName === "string" ? data.catName.slice(0, 100) : "",
+    creatorName:
+      typeof data.creatorName === "string"
+        ? data.creatorName.slice(0, 100)
+        : "",
+  };
 }
 
 // ---------------------------------------------------------------------------

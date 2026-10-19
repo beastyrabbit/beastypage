@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { Image as CanvasImage, createCanvas, loadImage } from "@napi-rs/canvas";
 import pixelmatch from "pixelmatch";
-import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 
 import { preparePreviewBatchParams } from "@/components/visual-builder/previewBatcher";
 import {
@@ -8,7 +10,7 @@ import {
   synchronizeBuilderParams,
 } from "@/lib/cat-builder/genericTraitEditor";
 import { renderCatV3 } from "@/lib/cat-v3/api";
-import type { CatParams } from "@/lib/cat-v3/types";
+import type { CatParams, RandomGenerationOptions } from "@/lib/cat-v3/types";
 import { CatGeneratorV3 } from "@/lib/single-cat/catGeneratorV3";
 
 const baseUrl = inject("rendererBaseUrl");
@@ -143,6 +145,70 @@ async function decodePng(dataUrl: string) {
 
 // Skip tests if RENDERER_BASE_URL is not set
 describe("renderer-service", () => {
+  it("keeps fixed-seed cats pixel-identical to the pre-refactor baseline", async () => {
+    // RGBA hashes captured from e984e23 before the Sonar complexity refactor.
+    const baselines: Array<[RandomGenerationOptions, string]> = [
+      [
+        { seed: 0 },
+        "02858f7e290f035c14fa5be3f549c1abae511a7050489bf6334c5e016769576d",
+      ],
+      [
+        { seed: 1 },
+        "db3d47bf2976ac2dc10b43a589ccaf0aca1b3908bca57a3ec341082b5a5da1a2",
+      ],
+      [
+        { seed: 42 },
+        "c26911ae0d0ee5d27cb8fd93960487f17b8984c5728bcbc43ebd7724fbb39154",
+      ],
+      [
+        { seed: "sonar-08" },
+        "944dfc91fe9f2bd8a7537d1508d2e9eb48e03e132bbc8a32a6d6e0f4c574acee",
+      ],
+      [
+        { seed: 20261019, accessoryCount: 3, scarCount: 3, tortieCount: 3 },
+        "07a0a1245afc128d13cfa4a9642ab1a95a8621d46286ad7c5d3e1eb7732cf5d5",
+      ],
+      [
+        {
+          seed: "sonar-08-palette",
+          experimentalColourMode: ["mood", "bold"],
+          includeBaseColours: false,
+        },
+        "5a986f90ea704ab3b4cbc319e370c7aeff7388d56736d8f0da0a882429338925",
+      ],
+    ];
+    const nativeFetch = globalThis.fetch;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input, init) => {
+        if (typeof input === "string" && input.startsWith("/sprite-data/")) {
+          const json = await readFile(
+            new URL(`../../public${input}`, import.meta.url),
+            "utf8",
+          );
+          return new Response(json, { status: 200 });
+        }
+        return nativeFetch(input, init);
+      });
+    try {
+      const generator = new CatGeneratorV3(baseUrl);
+      for (const [options, hash] of baselines) {
+        const params = await generator.generateRandomParams(options);
+        const rendered = await generator.generateCat(params);
+        const decoded = await decodePng(rendered.imageDataUrl);
+        expect([decoded.width, decoded.height], `seed ${options.seed}`).toEqual(
+          [50, 50],
+        );
+        expect(
+          createHash("sha256").update(decoded.pixels).digest("hex"),
+          `seed ${options.seed}`,
+        ).toBe(hash);
+      }
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it("returns a PNG data URL for a simple cat", async () => {
     const result = await renderCatV3(
       {
