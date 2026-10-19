@@ -6,18 +6,31 @@ The source is google/fonts at commit
 `47d54ca1ebb14fd864695f1d39dc734f39017c33`. `sources.json` records the original
 TTF URLs and SHA-256 hashes of both formats. The TTFs were compressed losslessly
 with FontTools 4.67.0 (`TTFont`, `font.flavor = "woff2"`, `font.save(...)`).
-No outlines, names, axes, or character maps were changed. Geist and Geist Mono
-omit the `prep` hinting table, matching Google's WOFF2 delivery and preserving
+The full fonts retain their outlines, names, axes, and character maps. Geist and
+Geist Mono omit the `prep` hinting table, matching Google's WOFF2 delivery and preserving
 browser text widths. Their glyphs contain no hinting instructions.
 
 The full character maps retain Latin and the other scripts previously available
 from Google's CSS. The old `subsets: ["latin"]` selected preloads, not the
-available glyphs. Local files preload the full character maps. Geist and Geist
+available glyphs. Geist and Geist Mono preload small Latin subsets and load the
+full fonts as fallback faces only when additional glyphs are needed. The full faces
+have stable CSS family names so they can follow the Latin face in each stack.
+The original Arial fallback and its metrics remain last in the stack. This keeps
+Latin page loads small while retaining the other scripts. The six look fonts
+preload their full character maps on the overlay and its preview. Geist and Geist
 Mono retain the 100–900 variable range. The other families expose the same
 weights and normal/italic styles as before, with `display: "swap"` and the same
 CSS variables. `fallbacks.css` preserves the Google loader's fallback families
 and metric overrides. Local automatic fallback calculation is disabled to avoid
 changing those metrics.
+
+The Latin files were generated with `fontTools.subset.Subsetter` using the
+225-codepoint character maps from Google's Latin WOFF2 files, recorded in
+`sources.json`. Subsetting keeps all layout features and name IDs
+1, 2, 3, 4, 5, 6, 13, 14, and 25, including the license. The extended faces'
+`unicode-range` values contain the full character maps minus those Latin maps,
+so missing system glyphs do not trigger a full-font download. Only the two Latin
+files are preloaded, about 68 KB together instead of 141 KB for the full fonts.
 
 Each family directory contains its upstream license. Geist, Geist Mono,
 EB Garamond, Cormorant Garamond, Press Start 2P, IBM Plex Mono, and Caveat use

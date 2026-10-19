@@ -32,7 +32,7 @@ describe("self-hosted fonts", () => {
   });
 
   it("ships intact WOFF2 files and a redistribution license for every family", () => {
-    expect(sources).toHaveLength(11);
+    expect(sources).toHaveLength(13);
     for (const source of sources) {
       const file = path.join(import.meta.dirname, source.file);
       const bytes = readFileSync(file);
@@ -51,5 +51,19 @@ describe("self-hosted fonts", () => {
         licenseName === "OFL.txt" ? "SIL OPEN FONT LICENSE" : "Apache License",
       );
     }
+  });
+
+  it("keeps the two Latin preload files below 75 KB together", () => {
+    const latinFonts = sources.filter((source) =>
+      source.file.endsWith("-Latin.woff2"),
+    );
+    expect(latinFonts).toHaveLength(2);
+    const bytes = latinFonts.reduce(
+      (total, source) =>
+        total +
+        readFileSync(path.join(import.meta.dirname, source.file)).length,
+      0,
+    );
+    expect(bytes).toBeLessThan(75_000);
   });
 });
