@@ -63,7 +63,7 @@ describe("cat share codec", () => {
   );
 
   it.each([1, 2])(
-    "reads V%s scalar slots unchanged and defaults malformed slot fields",
+    "reads V%s scalar slots unchanged and repairs duplicate defaulted tortie slots",
     async (v) => {
       const stored = prepareCatShare({ params: { colour: "WHITE" } });
       const decoded = await decodeCatShare(
@@ -96,7 +96,6 @@ describe("cat share codec", () => {
       ]);
       expect(decoded?.scarSlots).toEqual(["none", "none", "FACE"]);
       expect(decoded?.tortieSlots).toEqual([
-        { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
         { mask: "ONE", pattern: "SingleColour", colour: "GINGER" },
         { mask: "ONE", pattern: "SingleColour", colour: "BLACK" },
       ]);

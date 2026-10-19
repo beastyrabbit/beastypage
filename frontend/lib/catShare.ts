@@ -6,6 +6,7 @@ import {
 } from "@/lib/cat-system";
 import type { JsonValue } from "@/lib/cat-system/definition";
 import { getSlotTraits, isJsonValue } from "@/lib/cat-system/runtime";
+import { deduplicateTortieLayers } from "@/lib/cat-system/tortieLayers";
 import type { TortieLayer as SharedTortieLayer } from "@/lib/cat-v3/types";
 
 // Keep the wire version readable by v7.3.1 during rolling deploys and
@@ -163,7 +164,16 @@ function buildSlots(data: EncodePayload, document: CatDocument): CatShareSlots {
       traitId === "tortie" ? null : "none",
     );
   }
+  repairTortieSlots(slots);
   return slots;
+}
+
+function repairTortieSlots(slots: CatShareSlots): void {
+  if (!Array.isArray(slots.tortie)) return;
+  const repaired = deduplicateTortieLayers(sanitizeTortieArray(slots.tortie));
+  if (repaired.length !== slots.tortie.length) {
+    slots.tortie = repaired as JsonValue[];
+  }
 }
 
 export interface CatShareStoredPayloadV1 {
@@ -296,6 +306,7 @@ function projectPayload(
   try {
     const document = readCatDocument(documentInput);
     const slots = normalizeSlots(slotsInput);
+    repairTortieSlots(slots);
     const counts = normalizeCounts(countsInput, slots);
     return {
       document,

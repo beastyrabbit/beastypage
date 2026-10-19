@@ -11,6 +11,7 @@ import {
   hydrateBuilderParams,
   synchronizeBuilderParams,
 } from "@/lib/cat-builder/genericTraitEditor";
+import { deduplicateTortieLayers } from "@/lib/cat-system/tortieLayers";
 import { isCoatPatternId } from "@/lib/cat-v3/coatPatterns";
 import { useCatProfile } from "@/lib/data/cats";
 import type { PaletteMode } from "@/lib/palettes";
@@ -93,7 +94,7 @@ function normalizeTortieLayers(value: unknown): TortieLayer[] {
     if (!pattern || !colour || !mask) continue;
     result.push({ pattern, colour, mask });
   }
-  return result;
+  return deduplicateTortieLayers(result);
 }
 
 function sanitizeOption(value: unknown): string | undefined {

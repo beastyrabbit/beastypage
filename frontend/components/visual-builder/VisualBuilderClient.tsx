@@ -12,6 +12,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { toast } from "sonner";
 import {
   useCatGenerator,
   useSpriteMapperOptions,
@@ -45,9 +46,12 @@ import {
 } from "@/lib/cat-builder/genericTraitEditor";
 import {
   createTortieLayer,
+  DUPLICATE_TORTIE_MESSAGE,
+  hasDuplicateTortieLayers,
   MAX_BUILDER_TORTIE_LAYERS as MAX_TORTIE_LAYERS,
 } from "@/lib/cat-builder/tortieLayers";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
+import { deduplicateTortieLayers } from "@/lib/cat-system/tortieLayers";
 import {
   applyCoatChoice,
   getCoatChoiceValue,
@@ -461,11 +465,11 @@ export function VisualBuilderClient({
       delete initialParams.poseName;
     }
     const mergedParams = hydrateBuilderParams(cloneParams(initialParams));
-    const incomingTortie = (
-      initialCat.tortie ??
-      mergedParams.tortie ??
-      []
-    ).filter(Boolean) as TortieLayer[];
+    const incomingTortie = deduplicateTortieLayers(
+      (initialCat.tortie ?? mergedParams.tortie ?? []).filter(
+        Boolean,
+      ) as TortieLayer[],
+    );
     const synced = ensureTortieSync(incomingTortie, mergedParams);
     setParams(synchronizeBuilderParams(synced));
     setTortieLayers(
@@ -1075,6 +1079,10 @@ export function VisualBuilderClient({
       const draftLayer = { ...next[index] };
       mutator(draftLayer);
       next[index] = draftLayer;
+      if (hasDuplicateTortieLayers(next)) {
+        toast.error(DUPLICATE_TORTIE_MESSAGE);
+        return;
+      }
       applyTortieLayers(next, next.length > 0);
     },
     [applyTortieLayers, computeDefaultTortieLayer, params, tortieLayers],

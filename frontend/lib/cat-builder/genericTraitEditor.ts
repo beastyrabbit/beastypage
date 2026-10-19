@@ -135,7 +135,13 @@ export function synchronizeBuilderParams(params: CatParams): CatParams {
 
 /** Use when loading a canonical envelope before specialized fields are edited. */
 export function hydrateBuilderParams(params: CatParams): CatParams {
-  if (!isRecord(params.traits)) return synchronizeBuilderParams(params);
+  if (!isRecord(params.traits)) {
+    const loaded = catDocumentToBuilderParams(readCatDocument(params), params);
+    return synchronizeBuilderParams({
+      ...params,
+      tortie: loaded.tortie,
+    });
+  }
   const document = readCatDocument({
     schemaVersion: params.schemaVersion,
     traits: params.traits,

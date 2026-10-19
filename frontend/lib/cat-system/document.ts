@@ -12,6 +12,7 @@ import {
   isJsonValue,
   partitionTraitValues,
 } from "./runtime";
+import { deduplicateTortieLayers } from "./tortieLayers";
 
 const LEGACY_ENVELOPE_KEYS = new Set([
   "schemaVersion",
@@ -397,13 +398,28 @@ export function readCatDocument(
   options: ReadCatDocumentOptions = {},
 ): CatDocument {
   if (!isRecord(input)) throw new Error("Cat document must be an object");
-  if (!isRecord(input.traits)) return legacyParamsToCatDocument(input);
+  if (!isRecord(input.traits)) {
+    if (options.strict) return legacyParamsToCatDocument(input);
+    const source = resolveLegacySource(input);
+    const repaired = {
+      ...source,
+      tortie: deduplicateTortieLayers(normalizeTortieLayers(source)),
+    };
+    return legacyParamsToCatDocument(
+      source === input ? repaired : { ...input, params: repaired },
+    );
+  }
 
   if (options.strict) {
     return parseKnownCatDocument(input);
   }
 
   const partitioned = partitionTraitValues(input.traits);
+  if (Array.isArray(partitioned.known.tortie)) {
+    partitioned.known.tortie = deduplicateTortieLayers(
+      partitioned.known.tortie,
+    );
+  }
   applyRequiredDefaults(partitioned.known);
   const existingUnknown = isRecord(input.unknownTraits)
     ? Object.fromEntries(
