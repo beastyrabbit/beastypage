@@ -92,7 +92,7 @@ body {
   gap: 10px;
   padding: 18px 70px 18px 36px;
   background: #d4af37;
-  color: white;
+  color: #171717;
   text-decoration: none;
   border-radius: 12px;
   font-weight: 600;
@@ -108,10 +108,10 @@ body {
   transform: translateY(-50%);
   width: 50px;
   height: 50px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #d8b74b;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
-  color: white;
+  color: #171717;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -120,7 +120,7 @@ body {
 }
 
 .inner-copy-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #ddbf5f;
 }
 
 .commission-button:hover,
@@ -136,6 +136,7 @@ body {
 
 .commission-button:hover {
   background: #7c3aed;
+  color: #ffffff;
   box-shadow: 0 8px 30px rgba(212, 175, 55, 0.5);
 }
 
@@ -150,6 +151,7 @@ body {
 }
 
 .twitch-button {
+  color: #ffffff;
   background: #9146ff;
   box-shadow: 0 5px 20px rgba(145, 70, 255, 0.3);
 }
@@ -639,7 +641,7 @@ body {
   align-items: center;
   justify-content: center;
   background: linear-gradient(45deg, #d4af37, #ffd700);
-  color: white;
+  color: #171717;
   text-decoration: none;
   padding: 12px 20px;
   border-radius: 5px;
@@ -658,7 +660,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
+  background: #26262a;
   border: 1px solid var(--border);
   border-radius: 5px;
   color: white;
@@ -684,7 +686,7 @@ body {
 
 .view-cat-button {
   background: #d4af37;
-  color: white;
+  color: #171717;
   border: none;
   padding: 8px 16px;
   border-radius: 5px;
@@ -695,11 +697,12 @@ body {
 
 .view-cat-button:hover {
   background: #7c3aed;
+  color: #ffffff;
 }
 
 .spin-again-button {
   background: linear-gradient(45deg, #d4af37, #ffd700);
-  color: white;
+  color: #171717;
   border: none;
   padding: 15px 30px;
   font-size: 1.1em;
@@ -805,7 +808,7 @@ body {
 
 .links-container a:hover {
   background: #d4af37;
-  color: white;
+  color: #171717;
 }
 
 /* Modal */
@@ -880,7 +883,7 @@ body {
 }
 
 .nav-button {
-  background: rgba(255, 255, 255, 0.06);
+  background: #26262a;
   color: white;
   border: 1px solid var(--border);
   border-radius: 5px;

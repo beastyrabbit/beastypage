@@ -589,22 +589,22 @@
 .coin__face--front {
   background: radial-gradient(
     circle at 35% 30%,
-    rgba(253, 224, 71, 0.95),
-    rgba(217, 119, 6, 0.75) 55%,
-    rgba(146, 64, 14, 0.6)
+    #fde047,
+    #d97706 55%,
+    #9e4a11
   );
-  color: rgba(67, 20, 7, 0.92);
+  color: #1c0903;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
 }
 
 .coin__face--back {
   background: radial-gradient(
     circle at 30% 25%,
-    rgba(255, 255, 255, 0.95),
-    rgba(209, 213, 219, 0.75) 55%,
-    rgba(107, 114, 128, 0.55)
+    #ffffff,
+    #d1d5db 55%,
+    #6b7280
   );
-  color: rgba(30, 41, 59, 0.85);
+  color: #0b1220;
   transform: rotateY(180deg);
 }
 
