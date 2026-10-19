@@ -16,16 +16,76 @@ import {
   setRegistryRevealValue,
 } from "@/utils/spinTiming";
 import {
+  activateParamRow,
   applyParamValue,
   buildLayerOptionStrings,
   buildParameterOptions,
   cloneParams,
   formatValue,
+  LAYER_PARAM_IDS,
   PARAM_SEQUENCE,
   type ParameterOptions,
-  sampleValues,
+  type ParamRow,
   type SpriteMapperApi,
+  sampleValues,
 } from "./spinSupport";
+
+describe("OBS param row activation", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const prefilled = (): ParamRow[] =>
+    PARAM_SEQUENCE.filter(
+      (definition) => !LAYER_PARAM_IDS.has(definition.id),
+    ).map(({ id, label }) => ({ id, label, value: "???", status: "pending" }));
+
+  it.each(["tortie", "accessory", "scar"])(
+    "creates the %s summary on reveal without reporting missing data",
+    (id) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const definition = PARAM_SEQUENCE.find((entry) => entry.id === id);
+      if (!definition) throw new Error(`Missing reveal definition: ${id}`);
+      // Each spin/replay starts with a freshly prefilled main board.
+      for (let replay = 0; replay < 2; replay++) {
+        const prev = prefilled();
+        const row = { current: -1 };
+        const next = activateParamRow(prev, definition, row);
+        expect(row.current).toBe(prev.length);
+        expect(next).toEqual([
+          ...prev,
+          { id, label: definition.label, value: "---", status: "active" },
+        ]);
+      }
+      expect(warn).not.toHaveBeenCalled();
+    },
+  );
+
+  it("activates prefilled rows without changing their order", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const prev = prefilled();
+    const definition = PARAM_SEQUENCE.find((entry) => entry.id === prev[0].id);
+    if (!definition) throw new Error("Missing prefilled reveal definition");
+    const row = { current: -1 };
+    const next = activateParamRow(prev, definition, row);
+    expect(row.current).toBe(0);
+    expect(next[0]).toEqual({ ...prev[0], value: "---", status: "active" });
+    expect(next.slice(1)).toEqual(prev.slice(1));
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("still warns and recovers when an ordinary prefilled row is missing", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const definition = PARAM_SEQUENCE.find(
+      (entry) => !LAYER_PARAM_IDS.has(entry.id),
+    );
+    if (!definition) throw new Error("Missing ordinary reveal definition");
+    const row = { current: -1 };
+    const next = activateParamRow([], definition, row);
+    expect(row.current).toBe(0);
+    expect(next[0]).toMatchObject({ id: definition.id, status: "active" });
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(definition.id));
+  });
+});
 
 describe("OBS option sampling", () => {
   it("keeps the same spaced layer samples and puts the target last", () => {

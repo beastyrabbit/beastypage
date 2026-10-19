@@ -482,12 +482,12 @@ export function ControlShell() {
     if (!initialized) setInitialized(true);
   }, [session, initialized, applySessionSettings, deferIfEditing, retryTick]);
 
-  // Ensure session exists on mount
+  // Profile provisioning invalidates the viewer query after the user row exists.
   useEffect(() => {
-    if (isAuthenticated && session === null) {
+    if (isAuthenticated && viewer?._id && session === null) {
       ensureSession({}).catch(console.error);
     }
-  }, [isAuthenticated, session, ensureSession]);
+  }, [isAuthenticated, viewer?._id, session, ensureSession]);
 
   // Auto-fill creator name from viewer username
   useEffect(() => {

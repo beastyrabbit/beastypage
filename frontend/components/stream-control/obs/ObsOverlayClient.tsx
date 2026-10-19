@@ -115,6 +115,7 @@ import { EvolutionScene } from "./scenes/EvolutionScene";
 import { LobbyCountdownScene } from "./scenes/LobbyCountdownScene";
 import { TestCard } from "./scenes/TestCard";
 import {
+  activateParamRow,
   buildFlipSequence,
   buildParameterOptions,
   buildSharePayload,
@@ -260,35 +261,6 @@ function flipStepStatus(step: FlipStep): "active" | "revealed" {
 
 function formatSlotValue(value: string | null): string {
   return value ? formatValue(value) : "None";
-}
-
-/** Marks a prefilled param row active and records its index in `row`. */
-function activateParamRow(
-  prev: ParamRow[],
-  definition: RegistryRevealDefinition,
-  row: ParamRowIndex,
-): ParamRow[] {
-  const idx = prev.findIndex((entry) => entry.id === definition.id);
-  if (idx !== -1) {
-    row.current = idx;
-    return prev.map((entry, i) =>
-      i === idx ? { ...entry, value: "---", status: "active" as const } : entry,
-    );
-  }
-  // Fallback: append if not found (shouldn't happen with prefill)
-  console.warn(
-    `[ObsOverlayClient] Param row for "${definition.id}" not found in prefilled board — appending as fallback`,
-  );
-  row.current = prev.length;
-  return [
-    ...prev,
-    {
-      id: definition.id,
-      label: definition.label,
-      value: "---",
-      status: "active" as const,
-    },
-  ];
 }
 
 function revealParamRow(
