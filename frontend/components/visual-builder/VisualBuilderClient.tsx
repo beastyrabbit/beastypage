@@ -226,11 +226,7 @@ function VisualBuilderPreviewSprite({
   const cachedSrc = getCachedPreview(cacheKey);
   const loading =
     !unavailable && rendererReady && resolvedKey !== cacheKey && !cachedSrc;
-  const displaySrc = unavailable
-    ? null
-    : resolvedKey === cacheKey
-      ? src
-      : cachedSrc;
+  const displaySrc = resolvedKey === cacheKey ? src : cachedSrc;
 
   useEffect(() => {
     mutateRef.current = mutate;
@@ -271,7 +267,7 @@ function VisualBuilderPreviewSprite({
           <Loader2 className="size-5 animate-spin text-amber-200" />
         </div>
       )}
-      {displaySrc && (
+      {!unavailable && displaySrc && (
         <Image
           src={displaySrc}
           alt={label ?? "Preview"}
