@@ -69,11 +69,9 @@ for (const viewport of [
         await page.getByRole("button", { name, exact: true }).press("Enter");
         await expect(swatch).toHaveAttribute("aria-pressed", "true");
       }
-      expect(
-        await page
-          .locator("button button, button input, [role=button]")
-          .count(),
-      ).toBe(0);
+      await expect(
+        page.locator("button button, button input, [role=button]"),
+      ).toHaveCount(0);
     });
 
     test("palette trigger, removal, Escape and outside click preserve focus", async ({
