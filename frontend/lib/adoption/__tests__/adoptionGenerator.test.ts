@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
   catDocumentToLegacyParams,
@@ -21,6 +22,83 @@ function makeGenerator(): AdoptionGenerator {
 }
 
 describe("AdoptionGenerator coat reveal", () => {
+  it("preserves seeded layer bytes and RNG consumption", () => {
+    const generator = makeGenerator();
+    Object.assign(generator, {
+      parameterOptions: {
+        accessory: ["none", "HOLLY", "MAPLE LEAF"],
+        scar: ["none", "ONE", "TWO"],
+        tortieMask: ["none", "ONE", "TWO"],
+        tortiePattern: ["none", "Tabby", "SingleColour"],
+        tortieColour: ["none", "GINGER", "BLACK"],
+      },
+    });
+    const fingerprints = Array.from({ length: 32 }, (_, seed) => {
+      let state = seed;
+      let calls = 0;
+      const spy = vi.spyOn(Math, "random").mockImplementation(() => {
+        calls += 1;
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return state / 0x100000000;
+      });
+      try {
+        const params = { accessories: ["OLD"], scars: ["OLD"], tortie: [] };
+        generator.ensureLayerDepth(params, {
+          accessoryCount: seed % 4,
+          scarCount: seed % 3,
+          tortieCount: seed % 5,
+        });
+        const bytes = JSON.stringify({ params, calls, state }, (_key, value) =>
+          value === undefined ? "<undefined>" : value,
+        );
+        return createHash("sha256").update(bytes).digest("hex");
+      } finally {
+        spy.mockRestore();
+      }
+    });
+    expect(fingerprints).toMatchSnapshot();
+  });
+
+  it("preserves stage state for simple, slot and legacy reveal values", () => {
+    const generator = makeGenerator();
+    const cases = [
+      ["simple", "peltName", "pelt", "tiger-stripes"],
+      ["simple", "whitePatches", "whitePatches", "none"],
+      ["simple", "points", "points", "none"],
+      ["simple", "whitePatchesTint", "whitePatchesTint", "none"],
+      ["simple", "vitiligo", "vitiligo", "none"],
+      ["simple", "eyeColour2", "eyeColour2", null],
+      ["simple", "eyeColour2", "eyeColour2", "none"],
+      ["simple", "eyeColour2", "eyeColour2", "BLUE"],
+      ["simple", "poseName", "pose", "adult_short2"],
+      ["simple", "colour", "colour", "BLACK"],
+      ["slot", "accessory", "accessories", "HOLLY"],
+      ["slot", "accessory", "accessories", undefined],
+      ["slot", "accessory", "accessories", null],
+      ["slot", "accessory", "accessories", "none"],
+      ["accessory", "accessory", "accessories", "HOLLY"],
+      ["scar", "scar", "scars", "ONE"],
+    ];
+    const states = cases.flatMap(([type, param, traitId, value]) =>
+      (type === "slot" ? [true] : [true, false]).map((canonical) => {
+        const state = generator.buildInitialState(
+          { dead: false, darkForest: false },
+          2,
+          2,
+          0,
+        );
+        if (!canonical) Reflect.deleteProperty(state, "document");
+        generator.applyStageValue(
+          state,
+          { type, param, traitId, slotIndex: 0 },
+          value,
+        );
+        return state;
+      }),
+    );
+    expect(states).toMatchSnapshot();
+  });
+
   const peltStage = {
     id: "peltName",
     traitId: "pelt",

@@ -1,6 +1,7 @@
 import type {
   AnyCatTraitDefinition,
   CatSystemDefinition,
+  GachaGate,
   JsonValue,
 } from "@/lib/cat-system/definition";
 import {
@@ -1411,6 +1412,26 @@ function evolutionCatalogValues(catalog: GachaCatalog | undefined): string[] {
   );
 }
 
+function isEvolutionGateActive(
+  gate: GachaGate | undefined,
+  gateResults: Map<string, boolean>,
+  random: RandomFn,
+): boolean {
+  if (!gate) return true;
+  let active = gateResults.get(gate.group);
+  if (active === undefined) {
+    active = roll({ nextFloat: random }, gate.probability);
+    gateResults.set(gate.group, active);
+  }
+  return active;
+}
+
+function evolutionStringValues(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
 function appendGenericEvolutionTraits({
   parent,
   traits,
@@ -1441,21 +1462,10 @@ function appendGenericEvolutionTraits({
       continue;
     }
 
-    if (binding.gate) {
-      let active = gateResults.get(binding.gate.group);
-      if (active === undefined) {
-        active = roll(randomSource, binding.gate.probability);
-        gateResults.set(binding.gate.group, active);
-      }
-      if (!active) continue;
-    }
+    if (!isEvolutionGateActive(binding.gate, gateResults, random)) continue;
 
     const catalog = evolutionCatalogFor(catalogs, binding.catalog, pose);
-    const current = Array.isArray(parentTraits[trait.id])
-      ? (parentTraits[trait.id] as unknown[]).filter(
-          (value): value is string => typeof value === "string",
-        )
-      : [];
+    const current = evolutionStringValues(parentTraits[trait.id]);
     const enforceUnique = binding.unique || trait.value.unique === true;
     const owned = new Set(current);
     const available = evolutionCatalogValues(catalog).filter(
@@ -1501,6 +1511,306 @@ function appendGenericEvolutionTraits({
         value,
       });
     }
+  }
+}
+
+type EvolutionStageContext = {
+  parent: EvolutionCatData;
+  starterData: EvolutionCatData;
+  controls: EvolutionControls;
+  pools: EvolutionPools;
+  random: RandomFn;
+  archetype: EvolutionArchetype;
+  typedLevel: EvolutionLevel;
+  usedAccessories: Set<string>;
+  usedScars: Set<string>;
+  usedMasks: Set<string>;
+  usedColours: Set<string>;
+  nextAccessories: string[];
+  nextScars: string[];
+  nextTorties: TortieLayer[];
+  additions: EvolutionAddition[];
+  rolls: EvolutionRoll[];
+};
+
+function rollEvolutionCoatGrowth(context: EvolutionStageContext): boolean {
+  const { parent, random, additions, rolls } = context;
+  // One-way coat growth: a shorthair line can grow out and stays long.
+  let coatGrew = false;
+  if (
+    Number(parent.params.spriteNumber) === SHORT_HAIR_SPRITE &&
+    random() < COAT_GROWTH_CHANCE
+  ) {
+    coatGrew = true;
+    rolls.push({ kind: "coat", label: "Coat", value: "Long hair" });
+    additions.push({
+      kind: "coat",
+      traitId: "pose",
+      label: "Coat grew long",
+      value: "Long hair",
+      traitValue: LONG_HAIR_POSE,
+    });
+  }
+
+  return coatGrew;
+}
+
+function replaceEvolutionTortie(
+  context: EvolutionStageContext,
+  index: number,
+): void {
+  const {
+    starterData,
+    pools,
+    random,
+    archetype,
+    typedLevel,
+    usedMasks,
+    usedColours,
+    nextTorties,
+    additions,
+    rolls,
+  } = context;
+  const mask = pickUniqueString(pools.tortieMasks, usedMasks, random);
+  const pattern = pickOne(pools.tortiePatterns, random);
+  if (mask && pattern) {
+    const colour = pickEvolutionColour(
+      starterData.params.colour,
+      archetype,
+      typedLevel,
+      pools,
+      random,
+      usedColours,
+    );
+    usedColours.add(colour.toUpperCase());
+    const previousLayer = { ...nextTorties[index] };
+    const previous = formatTortieLayer(previousLayer);
+    const layer: TortieLayer = { mask, pattern, colour };
+    nextTorties[index] = layer;
+    const value = formatTortieLayer(layer);
+    rolls.push({
+      kind: "replacement",
+      label: "Replacement",
+      slot: "tortie",
+      value: `${previous} → ${value}`,
+    });
+    additions.push({
+      kind: "replacement",
+      traitId: "tortie",
+      slot: "tortie",
+      label: `Replaced tortie ${previous}`,
+      previous,
+      value,
+      previousValue: previousLayer,
+      traitValue: layer,
+    });
+  }
+}
+
+function replaceEvolutionAccessory(
+  context: EvolutionStageContext,
+  index: number,
+): void {
+  const {
+    pools,
+    random,
+    typedLevel,
+    usedAccessories,
+    nextAccessories,
+    additions,
+    rolls,
+  } = context;
+  const accessory = pickAccessory(typedLevel, pools, usedAccessories, random);
+  if (accessory) {
+    const previous = nextAccessories[index];
+    nextAccessories[index] = accessory;
+    rolls.push({
+      kind: "replacement",
+      label: "Replacement",
+      slot: "accessory",
+      value: `${previous} → ${accessory}`,
+    });
+    additions.push({
+      kind: "replacement",
+      traitId: "accessories",
+      slot: "accessory",
+      label: `Replaced accessory ${previous}`,
+      previous,
+      value: accessory,
+      previousValue: previous,
+      traitValue: accessory,
+    });
+  }
+}
+
+function replaceEvolutionScar(
+  context: EvolutionStageContext,
+  index: number,
+): void {
+  const { pools, random, usedScars, nextScars, additions, rolls } = context;
+  const scar = pickUniqueString(pools.scars, usedScars, random);
+  if (scar) {
+    const previous = nextScars[index];
+    nextScars[index] = scar;
+    rolls.push({
+      kind: "replacement",
+      label: "Replacement",
+      slot: "scar",
+      value: `${previous} → ${scar}`,
+    });
+    additions.push({
+      kind: "replacement",
+      traitId: "scars",
+      slot: "scar",
+      label: `Replaced scar ${previous}`,
+      previous,
+      value: scar,
+      previousValue: previous,
+      traitValue: scar,
+    });
+  }
+}
+
+function rollEvolutionReplacement(context: EvolutionStageContext): void {
+  const { controls, random, nextAccessories, nextScars, nextTorties } = context;
+  // Rare replacement: reroll one trait the cat already owns.
+  const replaceable: Array<{
+    slot: EvolutionReplacementSlot;
+    index: number;
+  }> = [
+    ...nextTorties.map((_, index) => ({ slot: "tortie" as const, index })),
+    ...nextAccessories.map((_, index) => ({
+      slot: "accessory" as const,
+      index,
+    })),
+    ...(controls.scarsEnabled
+      ? nextScars.map((_, index) => ({ slot: "scar" as const, index }))
+      : []),
+  ];
+  if (replaceable.length > 0 && random() < REPLACEMENT_CHANCE) {
+    const target =
+      replaceable[
+        Math.min(
+          Math.floor(random() * replaceable.length),
+          replaceable.length - 1,
+        )
+      ];
+    if (target.slot === "tortie") {
+      replaceEvolutionTortie(context, target.index);
+    } else if (target.slot === "accessory") {
+      replaceEvolutionAccessory(context, target.index);
+    } else {
+      replaceEvolutionScar(context, target.index);
+    }
+  }
+}
+
+function appendEvolutionTorties(context: EvolutionStageContext): void {
+  const {
+    starterData,
+    controls,
+    pools,
+    random,
+    archetype,
+    typedLevel,
+    usedMasks,
+    usedColours,
+    nextTorties,
+    additions,
+    rolls,
+  } = context;
+  const tortieCount = pickCount(controls.torties, TORTIE_COUNT_WEIGHTS, random);
+  rolls.push({
+    kind: "tortie-count",
+    label: "Tortie layers",
+    value: tortieCount,
+    range: { ...controls.torties },
+  });
+  for (let i = 0; i < tortieCount; i += 1) {
+    const mask = pickUniqueString(pools.tortieMasks, usedMasks, random);
+    const pattern = pickOne(pools.tortiePatterns, random);
+    if (!mask || !pattern) continue;
+    const colour = pickEvolutionColour(
+      starterData.params.colour,
+      archetype,
+      typedLevel,
+      pools,
+      random,
+      usedColours,
+    );
+    usedColours.add(colour.toUpperCase());
+    const layer: TortieLayer = { mask, pattern, colour };
+    const parts = getTortieLayerParts(layer);
+    for (const part of parts) {
+      rolls.push({
+        kind: "tortie-part",
+        label: `Tortie ${i + 1} ${part.label}`,
+        layerIndex: i + 1,
+        part: part.kind,
+        value: part.value,
+      });
+    }
+    nextTorties.push(layer);
+    additions.push({
+      kind: "tortie",
+      traitId: "tortie",
+      label: `Tortie ${formatTortieLayer(layer)}`,
+      value: layer,
+      traitValue: layer,
+      parts,
+    });
+  }
+}
+
+function appendEvolutionScars(context: EvolutionStageContext): void {
+  const { controls, pools, random, usedScars, nextScars, additions, rolls } =
+    context;
+  const scarCount = controls.scarsEnabled
+    ? pickCount(controls.scars, SCAR_COUNT_WEIGHTS, random)
+    : 0;
+  for (let i = 0; i < scarCount; i += 1) {
+    const scar = pickUniqueString(pools.scars, usedScars, random);
+    if (!scar) continue;
+    nextScars.push(scar);
+    rolls.push({ kind: "scar", label: "Scar", value: scar });
+    additions.push({
+      kind: "scar",
+      traitId: "scars",
+      label: `Scar ${scar}`,
+      value: scar,
+      traitValue: scar,
+    });
+  }
+}
+
+function appendEvolutionAccessories(context: EvolutionStageContext): void {
+  const {
+    controls,
+    pools,
+    random,
+    typedLevel,
+    usedAccessories,
+    nextAccessories,
+    additions,
+    rolls,
+  } = context;
+  const accessoryCount = pickCount(
+    controls.accessories,
+    ACCESSORY_COUNT_WEIGHTS,
+    random,
+  );
+  for (let i = 0; i < accessoryCount; i += 1) {
+    const accessory = pickAccessory(typedLevel, pools, usedAccessories, random);
+    if (!accessory) continue;
+    nextAccessories.push(accessory);
+    rolls.push({ kind: "accessory", label: "Accessory", value: accessory });
+    additions.push({
+      kind: "accessory",
+      traitId: "accessories",
+      label: `Accessory ${accessory}`,
+      value: accessory,
+      traitValue: accessory,
+    });
   }
 }
 
@@ -1576,218 +1886,29 @@ export function generateEvolutionBatch(
       const additions: EvolutionAddition[] = [];
       const rolls: EvolutionRoll[] = [];
 
-      // One-way coat growth: a shorthair line can grow out and stays long.
-      let coatGrew = false;
-      if (
-        Number(parent.params.spriteNumber) === SHORT_HAIR_SPRITE &&
-        random() < COAT_GROWTH_CHANCE
-      ) {
-        coatGrew = true;
-        rolls.push({ kind: "coat", label: "Coat", value: "Long hair" });
-        additions.push({
-          kind: "coat",
-          traitId: "pose",
-          label: "Coat grew long",
-          value: "Long hair",
-          traitValue: LONG_HAIR_POSE,
-        });
-      }
-
-      // Rare replacement: reroll one trait the cat already owns.
-      const replaceable: Array<{
-        slot: EvolutionReplacementSlot;
-        index: number;
-      }> = [
-        ...nextTorties.map((_, index) => ({ slot: "tortie" as const, index })),
-        ...nextAccessories.map((_, index) => ({
-          slot: "accessory" as const,
-          index,
-        })),
-        ...(controls.scarsEnabled
-          ? nextScars.map((_, index) => ({ slot: "scar" as const, index }))
-          : []),
-      ];
-      if (replaceable.length > 0 && random() < REPLACEMENT_CHANCE) {
-        const target =
-          replaceable[
-            Math.min(
-              Math.floor(random() * replaceable.length),
-              replaceable.length - 1,
-            )
-          ];
-        if (target.slot === "tortie") {
-          const mask = pickUniqueString(pools.tortieMasks, usedMasks, random);
-          const pattern = pickOne(pools.tortiePatterns, random);
-          if (mask && pattern) {
-            const colour = pickEvolutionColour(
-              starterData.params.colour,
-              archetype,
-              typedLevel,
-              pools,
-              random,
-              usedColours,
-            );
-            usedColours.add(colour.toUpperCase());
-            const previousLayer = { ...nextTorties[target.index] };
-            const previous = formatTortieLayer(previousLayer);
-            const layer: TortieLayer = { mask, pattern, colour };
-            nextTorties[target.index] = layer;
-            const value = formatTortieLayer(layer);
-            rolls.push({
-              kind: "replacement",
-              label: "Replacement",
-              slot: "tortie",
-              value: `${previous} → ${value}`,
-            });
-            additions.push({
-              kind: "replacement",
-              traitId: "tortie",
-              slot: "tortie",
-              label: `Replaced tortie ${previous}`,
-              previous,
-              value,
-              previousValue: previousLayer,
-              traitValue: layer,
-            });
-          }
-        } else if (target.slot === "accessory") {
-          const accessory = pickAccessory(
-            typedLevel,
-            pools,
-            usedAccessories,
-            random,
-          );
-          if (accessory) {
-            const previous = nextAccessories[target.index];
-            nextAccessories[target.index] = accessory;
-            rolls.push({
-              kind: "replacement",
-              label: "Replacement",
-              slot: "accessory",
-              value: `${previous} → ${accessory}`,
-            });
-            additions.push({
-              kind: "replacement",
-              traitId: "accessories",
-              slot: "accessory",
-              label: `Replaced accessory ${previous}`,
-              previous,
-              value: accessory,
-              previousValue: previous,
-              traitValue: accessory,
-            });
-          }
-        } else {
-          const scar = pickUniqueString(pools.scars, usedScars, random);
-          if (scar) {
-            const previous = nextScars[target.index];
-            nextScars[target.index] = scar;
-            rolls.push({
-              kind: "replacement",
-              label: "Replacement",
-              slot: "scar",
-              value: `${previous} → ${scar}`,
-            });
-            additions.push({
-              kind: "replacement",
-              traitId: "scars",
-              slot: "scar",
-              label: `Replaced scar ${previous}`,
-              previous,
-              value: scar,
-              previousValue: previous,
-              traitValue: scar,
-            });
-          }
-        }
-      }
-
-      const tortieCount = pickCount(
-        controls.torties,
-        TORTIE_COUNT_WEIGHTS,
+      const context: EvolutionStageContext = {
+        parent,
+        starterData,
+        controls,
+        pools,
         random,
-      );
-      rolls.push({
-        kind: "tortie-count",
-        label: "Tortie layers",
-        value: tortieCount,
-        range: { ...controls.torties },
-      });
-      for (let i = 0; i < tortieCount; i += 1) {
-        const mask = pickUniqueString(pools.tortieMasks, usedMasks, random);
-        const pattern = pickOne(pools.tortiePatterns, random);
-        if (!mask || !pattern) continue;
-        const colour = pickEvolutionColour(
-          starterData.params.colour,
-          archetype,
-          typedLevel,
-          pools,
-          random,
-          usedColours,
-        );
-        usedColours.add(colour.toUpperCase());
-        const layer: TortieLayer = { mask, pattern, colour };
-        const parts = getTortieLayerParts(layer);
-        for (const part of parts) {
-          rolls.push({
-            kind: "tortie-part",
-            label: `Tortie ${i + 1} ${part.label}`,
-            layerIndex: i + 1,
-            part: part.kind,
-            value: part.value,
-          });
-        }
-        nextTorties.push(layer);
-        additions.push({
-          kind: "tortie",
-          traitId: "tortie",
-          label: `Tortie ${formatTortieLayer(layer)}`,
-          value: layer,
-          traitValue: layer,
-          parts,
-        });
-      }
-
-      const scarCount = controls.scarsEnabled
-        ? pickCount(controls.scars, SCAR_COUNT_WEIGHTS, random)
-        : 0;
-      for (let i = 0; i < scarCount; i += 1) {
-        const scar = pickUniqueString(pools.scars, usedScars, random);
-        if (!scar) continue;
-        nextScars.push(scar);
-        rolls.push({ kind: "scar", label: "Scar", value: scar });
-        additions.push({
-          kind: "scar",
-          traitId: "scars",
-          label: `Scar ${scar}`,
-          value: scar,
-          traitValue: scar,
-        });
-      }
-
-      const accessoryCount = pickCount(
-        controls.accessories,
-        ACCESSORY_COUNT_WEIGHTS,
-        random,
-      );
-      for (let i = 0; i < accessoryCount; i += 1) {
-        const accessory = pickAccessory(
-          typedLevel,
-          pools,
-          usedAccessories,
-          random,
-        );
-        if (!accessory) continue;
-        nextAccessories.push(accessory);
-        rolls.push({ kind: "accessory", label: "Accessory", value: accessory });
-        additions.push({
-          kind: "accessory",
-          traitId: "accessories",
-          label: `Accessory ${accessory}`,
-          value: accessory,
-          traitValue: accessory,
-        });
-      }
+        archetype,
+        typedLevel,
+        usedAccessories,
+        usedScars,
+        usedMasks,
+        usedColours,
+        nextAccessories,
+        nextScars,
+        nextTorties,
+        additions,
+        rolls,
+      };
+      const coatGrew = rollEvolutionCoatGrowth(context);
+      rollEvolutionReplacement(context);
+      appendEvolutionTorties(context);
+      appendEvolutionScars(context);
+      appendEvolutionAccessories(context);
 
       appendGenericEvolutionTraits({
         parent,
@@ -1883,6 +2004,100 @@ export function buildEvolutionBatchSettings(
   };
 }
 
+function applyTeaserReplacement(
+  addition: Extract<EvolutionAddition, { kind: "replacement" }>,
+  context: {
+    torties: TortieLayer[];
+    accessories: string[];
+    scars: string[];
+    pools: EvolutionPools;
+    random: RandomFn;
+    randomLayer: () => TortieLayer | null;
+    randomIndex: (length: number) => number;
+    traitChanges: EvolutionTraitChange[];
+  },
+): void {
+  const {
+    torties,
+    accessories,
+    scars,
+    pools,
+    random,
+    randomLayer,
+    randomIndex,
+    traitChanges,
+  } = context;
+  if (addition.slot === "tortie" && torties.length > 0) {
+    const layer = randomLayer();
+    if (layer) {
+      const index = randomIndex(torties.length);
+      const previous = torties[index];
+      torties[index] = layer;
+      traitChanges.push({
+        traitId: addition.traitId,
+        previous,
+        value: layer,
+      });
+    }
+  } else if (addition.slot === "accessory" && accessories.length > 0) {
+    const accessory = pickOne(pools.accessories, random);
+    if (accessory) {
+      const index = randomIndex(accessories.length);
+      const previous = accessories[index];
+      accessories[index] = accessory;
+      traitChanges.push({
+        traitId: addition.traitId,
+        previous,
+        value: accessory,
+      });
+    }
+  } else if (addition.slot === "scar" && scars.length > 0) {
+    const scar = pickOne(pools.scars, random);
+    if (scar) {
+      const index = randomIndex(scars.length);
+      const previous = scars[index];
+      scars[index] = scar;
+      traitChanges.push({
+        traitId: addition.traitId,
+        previous,
+        value: scar,
+      });
+    }
+  }
+}
+
+function appendTeaserTorties(
+  count: number,
+  randomLayer: () => TortieLayer | null,
+  torties: TortieLayer[],
+  traitChanges: EvolutionTraitChange[],
+): void {
+  for (let i = 0; i < count; i += 1) {
+    const layer = randomLayer();
+    if (layer) {
+      torties.push(layer);
+      traitChanges.push({ traitId: "tortie", value: layer });
+    }
+  }
+}
+
+function appendTeaserStrings(
+  count: number,
+  pool: string[],
+  slots: string[],
+  traitId: "accessories" | "scars",
+  random: RandomFn,
+  traitChanges: EvolutionTraitChange[],
+): void {
+  for (let i = 0; i < count; i += 1) {
+    const value = pickOne(pool, random);
+    if (value) {
+      slots.push(value);
+      traitChanges.push({ traitId, value });
+    }
+  }
+}
+
 /**
  * Build a plausible "could have been" variant of an upcoming evolution for
  * the ceremony's slot-machine tease. The variant starts from the parent cat
@@ -1943,69 +2158,38 @@ export function generateTeaserVariant(
   // Tease replacements as a coin-flip reroll of one owned trait.
   for (const addition of additions) {
     if (addition.kind !== "replacement" || random() < 0.5) continue;
-    if (addition.slot === "tortie" && torties.length > 0) {
-      const layer = randomLayer();
-      if (layer) {
-        const index = randomIndex(torties.length);
-        const previous = torties[index];
-        torties[index] = layer;
-        traitChanges.push({
-          traitId: addition.traitId,
-          previous,
-          value: layer,
-        });
-      }
-    } else if (addition.slot === "accessory" && accessories.length > 0) {
-      const accessory = pickOne(pools.accessories, random);
-      if (accessory) {
-        const index = randomIndex(accessories.length);
-        const previous = accessories[index];
-        accessories[index] = accessory;
-        traitChanges.push({
-          traitId: addition.traitId,
-          previous,
-          value: accessory,
-        });
-      }
-    } else if (addition.slot === "scar" && scars.length > 0) {
-      const scar = pickOne(pools.scars, random);
-      if (scar) {
-        const index = randomIndex(scars.length);
-        const previous = scars[index];
-        scars[index] = scar;
-        traitChanges.push({
-          traitId: addition.traitId,
-          previous,
-          value: scar,
-        });
-      }
-    }
+    applyTeaserReplacement(addition, {
+      torties,
+      accessories,
+      scars,
+      pools,
+      random,
+      randomLayer,
+      randomIndex,
+      traitChanges,
+    });
   }
 
   const tortieAdds = rollCount(countOf("tortie"));
-  for (let i = 0; i < tortieAdds; i += 1) {
-    const layer = randomLayer();
-    if (layer) {
-      torties.push(layer);
-      traitChanges.push({ traitId: "tortie", value: layer });
-    }
-  }
+  appendTeaserTorties(tortieAdds, randomLayer, torties, traitChanges);
   const accessoryAdds = rollCount(countOf("accessory"));
-  for (let i = 0; i < accessoryAdds; i += 1) {
-    const accessory = pickOne(pools.accessories, random);
-    if (accessory) {
-      accessories.push(accessory);
-      traitChanges.push({ traitId: "accessories", value: accessory });
-    }
-  }
+  appendTeaserStrings(
+    accessoryAdds,
+    pools.accessories,
+    accessories,
+    "accessories",
+    random,
+    traitChanges,
+  );
   const scarAdds = rollCount(countOf("scar"));
-  for (let i = 0; i < scarAdds; i += 1) {
-    const scar = pickOne(pools.scars, random);
-    if (scar) {
-      scars.push(scar);
-      traitChanges.push({ traitId: "scars", value: scar });
-    }
-  }
+  appendTeaserStrings(
+    scarAdds,
+    pools.scars,
+    scars,
+    "scars",
+    random,
+    traitChanges,
+  );
 
   for (const addition of additions) {
     if (addition.kind !== "trait" || random() >= 0.5) continue;

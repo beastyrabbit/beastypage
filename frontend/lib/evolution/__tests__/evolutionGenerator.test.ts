@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CatParams } from "@/lib/cat-v3/types";
+import { defineCatTrait, stringListValue } from "@/lib/cat-system/definition";
+import { catSystem } from "@/lib/cat-system/registry";
 import {
   applyEvolutionStarterHairToPayload,
   buildEvolutionBatchSettings,
@@ -118,12 +121,178 @@ function cleanStarter() {
 describe("evolution generation", () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it("preserves seeded batch and teaser bytes and RNG consumption", () => {
+    const fingerprints = Array.from({ length: 64 }, (_, seed) => {
+      let state = seed;
+      let calls = 0;
+      const random = () => {
+        calls += 1;
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return state / 0x100000000;
+      };
+      const result = generateEvolutionBatch(
+        seed % 2 ? cleanStarter() : starterParams,
+        {
+          branchCount: 3,
+          targetLevel: 3,
+          torties: { min: 0, max: 3 },
+          accessories: { min: 0, max: 3 },
+          scars: { min: 0, max: 2 },
+          scarsEnabled: seed % 3 !== 0,
+        },
+        seed % 4 === 0
+          ? { ...pools, tortieMasks: [], accessories: [], scars: [] }
+          : {
+              ...pools,
+              clanColours: { aqua: ["AQUA"], moon: ["NEONPINK"] },
+            },
+        { random },
+      );
+      const teasers = result.cats.slice(1).map((cat) => {
+        const parent =
+          result.cats.find(
+            (candidate) =>
+              candidate.branchIndex === cat.branchIndex &&
+              candidate.level === cat.level - 1,
+          ) ?? result.starter;
+        return generateTeaserVariant(parent.catData, cat.additions, pools, {
+          random,
+          archetype: cat.archetype,
+        });
+      });
+      // Keep undefined fields and property order visible as well as JSON bytes.
+      const bytes = JSON.stringify(
+        { result, teasers, state, calls },
+        (_key, value) => (value === undefined ? "<undefined>" : value),
+      );
+      return createHash("sha256").update(bytes).digest("hex");
+    });
+    expect(fingerprints).toMatchSnapshot();
+  });
+
+  it("retains legacy object stringification for slot payloads", () => {
+    expect(() =>
+      normalizeEvolutionStarter({
+        params: starterParams,
+        accessorySlots: [{}],
+      }),
+    ).toThrow('unsupported value "[object Object]"');
+    const normalized = normalizeEvolutionStarter({
+      params: starterParams,
+      accessorySlots: [{ toString: () => "HOLLY" }],
+    });
+    expect(normalized.accessorySlots).toEqual(["HOLLY"]);
+  });
+
+  it("preserves generic slots, shared gates, limits and weighted draws", () => {
+    const traits = [0, 1, 2].map((index) =>
+      defineCatTrait({
+        id: `probe${index}`,
+        label: `Probe ${index}`,
+        order: 1000 + index,
+        value: stringListValue({
+          required: false,
+          default: [],
+          catalog: "probe",
+          maxItems: 2,
+          unique: index !== 2,
+        }),
+        legacy: { strategy: "list", key: `probe${index}` },
+        render: { kind: "context" },
+        gacha: {
+          strategy: "slotList",
+          catalog: "probe",
+          count: { strategy: "uniformCount", min: 0, max: 3 },
+          unique: index !== 2,
+          fillProbability: 0.7,
+          ...(index < 2
+            ? { gate: { group: "shared-probe", probability: 0.5 } }
+            : {}),
+        },
+        capabilities: {
+          display: false,
+          edit: false,
+          reveal: false,
+          evolution: "accumulate",
+          inherit: "none",
+          settings: false,
+        },
+      }),
+    );
+    const system = {
+      ...catSystem,
+      catalogs: {
+        ...catSystem.catalogs,
+        probe: {
+          source: "static" as const,
+          elements: ["a", "b", "c"].map((id) => ({ id })),
+        },
+      },
+      traits: [...catSystem.traits, ...traits],
+    };
+    const fingerprints = Array.from({ length: 32 }, (_, seed) => {
+      let state = seed;
+      let calls = 0;
+      const result = generateEvolutionBatch(
+        starterParams,
+        { branchCount: 1, targetLevel: 3 },
+        pools,
+        {
+          system,
+          catalogs: {
+            probe: {
+              pools: seed % 3 === 0 ? [[]] : [["a", "b", "c"]],
+              weights: { a: 3 },
+            },
+          },
+          random: () => {
+            calls += 1;
+            state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+            return state / 0x100000000;
+          },
+        },
+      );
+      return createHash("sha256")
+        .update(
+          JSON.stringify({ result, state, calls }, (_key, value) =>
+            value === undefined ? "<undefined>" : value,
+          ),
+        )
+        .digest("hex");
+    });
+    expect(fingerprints).toMatchSnapshot();
+  });
+
   it("normalizes starter payloads without structuredClone", () => {
     vi.stubGlobal("structuredClone", undefined);
     const normalized = normalizeEvolutionStarter(starterParams);
     expect(normalized.params.colour).toBe("GINGER");
     expect(normalized.params.tortie).toEqual(starterParams.tortie);
     expect(normalized.params.tortie).not.toBe(starterParams.tortie);
+  });
+
+  it("preserves JSON clone normalization of saved payload metadata", () => {
+    const payload = {
+      params: starterParams,
+      optional: undefined,
+      score: Number.NaN,
+      savedAt: new Date("2026-10-19T00:00:00.000Z"),
+    };
+    const updated = applyEvolutionStarterHairToPayload(
+      payload,
+      EVOLUTION_STARTER_HAIR_STYLES.long,
+    );
+    expect(updated).toEqual({
+      params: {
+        ...starterParams,
+        spriteNumber: EVOLUTION_STARTER_HAIR_STYLES.long.spriteNumber,
+        poseName: EVOLUTION_STARTER_HAIR_STYLES.long.poseName,
+      },
+      score: null,
+      savedAt: "2026-10-19T00:00:00.000Z",
+    });
+    expect(payload).toHaveProperty("optional");
+    expect(payload.params).toBe(starterParams);
   });
 
   it("normalizes flat and wrapped starter payloads", () => {
