@@ -278,22 +278,9 @@ function inheritTortieData(
 
   // If neither parent has tortie genetics, rarely create new tortie genetics through mutation
   if (!motherData && !fatherData) {
-    if (roll(MUTATION_RATE * 0.3)) {
-      // Spontaneous tortie mutation - create fresh tortie genetics
-      return {
-        hasTortieGene: true,
-        patterns: tortiePelts.length > 0 ? [pickOne(tortiePelts)] : ["Tabby"],
-        masks:
-          mutationPool.tortieMasks.length > 0
-            ? [pickOne(mutationPool.tortieMasks)]
-            : ["ONE"],
-        colours:
-          mutationPool.colours.length > 0
-            ? [pickOne(mutationPool.colours)]
-            : ["BLACK"],
-      };
-    }
-    return null;
+    return roll(MUTATION_RATE * 0.3)
+      ? createFreshTortieData(mutationPool)
+      : null;
   }
 
   // Combine genetics from both parents

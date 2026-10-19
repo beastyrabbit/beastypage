@@ -35,7 +35,14 @@ import type {
 
 function cloneValue<T>(value: T): T {
   if (typeof structuredClone === "function") return structuredClone(value);
-  return JSON.parse(JSON.stringify(value)) as T;
+  // Older browsers still need a copy of the registry's plain trait data.
+  if (Array.isArray(value)) return value.map(cloneValue) as T;
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, cloneValue(entry)]),
+    ) as T;
+  }
+  return value;
 }
 
 function catalogFor(
@@ -373,6 +380,231 @@ export function rollCatFromRegistry(
   } as GachaRollResult;
 }
 
+interface RollContext {
+  random: RandomSource;
+  catalogs: GachaCatalogs;
+  options: GachaGenerationOptions;
+  traits: Record<string, unknown>;
+  slotSelections: GachaSlotSelections;
+}
+
+type BindingFor<T extends GachaBinding["strategy"]> = Extract<
+  GachaBinding,
+  { strategy: T }
+>;
+
+function rollCatalogTrait(
+  trait: AnyCatTraitDefinition,
+  binding: BindingFor<"catalogChoice">,
+  context: RollContext,
+): void {
+  const { random, catalogs, options, traits } = context;
+  if (
+    binding.optionalProbability !== undefined &&
+    !roll(
+      random,
+      probabilityForTrait(trait.id, binding.optionalProbability, options),
+    )
+  ) {
+    delete traits[trait.id];
+    return;
+  }
+  const catalog = catalogChoiceCatalog(catalogs, binding, traits);
+  if (!catalog || catalogValues(catalog).length === 0) {
+    if (trait.value.required) {
+      throw new Error(`Gacha catalog ${binding.catalog} is empty`);
+    }
+    delete traits[trait.id];
+    return;
+  }
+  if (binding.includeUnsetChoice) {
+    const values = catalogValues(catalog);
+    const selectedIndex = weightedChoiceIndex(random, [
+      1,
+      ...values.map((choice) => catalogWeight(catalog, choice)),
+    ]);
+    if (selectedIndex === 0) {
+      resetTraitToDefault(trait, traits);
+    } else {
+      assignCatalogChoice(trait.id, values[selectedIndex - 1], traits);
+    }
+  } else {
+    assignCatalogChoice(
+      trait.id,
+      pickFromCatalog(random, catalog, binding.flattenSelection === true),
+      traits,
+    );
+  }
+}
+
+function rollSlotTrait(
+  trait: AnyCatTraitDefinition,
+  binding: BindingFor<"slotList">,
+  context: RollContext,
+): void {
+  const { random, catalogs, options, traits, slotSelections } = context;
+  const slotTraitId = trait.id as GachaSlotTraitId;
+  const slotCount = resolveSlotCount(
+    random,
+    slotTraitId,
+    binding.count,
+    options,
+  );
+  const catalog = catalogFor(catalogs, binding.catalog, traits.pose);
+  const choices = catalogValues(catalog);
+  const result = materializeSlots({
+    random,
+    slotCount,
+    availableChoices: choices,
+    unique: binding.unique,
+    exactCount: options.exactLayerCounts === true,
+    placeholder: "none",
+    shouldFillSlot: () => roll(random, binding.fillProbability ?? 1),
+    choiceWeight: (choice) => catalogWeight(catalog, choice),
+    mapChoice: (choice) => choice,
+    mapValueToSlot: (choice) => choice,
+  });
+  traits[trait.id] = result.selectedValues;
+  slotSelections[slotTraitId] = result.slotSelections;
+}
+
+function rollTortieTrait(
+  trait: AnyCatTraitDefinition,
+  binding: BindingFor<"tortieList">,
+  context: RollContext,
+): void {
+  const { random, catalogs, options, traits, slotSelections } = context;
+  const slotTraitId = trait.id as GachaSlotTraitId;
+  const numericOverride = hasNumericSlotOverride(slotTraitId, options);
+  const explicitCountMode = hasExplicitCountMode(slotTraitId, options);
+  const usesSlotRange =
+    !numericOverride &&
+    !explicitCountMode &&
+    options.slotRanges?.[slotTraitId] !== undefined;
+  if (
+    !numericOverride &&
+    usesSlotRange &&
+    !roll(random, binding.activationProbability)
+  ) {
+    traits[trait.id] = [];
+    slotSelections[slotTraitId] = [];
+    return;
+  }
+  const slotCount = resolveSlotCount(
+    random,
+    slotTraitId,
+    binding.count,
+    options,
+  );
+  const active =
+    slotCount > 0 &&
+    (numericOverride ||
+      explicitCountMode ||
+      usesSlotRange ||
+      options.exactLayerCounts === true ||
+      roll(random, binding.activationProbability));
+  if (!active) {
+    traits[trait.id] = [];
+    slotSelections[slotTraitId] = [];
+    return;
+  }
+
+  const masks = catalogValues(
+    catalogFor(catalogs, binding.maskCatalog, traits.pose),
+  );
+  const peltCatalog = catalogFor(catalogs, binding.peltCatalog, traits.pose);
+  const colourCatalog = catalogFor(
+    catalogs,
+    binding.colourCatalog,
+    traits.pose,
+  );
+  const result = materializeSlots({
+    random,
+    slotCount,
+    availableChoices: masks,
+    unique: binding.uniqueMasks,
+    exactCount: options.exactLayerCounts === true,
+    placeholder: null,
+    shouldFillSlot: (slotIndex) =>
+      slotIndex === 0 || roll(random, binding.fillProbability),
+    choiceWeight: (choice) =>
+      catalogWeight(
+        catalogFor(catalogs, binding.maskCatalog, traits.pose),
+        choice,
+      ),
+    mapChoice: (mask) => ({
+      mask,
+      pattern: pickFromPools(random, peltCatalog?.pools ?? [], (choice) =>
+        catalogWeight(peltCatalog, choice),
+      ),
+      colour: pickFromPools(random, colourCatalog?.pools ?? [], (choice) =>
+        catalogWeight(colourCatalog, choice),
+      ),
+    }),
+    mapValueToSlot: (layer) => layer,
+  });
+  traits[trait.id] = result.selectedValues;
+  slotSelections[slotTraitId] = result.slotSelections;
+}
+
+function gateIsActive(
+  traitId: string,
+  binding: Exclude<GachaBinding, { strategy: "none" | "derived" }>,
+  context: RollContext,
+  gateResults: Map<string, boolean>,
+): boolean {
+  if (
+    !binding.gate ||
+    hasGateOverride(traitId, declaredProbabilityOf(binding), context.options)
+  )
+    return true;
+  let active = gateResults.get(binding.gate.group);
+  if (active === undefined) {
+    active = roll(context.random, binding.gate.probability);
+    gateResults.set(binding.gate.group, active);
+  }
+  return active;
+}
+
+function rollTrait(
+  trait: AnyCatTraitDefinition,
+  context: RollContext,
+  fixedIds: Set<string>,
+  gateResults: Map<string, boolean>,
+): void {
+  const binding = trait.gacha;
+  const { random, options, traits, slotSelections } = context;
+  if (binding.strategy === "none") return;
+  if (binding.strategy === "derived") {
+    resolveDerivedTrait(trait, binding, fixedIds.has(trait.id), traits);
+    return;
+  }
+  if (fixedIds.has(trait.id)) return;
+  if (!gateIsActive(trait.id, binding, context, gateResults)) {
+    resetTraitToDefault(trait, traits);
+    if (binding.strategy === "slotList" || binding.strategy === "tortieList")
+      slotSelections[trait.id as GachaSlotTraitId] = [];
+    return;
+  }
+  switch (binding.strategy) {
+    case "boolean":
+      traits[trait.id] = roll(
+        random,
+        probabilityForTrait(trait.id, binding.probability, options),
+      );
+      return;
+    case "catalogChoice":
+      rollCatalogTrait(trait, binding, context);
+      return;
+    case "slotList":
+      rollSlotTrait(trait, binding, context);
+      return;
+    case "tortieList":
+      rollTortieTrait(trait, binding, context);
+      return;
+  }
+}
+
 /** Testable generic entry point. Product callers normally use rollCatFromRegistry. */
 export function rollCatFromSystem(
   system: CatSystemDefinition,
@@ -399,185 +631,15 @@ export function rollCatFromSystem(
     }
   }
 
+  const context: RollContext = {
+    random,
+    catalogs,
+    options,
+    traits,
+    slotSelections,
+  };
   for (const trait of definitions) {
-    const binding = trait.gacha;
-    if (binding.strategy === "none") continue;
-    if (binding.strategy === "derived") {
-      resolveDerivedTrait(trait, binding, fixedIds.has(trait.id), traits);
-      continue;
-    }
-    if (fixedIds.has(trait.id)) continue;
-
-    const declaredProbability = declaredProbabilityOf(binding);
-    if (
-      binding.gate &&
-      !hasGateOverride(trait.id, declaredProbability, options)
-    ) {
-      let active = gateResults.get(binding.gate.group);
-      if (active === undefined) {
-        active = roll(random, binding.gate.probability);
-        gateResults.set(binding.gate.group, active);
-      }
-      if (!active) {
-        resetTraitToDefault(trait, traits);
-        if (
-          binding.strategy === "slotList" ||
-          binding.strategy === "tortieList"
-        ) {
-          slotSelections[trait.id as GachaSlotTraitId] = [];
-        }
-        continue;
-      }
-    }
-
-    if (binding.strategy === "boolean") {
-      const probability = probabilityForTrait(
-        trait.id,
-        binding.probability,
-        options,
-      );
-      traits[trait.id] = roll(random, probability);
-      continue;
-    }
-
-    if (binding.strategy === "catalogChoice") {
-      if (
-        binding.optionalProbability !== undefined &&
-        !roll(
-          random,
-          probabilityForTrait(trait.id, binding.optionalProbability, options),
-        )
-      ) {
-        delete traits[trait.id];
-        continue;
-      }
-      const catalog = catalogChoiceCatalog(catalogs, binding, traits);
-      if (!catalog || catalogValues(catalog).length === 0) {
-        if (trait.value.required) {
-          throw new Error(`Gacha catalog ${binding.catalog} is empty`);
-        }
-        delete traits[trait.id];
-        continue;
-      }
-      if (binding.includeUnsetChoice) {
-        const values = catalogValues(catalog);
-        const selectedIndex = weightedChoiceIndex(random, [
-          1,
-          ...values.map((choice) => catalogWeight(catalog, choice)),
-        ]);
-        if (selectedIndex === 0) {
-          resetTraitToDefault(trait, traits);
-        } else {
-          assignCatalogChoice(trait.id, values[selectedIndex - 1], traits);
-        }
-      } else {
-        assignCatalogChoice(
-          trait.id,
-          pickFromCatalog(random, catalog, binding.flattenSelection === true),
-          traits,
-        );
-      }
-      continue;
-    }
-
-    const slotTraitId = trait.id as GachaSlotTraitId;
-
-    if (binding.strategy === "slotList") {
-      const slotCount = resolveSlotCount(
-        random,
-        slotTraitId,
-        binding.count,
-        options,
-      );
-      const catalog = catalogFor(catalogs, binding.catalog, traits.pose);
-      const choices = catalogValues(catalog);
-      const result = materializeSlots({
-        random,
-        slotCount,
-        availableChoices: choices,
-        unique: binding.unique,
-        exactCount: options.exactLayerCounts === true,
-        placeholder: "none",
-        shouldFillSlot: () => roll(random, binding.fillProbability ?? 1),
-        choiceWeight: (choice) => catalogWeight(catalog, choice),
-        mapChoice: (choice) => choice,
-        mapValueToSlot: (choice) => choice,
-      });
-      traits[trait.id] = result.selectedValues;
-      slotSelections[slotTraitId] = result.slotSelections;
-      continue;
-    }
-
-    const numericOverride = hasNumericSlotOverride(slotTraitId, options);
-    const explicitCountMode = hasExplicitCountMode(slotTraitId, options);
-    const usesSlotRange =
-      !numericOverride &&
-      !explicitCountMode &&
-      options.slotRanges?.[slotTraitId] !== undefined;
-    if (
-      !numericOverride &&
-      usesSlotRange &&
-      !roll(random, binding.activationProbability)
-    ) {
-      traits[trait.id] = [];
-      slotSelections[slotTraitId] = [];
-      continue;
-    }
-    const slotCount = resolveSlotCount(
-      random,
-      slotTraitId,
-      binding.count,
-      options,
-    );
-    const active =
-      slotCount > 0 &&
-      (numericOverride ||
-        explicitCountMode ||
-        usesSlotRange ||
-        options.exactLayerCounts === true ||
-        roll(random, binding.activationProbability));
-    if (!active) {
-      traits[trait.id] = [];
-      slotSelections[slotTraitId] = [];
-      continue;
-    }
-
-    const masks = catalogValues(
-      catalogFor(catalogs, binding.maskCatalog, traits.pose),
-    );
-    const peltCatalog = catalogFor(catalogs, binding.peltCatalog, traits.pose);
-    const colourCatalog = catalogFor(
-      catalogs,
-      binding.colourCatalog,
-      traits.pose,
-    );
-    const result = materializeSlots({
-      random,
-      slotCount,
-      availableChoices: masks,
-      unique: binding.uniqueMasks,
-      exactCount: options.exactLayerCounts === true,
-      placeholder: null,
-      shouldFillSlot: (slotIndex) =>
-        slotIndex === 0 || roll(random, binding.fillProbability),
-      choiceWeight: (choice) =>
-        catalogWeight(
-          catalogFor(catalogs, binding.maskCatalog, traits.pose),
-          choice,
-        ),
-      mapChoice: (mask) => ({
-        mask,
-        pattern: pickFromPools(random, peltCatalog?.pools ?? [], (choice) =>
-          catalogWeight(peltCatalog, choice),
-        ),
-        colour: pickFromPools(random, colourCatalog?.pools ?? [], (choice) =>
-          catalogWeight(colourCatalog, choice),
-        ),
-      }),
-      mapValueToSlot: (layer) => layer,
-    });
-    traits[trait.id] = result.selectedValues;
-    slotSelections[slotTraitId] = result.slotSelections;
+    rollTrait(trait, context, fixedIds, gateResults);
   }
 
   const document = createSystemCatDocumentSchema(system).parse({
