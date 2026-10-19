@@ -1,53 +1,66 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+# Worktree setup — copies env files and installs all dependencies.
+#
+# Usage:
+#   From T3Code: runs automatically with T3CODE_PROJECT_ROOT / T3CODE_WORKTREE_PATH
+#   Manual:      ./scripts/t3code-worktree-setup.sh /path/to/worktree
+set -euo pipefail
 
-repo_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
-cd "$repo_root"
-
-main_checkout=${ROOT_WORKTREE_PATH-}
-if [ -z "$main_checkout" ]; then
-  main_checkout=$(git -C "$repo_root" worktree list --porcelain |
-    awk '/^worktree / { print substr($0, 10); exit }')
+# Resolve paths — T3Code env vars or manual arg
+if [ -n "${T3CODE_PROJECT_ROOT:-}" ] && [ -n "${T3CODE_WORKTREE_PATH:-}" ]; then
+  ROOT="$T3CODE_PROJECT_ROOT"
+  WT="$T3CODE_WORKTREE_PATH"
+elif [ -n "${ROOT_WORKTREE_PATH:-}" ]; then
+  # wt CLI compatibility
+  ROOT="$ROOT_WORKTREE_PATH"
+  WT="$(pwd)"
+elif [ -n "${1:-}" ]; then
+  ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  WT="$1"
+else
+  echo "Usage: $0 <worktree-path>"
+  echo "  Or set T3CODE_PROJECT_ROOT + T3CODE_WORKTREE_PATH"
+  exit 1
 fi
 
-if [ -n "$main_checkout" ] && [ -d "$main_checkout" ]; then
-  main_checkout=$(CDPATH= cd "$main_checkout" && pwd)
-fi
+echo "==> Setting up worktree at $WT (root: $ROOT)"
 
-copy_env_file() {
-  source_file=$1
-  target_file=$2
-
-  if [ -n "$main_checkout" ] && [ "$main_checkout" = "$repo_root" ]; then
-    printf '%s\n' "Skipping $source_file copy: this is the main checkout"
-  elif [ -e "$target_file" ]; then
-    printf '%s\n' "Environment file already exists: $target_file"
-  elif [ -n "$main_checkout" ] && [ "$main_checkout" != "$repo_root" ] &&
-    [ -f "$main_checkout/$source_file" ]; then
-    printf '%s\n' "Copying $source_file from the main checkout"
-    cp "$main_checkout/$source_file" "$target_file"
-  else
-    printf '%s\n' "Skipping $source_file copy: source file not found"
+# Copy env files from main repo
+for envfile in .env.local frontend/.env.local; do
+  if [ -f "$ROOT/$envfile" ]; then
+    mkdir -p "$WT/$(dirname "$envfile")"
+    cp "$ROOT/$envfile" "$WT/$envfile"
+    echo "    Copied $envfile"
   fi
+done
+
+# Install dependencies. pnpm 11+ fails on unapproved build scripts (esbuild);
+# the prebuilt optional binaries work without them, as in the Docker builds.
+pnpm_install() {
+  pnpm install --config.strict-dep-builds=false
 }
 
-copy_env_file .env.local .env.local
-copy_env_file frontend/.env.local frontend/.env.local
+echo "==> Installing root dependencies"
+cd "$WT" && pnpm_install
 
-printf '%s\n' 'Installing root dependencies'
-pnpm install --frozen-lockfile --config.confirmModulesPurge=false
+echo "==> Installing frontend dependencies"
+cd "$WT/frontend" && pnpm_install
 
-printf '%s\n' 'Installing frontend dependencies'
-pnpm --dir frontend install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false
+for service in media_service image_processing_service; do
+  if [ -d "$WT/backend/$service" ]; then
+    echo "==> Installing $service dependencies"
+    cd "$WT/backend/$service" && pnpm_install
+  fi
+done
 
-printf '%s\n' 'Installing media service dependencies'
-pnpm --dir backend/media_service install --frozen-lockfile --config.confirmModulesPurge=false
+if [ -d "$WT/backend/discord-bot" ]; then
+  echo "==> Installing discord-bot dependencies"
+  cd "$WT/backend/discord-bot" && npm ci
+fi
 
-printf '%s\n' 'Installing image processing service dependencies'
-pnpm --dir backend/image_processing_service install --frozen-lockfile --config.confirmModulesPurge=false
+if [ -d "$WT/backend/renderer_service" ]; then
+  echo "==> Installing renderer dependencies"
+  cd "$WT/backend/renderer_service" && uv sync
+fi
 
-printf '%s\n' 'Installing Discord bot dependencies'
-npm --prefix backend/discord-bot ci
-
-printf '%s\n' 'Installing renderer service dependencies'
-uv sync --project backend/renderer_service --frozen --extra dev
+echo "==> Done! Worktree ready at $WT"
