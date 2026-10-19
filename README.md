@@ -50,8 +50,8 @@ URL is printed in the terminal; it is intentionally not hard-coded.
 
 The frontend uses PostgreSQL through the Drizzle data layer. The production CNPG
 cluster is `beastypage-postgres` in the `webpage` namespace; migrations run in
-the frontend init container before the application starts. Local database and
-runtime values come from Infisical paths
+the frontend init container before the application starts. The default full
+development setup gets database and runtime values from Infisical paths
 `/kubernetes/webpage/beastypage-postgres` and
 `/kubernetes/webpage/beastypage-frontend-runtime-config`.
 
@@ -62,6 +62,13 @@ pnpm --dir frontend run db:local up
 pnpm --dir frontend run db:migrate
 pnpm --dir frontend dev
 ```
+
+Before the final command, copy the `DATABASE_URL` line from the gitignored
+`frontend/.env.database.local` into `frontend/.env.local` because Next.js does
+not load the helper's filename. Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
+`CLERK_SECRET_KEY` there for signed-in flows. The root `pnpm dev:frontend` script
+is the Infisical-backed alternative and injects the database and runtime
+configuration for you.
 
 ### Renderer Service (Optional)
 
@@ -165,16 +172,27 @@ legacy renderer does not advertise a catalog hash.
 The frontend image connects to the PostgreSQL-backed API configured by its runtime environment:
 
 ```bash
-docker run -p 3000:3000 \
-  -e DATABASE_URL=postgresql://user:password@db.example.com:5432/beastypage \
+docker run --rm \
+  -v /absolute/path/to/ca.crt:/etc/postgres-ca/ca.crt:ro \
+  -e NODE_ENV=production \
+  -e DATABASE_MIGRATION_URL='postgresql://owner:owner_password@db.example.com:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt' \
+  -e DATABASE_APP_ROLE=beastypage_app \
+  ghcr.io/beastyrabbit/beastypage-frontend:8.1.0 \
+  node scripts/db/migrate.mjs
+
+docker run --rm -p 3000:3000 \
+  -v /absolute/path/to/ca.crt:/etc/postgres-ca/ca.crt:ro \
+  -e NODE_ENV=production \
+  -e DATABASE_URL='postgresql://app:app_password@db.example.com:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt' \
   -e NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_replace_me \
   -e CLERK_SECRET_KEY=sk_live_replace_me \
   ghcr.io/beastyrabbit/beastypage-frontend:8.1.0
 ```
 
-The image includes the bundled migration runner at `/app/scripts/db/migrate.mjs`.
-The production Helm template invokes it as `node scripts/db/migrate.mjs` in an
-init container before starting the frontend container.
+The first command applies the schema with the owner URL before the app starts;
+the second uses the app URL for serving requests. For a throwaway local setup,
+`DATABASE_ALLOW_INSECURE=1` is the documented override for a non-verified
+connection.
 
 ### Kubernetes Deployment
 

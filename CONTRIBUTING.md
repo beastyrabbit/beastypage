@@ -42,9 +42,16 @@ Thank you for your interest in contributing! This document provides guidelines f
    pnpm --dir frontend dev
    ```
 
+   Before the final command, copy the `DATABASE_URL` line from the gitignored
+   `frontend/.env.database.local` into `frontend/.env.local` because Next.js
+   does not load the helper's filename. Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   and `CLERK_SECRET_KEY` there for signed-in flows. The root
+   `pnpm dev:frontend` script is the Infisical-backed alternative and injects
+   the database and runtime configuration for you.
+
    The frontend uses PostgreSQL through Drizzle. Database migrations are applied
    by the frontend init container; local development reads database and runtime
-   settings from Infisical.
+   settings from Infisical in the full development setup.
 
 ## How to Contribute
 
