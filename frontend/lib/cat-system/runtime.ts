@@ -148,11 +148,6 @@ export function getSystemInheritanceTraits(
   );
 }
 
-function clonePortableValue<T>(value: T): T {
-  if (typeof structuredClone === "function") return structuredClone(value);
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
 function stableValueKey(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableValueKey).join(",")}]`;
   if (value && typeof value === "object") {
@@ -178,7 +173,7 @@ function accumulateValues(
     const key = stableValueKey(value);
     if (seen.has(key)) continue;
     seen.add(key);
-    result.push(clonePortableValue(value));
+    result.push(structuredClone(value));
     if (maxItems !== undefined && result.length >= maxItems) break;
   }
   return result;
@@ -197,9 +192,9 @@ export function applySystemEvolutionStrategies(
     switch (trait.capabilities.evolution) {
       case "replace":
         if (incomingValue !== undefined) {
-          result[trait.id] = clonePortableValue(incomingValue);
+          result[trait.id] = structuredClone(incomingValue);
         } else if (currentValue !== undefined) {
-          result[trait.id] = clonePortableValue(currentValue);
+          result[trait.id] = structuredClone(currentValue);
         }
         break;
       case "accumulate":
@@ -211,14 +206,14 @@ export function applySystemEvolutionStrategies(
         break;
       default:
         if (currentValue !== undefined) {
-          result[trait.id] = clonePortableValue(currentValue);
+          result[trait.id] = structuredClone(currentValue);
         } else if (incomingValue !== undefined) {
-          result[trait.id] = clonePortableValue(incomingValue);
+          result[trait.id] = structuredClone(incomingValue);
         }
         break;
     }
     if (result[trait.id] === undefined && trait.value.default !== undefined) {
-      result[trait.id] = clonePortableValue(trait.value.default);
+      result[trait.id] = structuredClone(trait.value.default);
     }
   }
   return result;
@@ -282,13 +277,13 @@ export function applySystemInheritanceStrategies(
     if (strategy === "none" || strategy === undefined) {
       const fallback = fallbackTraitValue(trait, options.generated?.[trait.id]);
       if (fallback !== undefined) {
-        result[trait.id] = clonePortableValue(fallback);
+        result[trait.id] = structuredClone(fallback);
       }
       continue;
     }
     const mutation = options.mutations?.[trait.id];
     if (strategy === "mutate" && mutation !== undefined) {
-      result[trait.id] = clonePortableValue(mutation);
+      result[trait.id] = structuredClone(mutation);
       continue;
     }
     let inherited = pickParentValue(mother[trait.id], father[trait.id], random);
@@ -296,7 +291,7 @@ export function applySystemInheritanceStrategies(
       inherited = fallbackTraitValue(trait, options.generated?.[trait.id]);
     }
     if (inherited !== undefined) {
-      result[trait.id] = clonePortableValue(inherited);
+      result[trait.id] = structuredClone(inherited);
     }
   }
   return result;

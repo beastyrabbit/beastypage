@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   defineCatSystem,
   defineCatTrait,
@@ -56,10 +56,7 @@ const probeSystem = defineCatSystem({
 });
 
 describe("registry-driven ancestry inheritance", () => {
-  afterEach(() => vi.unstubAllGlobals());
-
-  it("copies mutation and inheritance values without structuredClone", () => {
-    vi.stubGlobal("structuredClone", undefined);
+  it("copies mutation and inheritance values independently", () => {
     const mutations = selectAncestryTraitMutations(
       probeSystem,
       {},
@@ -74,6 +71,8 @@ describe("registry-driven ancestry inheritance", () => {
     );
     expect(child.__probe_ancestry).toEqual(["EAR-FERN"]);
     expect(child.__probe_ancestry).not.toBe(mutations.__probe_ancestry);
+    (child.__probe_ancestry as string[]).push("EAR-RIBBON");
+    expect(mutations.__probe_ancestry).toEqual(["EAR-FERN"]);
   });
 
   it("inherits a newly registered trait without a mutation-pool field", () => {
@@ -126,5 +125,16 @@ describe("registry-driven ancestry inheritance", () => {
       colour: "GINGER",
       points: "COLOURPOINT",
     });
+  });
+
+  it("preserves explicitly undefined genetics and copies nested values", () => {
+    const inherited = { accessories: ["EAR-FERN"] };
+    const generated = { tortie: undefined };
+    const result = applyGeneticsTraitOverrides(inherited, generated);
+
+    expect(Object.hasOwn(result, "tortie")).toBe(true);
+    expect(result.tortie).toBeUndefined();
+    (result.accessories as string[]).push("EAR-RIBBON");
+    expect(inherited.accessories).toEqual(["EAR-FERN"]);
   });
 });
