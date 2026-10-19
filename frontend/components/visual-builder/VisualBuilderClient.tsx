@@ -192,6 +192,7 @@ type VisualBuilderPreviewSpriteProps = {
   labelOverlay?: boolean;
   badge?: ReactNode;
   selected?: boolean;
+  unavailable?: boolean;
   rendererReady: boolean;
   requestPreview: (
     key: string,
@@ -209,6 +210,7 @@ function VisualBuilderPreviewSprite({
   labelOverlay = false,
   badge,
   selected,
+  unavailable = false,
   rendererReady,
   requestPreview,
   getCachedPreview,
@@ -222,8 +224,13 @@ function VisualBuilderPreviewSprite({
   );
   const mutateRef = useRef(mutate);
   const cachedSrc = getCachedPreview(cacheKey);
-  const loading = rendererReady && resolvedKey !== cacheKey && !cachedSrc;
-  const displaySrc = resolvedKey === cacheKey ? src : cachedSrc;
+  const loading =
+    !unavailable && rendererReady && resolvedKey !== cacheKey && !cachedSrc;
+  const displaySrc = unavailable
+    ? null
+    : resolvedKey === cacheKey
+      ? src
+      : cachedSrc;
 
   useEffect(() => {
     mutateRef.current = mutate;
@@ -231,7 +238,7 @@ function VisualBuilderPreviewSprite({
 
   useEffect(() => {
     let cancelled = false;
-    if (!rendererReady) return;
+    if (!rendererReady || unavailable) return;
     (async () => {
       const preview = await requestPreview(cacheKey, (draft) =>
         mutateRef.current(draft),
@@ -243,7 +250,7 @@ function VisualBuilderPreviewSprite({
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, rendererReady, requestPreview]);
+  }, [cacheKey, rendererReady, requestPreview, unavailable]);
 
   return (
     <div
@@ -254,6 +261,11 @@ function VisualBuilderPreviewSprite({
           : "border-slate-800",
       )}
     >
+      {unavailable && (
+        <span className="px-3 text-center text-sm text-neutral-400">
+          Already used
+        </span>
+      )}
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center">
           <Loader2 className="size-5 animate-spin text-amber-200" />
@@ -1142,6 +1154,12 @@ export function VisualBuilderClient({
               const label = `Layer ${layerIndex + 1}`;
               const layerPrefix = `tortie-${getPoseCacheKey(currentParams)}-${layerIndex}`;
               const expanded = expandedLayer === layerIndex;
+              const isOptionTaken = (patch: Partial<TortieLayer>) =>
+                hasDuplicateTortieLayers(
+                  currentLayers.map((entry, index) =>
+                    index === layerIndex ? { ...entry, ...patch } : entry,
+                  ),
+                );
 
               let detailContent: ReactNode | null = null;
               if (expanded) {
@@ -1166,6 +1184,7 @@ export function VisualBuilderClient({
                           <VisualBuilderPreviewSprite
                             {...previewSpriteSharedProps}
                             cacheKey={previewKey}
+                            unavailable={isOptionTaken({ pattern })}
                             mutate={buildTortiePreviewMutator(layerIndex, {
                               pattern,
                             })}
@@ -1221,6 +1240,7 @@ export function VisualBuilderClient({
                             <VisualBuilderPreviewSprite
                               {...previewSpriteSharedProps}
                               cacheKey={previewKey}
+                              unavailable={isOptionTaken({ colour })}
                               mutate={buildTortiePreviewMutator(layerIndex, {
                                 colour,
                               })}
@@ -1271,6 +1291,7 @@ export function VisualBuilderClient({
                           <VisualBuilderPreviewSprite
                             {...previewSpriteSharedProps}
                             cacheKey={previewKey}
+                            unavailable={isOptionTaken({ mask })}
                             mutate={buildTortiePreviewMutator(layerIndex, {
                               mask,
                             })}
