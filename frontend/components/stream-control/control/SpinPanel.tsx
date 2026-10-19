@@ -74,7 +74,7 @@ export function SpinPanel() {
       <section className="rounded-2xl border border-border/40 bg-background/80 p-4 backdrop-blur">
         <p className="section-eyebrow mb-3">Trigger</p>
         {/* Spin + sliders row */}
-        <div className="mb-4 flex items-center gap-3">
+        <div className="mb-4 flex flex-wrap items-center gap-3 sm:flex-nowrap">
           <motion.button
             type="button"
             onClick={handleSpin}
@@ -118,7 +118,7 @@ export function SpinPanel() {
             {wheelSpinning ? "Wheel…" : "Spin Wheel"}
           </button>
 
-          <div className="flex flex-1 items-center gap-4">
+          <div className="flex flex-1 items-center gap-4 max-sm:basis-full max-sm:*:min-w-0 max-sm:*:flex-1">
             <SliderControl
               label="Countdown"
               value={countdownSeconds}

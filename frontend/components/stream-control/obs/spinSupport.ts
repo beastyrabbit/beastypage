@@ -105,6 +105,36 @@ export const LAYER_GROUPS = PARAM_SEQUENCE.filter(
   (definition) => definition.strategy !== "single",
 );
 
+/** Layer summary rows are created on reveal; ordinary param rows are prefilled. */
+export function activateParamRow(
+  prev: ParamRow[],
+  definition: RegistryRevealDefinition,
+  row: { current: number },
+): ParamRow[] {
+  const idx = prev.findIndex((entry) => entry.id === definition.id);
+  if (idx !== -1) {
+    row.current = idx;
+    return prev.map((entry, i) =>
+      i === idx ? { ...entry, value: "---", status: "active" as const } : entry,
+    );
+  }
+  if (!LAYER_PARAM_IDS.has(definition.id)) {
+    console.warn(
+      `[ObsOverlayClient] Param row for "${definition.id}" not found in prefilled board — appending as fallback`,
+    );
+  }
+  row.current = prev.length;
+  return [
+    ...prev,
+    {
+      id: definition.id,
+      label: definition.label,
+      value: "---",
+      status: "active" as const,
+    },
+  ];
+}
+
 export interface TimingSnapshot {
   counts: Record<ParamTimingKey, number>;
   estimated: Partial<Record<ParamTimingKey, number>>;
