@@ -1,4 +1,14 @@
+import { deduplicateTortieLayers } from "@/lib/cat-system/tortieLayers";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
+
+export function hasDuplicateTortieLayers(
+  layers: readonly TortieLayer[],
+): boolean {
+  return deduplicateTortieLayers(layers).length !== layers.length;
+}
+
+export const DUPLICATE_TORTIE_MESSAGE =
+  "Another tortie layer already uses this pattern, colour and mask. Your previous selection has been kept.";
 
 export const MAX_BUILDER_TORTIE_LAYERS = 6;
 

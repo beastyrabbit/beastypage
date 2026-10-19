@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { toast } from "sonner";
 import {
   useCatGenerator,
   useSpriteMapperOptions,
@@ -37,7 +38,11 @@ import {
   mutateBuilderParams,
   synchronizeBuilderParams,
 } from "@/lib/cat-builder/genericTraitEditor";
-import { createTortieLayer } from "@/lib/cat-builder/tortieLayers";
+import {
+  createTortieLayer,
+  DUPLICATE_TORTIE_MESSAGE,
+  hasDuplicateTortieLayers,
+} from "@/lib/cat-builder/tortieLayers";
 import {
   catDataToLegacyPersistence,
   catParamsToLegacyPersistence,
@@ -1118,12 +1123,16 @@ export function GuidedBuilderClient() {
       const target = nextLayers[layerIndex];
       if (!target) return;
       const ensuredCount = Math.max(desiredTortieLayers, layerIndex + 1);
-      if (ensuredCount !== desiredTortieLayers) {
-        setDesiredTortieLayers(ensuredCount);
-      }
       const mutated = { ...target };
       mutator(mutated);
       nextLayers[layerIndex] = mutated;
+      if (hasDuplicateTortieLayers(nextLayers)) {
+        toast.error(DUPLICATE_TORTIE_MESSAGE);
+        return;
+      }
+      if (ensuredCount !== desiredTortieLayers) {
+        setDesiredTortieLayers(ensuredCount);
+      }
       applyTortieLayers(nextLayers, true);
       const stepId = TORTIE_LAYER_STEPS[layerIndex];
       if (stepId) {
@@ -1538,33 +1547,35 @@ export function GuidedBuilderClient() {
               <PaletteControls
                 mode={tortiePaletteMode}
                 onChange={(mode) => {
-                  setTortiePaletteMode(mode);
-                  setTortieLayers((prev) => {
-                    const palette = getPaletteForMode(mode);
-                    const fallback = palette[0] ?? params.colour;
-                    const updated = prev.map((entry, index) => {
-                      if (!entry) return entry;
-                      if (!entry.colour || !palette.includes(entry.colour)) {
-                        const mutation: Partial<TortieLayer> = {
-                          colour: fallback,
-                        };
-                        if (index === layerIndex) {
-                          mutation.colour = fallback;
-                        }
-                        return { ...entry, ...mutation };
-                      }
+                  const palette = getPaletteForMode(mode);
+                  const fallback = palette[0] ?? params.colour;
+                  const updated = tortieLayers.map((entry, index) => {
+                    if (!entry) return entry;
+                    if (!entry.colour || !palette.includes(entry.colour)) {
+                      const mutation: Partial<TortieLayer> = {
+                        colour: fallback,
+                      };
                       if (index === layerIndex) {
-                        return { ...entry };
+                        mutation.colour = fallback;
                       }
-                      return entry;
-                    });
-                    setParams((prevParams) =>
-                      synchronizeBuilderParams(
-                        ensureTortieSync(updated, prevParams),
-                      ),
-                    );
-                    return updated;
+                      return { ...entry, ...mutation };
+                    }
+                    if (index === layerIndex) {
+                      return { ...entry };
+                    }
+                    return entry;
                   });
+                  if (hasDuplicateTortieLayers(updated)) {
+                    toast.error(DUPLICATE_TORTIE_MESSAGE);
+                    return;
+                  }
+                  setTortiePaletteMode(mode);
+                  setTortieLayers(updated);
+                  setParams((prevParams) =>
+                    synchronizeBuilderParams(
+                      ensureTortieSync(updated, prevParams),
+                    ),
+                  );
                 }}
               />
             </div>
