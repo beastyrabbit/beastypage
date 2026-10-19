@@ -51,6 +51,11 @@ describe("Discord random-cat renderer catalog guard", () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it("rejects requests without the service bearer token", async () => {
     const response = await POST(
       new NextRequest("http://localhost/api/discord/random-cat", {
@@ -61,11 +66,6 @@ describe("Discord random-cat renderer catalog guard", () => {
     );
 
     expect(response.status).toBe(401);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
   });
 
   it("accepts an image rendered from the current catalog", async () => {
