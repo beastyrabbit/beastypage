@@ -239,6 +239,11 @@ same Cluster name. Keep the frontend in maintenance throughout.
    loudly on a missing backup where `initdb` would silently start an empty
    database.
 
+After restoring a backup created before 2026-10-19, run
+`drop role if exists beastypage_import;` as the owner. The CloudNativePG
+manifest no longer manages this retired role, and the migration runner only
+revokes its privileges.
+
 Restore test status:
 
 - [ ] Staging restore rehearsed and timed (#108 / #116 gate)
