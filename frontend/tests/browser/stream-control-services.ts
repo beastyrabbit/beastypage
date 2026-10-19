@@ -82,6 +82,42 @@ window.addEventListener("storage", (event) => {
     );
 });
 
+function catStreamResponse(init?: RequestInit) {
+  if (init?.method !== "POST") {
+    requests.push("session:read");
+    return response(session);
+  }
+  if (typeof init.body !== "string")
+    throw new Error("Expected a JSON request body");
+  const args = JSON.parse(init.body);
+  requests.push(args.operation);
+  if (!profileReady)
+    return response({ error: "User not found", code: "not_found" }, 404);
+  session ??= { ...initialSession };
+  if (args.settings)
+    session.settings = { ...session.settings, ...args.settings };
+  if (args.operation === "triggerSpin")
+    session.currentCommand = {
+      type: "spin",
+      ...args,
+      seq: (session.currentCommand?.seq ?? 0) + 1,
+      timestamp: Date.now(),
+    };
+  if (args.operation === "showLobby")
+    session.currentCommand = {
+      type: "lobby",
+      seq: (session.currentCommand?.seq ?? 0) + 1,
+      timestamp: Date.now(),
+    };
+  session.revision++;
+  publish();
+  return response(
+    args.operation === "ensureSession"
+      ? session.id
+      : session.currentCommand.seq,
+  );
+}
+
 const previousFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = new URL(
@@ -102,39 +138,7 @@ window.fetch = async (input, init) => {
     requests.push("profile:ready");
     return response(viewer);
   }
-  if (url.pathname === "/api/cat-stream") {
-    if (init?.method !== "POST") {
-      requests.push("session:read");
-      return response(session);
-    }
-    const args = JSON.parse(String(init.body));
-    requests.push(args.operation);
-    if (!profileReady)
-      return response({ error: "User not found", code: "not_found" }, 404);
-    session ??= { ...initialSession };
-    if (args.settings)
-      session.settings = { ...session.settings, ...args.settings };
-    if (args.operation === "triggerSpin")
-      session.currentCommand = {
-        type: "spin",
-        ...args,
-        seq: (session.currentCommand?.seq ?? 0) + 1,
-        timestamp: Date.now(),
-      };
-    if (args.operation === "showLobby")
-      session.currentCommand = {
-        type: "lobby",
-        seq: (session.currentCommand?.seq ?? 0) + 1,
-        timestamp: Date.now(),
-      };
-    session.revision++;
-    publish();
-    return response(
-      args.operation === "ensureSession"
-        ? session.id
-        : session.currentCommand.seq,
-    );
-  }
+  if (url.pathname === "/api/cat-stream") return catStreamResponse(init);
   return previousFetch(input, init);
 };
 
