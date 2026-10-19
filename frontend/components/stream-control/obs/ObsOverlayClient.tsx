@@ -597,7 +597,8 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     removeVariant: (_id: string) => {},
     renameVariant: (_id: string, _name: string) => {},
   };
-  const [_lastTimingSnapshot, set_lastTimingSnapshot] = useState<TimingSnapshot | null>(null);
+  const [_lastTimingSnapshot, set_lastTimingSnapshot] =
+    useState<TimingSnapshot | null>(null);
   const [speedMultiplier, setSpeedMultiplier] = useState(
     initialSettings.speedMultiplier,
   );
