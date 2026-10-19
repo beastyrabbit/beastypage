@@ -774,30 +774,11 @@ export class AncestryTreeManager {
     }
     cat.partnerIds = [];
 
-    // Create new partner
-    const newPartnerGender: Gender = cat.gender === "F" ? "M" : "F";
-    const newPartnerGenetics = createGeneticsFromParams(
+    const newPartner = this.createLinkedPartner(
+      cat,
       newPartnerParams,
-      newPartnerGender,
+      newPartnerName,
     );
-
-    const newPartner = this.createCat({
-      params: newPartnerParams,
-      gender: newPartnerGender,
-      generation: cat.generation,
-      motherId: null,
-      fatherId: null,
-      genetics: newPartnerGenetics,
-      source: "generated",
-      historyProfileId: undefined,
-      existingName: newPartnerName,
-    });
-
-    newPartner.lifeStage = cat.lifeStage;
-
-    // Link partners
-    cat.partnerIds.push(newPartner.id);
-    newPartner.partnerIds.push(cat.id);
 
     // Recalculate descendants if they had children
     if (cat.childrenIds.length > 0) {
@@ -823,7 +804,28 @@ export class AncestryTreeManager {
       throw new Error("Cat not found");
     }
 
-    // Create new partner (allows multiple spouses)
+    const newPartner = this.createLinkedPartner(
+      cat,
+      newPartnerParams,
+      newPartnerName,
+    );
+
+    // Generate offspring if requested and not at max depth
+    if (generateChildren && cat.generation < this.tree.config.depth) {
+      const motherId = cat.gender === "F" ? cat.id : newPartner.id;
+      const fatherId = cat.gender === "M" ? cat.id : newPartner.id;
+      this.generateOffspring(motherId, fatherId, cat.generation + 1);
+    }
+
+    this.tree.updatedAt = Date.now();
+    return newPartner;
+  }
+
+  private createLinkedPartner(
+    cat: AncestryTreeCat,
+    newPartnerParams: CatParams,
+    newPartnerName?: CatName,
+  ): AncestryTreeCat {
     const newPartnerGender: Gender = cat.gender === "F" ? "M" : "F";
     const newPartnerGenetics = createGeneticsFromParams(
       newPartnerParams,
@@ -844,18 +846,8 @@ export class AncestryTreeManager {
 
     newPartner.lifeStage = cat.lifeStage;
 
-    // Link partners (add to arrays for multiple spouse support)
     cat.partnerIds.push(newPartner.id);
     newPartner.partnerIds.push(cat.id);
-
-    // Generate offspring if requested and not at max depth
-    if (generateChildren && cat.generation < this.tree.config.depth) {
-      const motherId = cat.gender === "F" ? cat.id : newPartner.id;
-      const fatherId = cat.gender === "M" ? cat.id : newPartner.id;
-      this.generateOffspring(motherId, fatherId, cat.generation + 1);
-    }
-
-    this.tree.updatedAt = Date.now();
     return newPartner;
   }
 

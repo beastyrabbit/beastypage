@@ -135,3 +135,44 @@ it("preserves pre-refactor trees, partner selection, names and RNG consumption",
     `"53b327e70fcad0aa95b583e005aad0b8fd822bdd3ddf230f1abc6023e9b43640"`,
   );
 });
+
+it("preserves seeded manual partner assignment and replacement", () => {
+  vi.spyOn(Date, "now").mockReturnValue(1700000000000);
+  vi.spyOn(crypto, "getRandomValues").mockImplementation((array) => array);
+  let id = 0;
+  vi.spyOn(crypto, "randomUUID").mockImplementation(
+    () => `00000000-0000-4000-8000-${String(++id).padStart(12, "0")}`,
+  );
+  const observed = [];
+  for (let seed = 0; seed < 32; seed++) {
+    const random = new Xoshiro128StarStar(seed);
+    vi.spyOn(Math, "random").mockImplementation(() => random.nextFloat());
+    const manager = new AncestryTreeManager(pool);
+    const founders = manager.initializeFoundingCouple({
+      mother: { params: father },
+      father: { params: father },
+    });
+    const cat = seed % 2 ? founders.mother : founders.father;
+    cat.lifeStage = "elder";
+    const assigned = manager.assignPartner(cat.id, father);
+    expect(assigned.lifeStage).toBe("elder");
+    expect(cat.partnerIds).toContain(assigned.id);
+    observed.push(fingerprint(manager.serialize()));
+    const replacement = manager.replacePartner(cat.id, father, {
+      prefix: "Ash",
+      suffix: "fern",
+      full: "Ashfern",
+    });
+    expect(replacement.name.full).toBe("Ashfern");
+    expect(replacement.lifeStage).toBe("elder");
+    expect(assigned.partnerIds).not.toContain(cat.id);
+    expect(cat.partnerIds).toEqual([replacement.id]);
+    observed.push({
+      tree: fingerprint(manager.serialize()),
+      next: random.nextUint32(),
+    });
+  }
+  expect(fingerprint(observed)).toMatchInlineSnapshot(
+    `"1e0206375fc345f406f2d585558cf65a6be7833e67c386170856b59be62c4f00"`,
+  );
+});
