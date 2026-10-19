@@ -211,6 +211,19 @@ class SpriteMapper {
             "BRONZE", "SILVER"
         ];
         
+        this.extractSkinColoursFromIndex();
+        this.extractTortieMasksFromIndex();
+        this.extractWhitePatchesFromIndex();
+
+        // Tints and white tints - include 'none' as first option
+        this.tints = ['none', 'pink', 'gray', 'red', 'black', 'orange', 'yellow', 'purple', 'blue', 'dilute', 'warmdilute', 'cooldilute'];
+        this.whiteTints = ['none', 'darkcream', 'cream', 'offwhite', 'gray', 'pink'];
+
+        // Lineart styles
+        this.lineartStyles = ['normal', 'dead', 'darkforest'];
+    }
+
+    extractSkinColoursFromIndex() {
         // Extract skin colors from spritesIndex
         const skinColors = new Set();
         for (const key of Object.keys(this.spritesIndex)) {
@@ -231,7 +244,9 @@ class SpriteMapper {
                 'LIGHTMARBLED', 'DARKBLUE', 'BLUE', 'LIGHTBLUE', 'RED'
             ];
         }
-        
+    }
+
+    extractTortieMasksFromIndex() {
         // Extract tortie masks from spritesIndex
         const tortieMasks = new Set();
         for (const key of Object.keys(this.spritesIndex)) {
@@ -243,7 +258,9 @@ class SpriteMapper {
             }
         }
         this.tortieMasks = Array.from(tortieMasks);
-        
+    }
+
+    extractWhitePatchesFromIndex() {
         // Extract white patches from spritesIndex
         const whitePatches = new Set();
         const allKeys = Object.keys(this.spritesIndex);
@@ -275,13 +292,6 @@ class SpriteMapper {
         console.log(`Loaded ${this.whitePatches.length} white patches after filtering (removed ${whiteKeyCount - this.whitePatches.length} points/vitiligo patterns)`);
         console.log(`First 20 white patches:`, this.whitePatches.slice(0, 20));
         console.log(`Last 20 white patches:`, this.whitePatches.slice(-20));
-        
-        // Tints and white tints - include 'none' as first option
-        this.tints = ['none', 'pink', 'gray', 'red', 'black', 'orange', 'yellow', 'purple', 'blue', 'dilute', 'warmdilute', 'cooldilute'];
-        this.whiteTints = ['none', 'darkcream', 'cream', 'offwhite', 'gray', 'pink'];
-        
-        // Lineart styles
-        this.lineartStyles = ['normal', 'dead', 'darkforest'];
     }
     
     /**
@@ -290,6 +300,43 @@ class SpriteMapper {
     extractNamesFromPeltInfo() {
         if (!this.peltInfo) return;
 
+        this.extractPeltPatternsFromPeltInfo();
+        this.copyPeltInfoList('colors', 'colours');
+        this.copyPeltInfoList('eyes', 'eyeColours');
+        this.copyPeltInfoList('skin', 'skinColours');
+        if (Array.isArray(this.peltInfo.white) && this.peltInfo.white.length > 0) {
+            const pointsSet = new Set(this.peltInfo.point_markings || this.points);
+            const vitiligoSet = new Set(this.peltInfo.vitiligo || this.vitiligo);
+            this.whitePatches = this.peltInfo.white.filter(patch => !pointsSet.has(patch) && !vitiligoSet.has(patch));
+        }
+        this.copyPeltInfoList('point_markings', 'points');
+        this.copyPeltInfoList('vitiligo', 'vitiligo');
+        this.copyPeltInfoList('tortie_masks', 'tortieMasks');
+
+        // Extract accessories - combine all types in their existing order
+        this.accessories = this.collectPeltInfoLists([
+            'plant_accessories', 'wild_accessories', 'collars', 'extra_accessories'
+        ]);
+        console.log(`Loaded ${this.accessories.length} accessories from peltInfo (plant: ${this.peltInfo.plant_accessories?.length || 0}, wild: ${this.peltInfo.wild_accessories?.length || 0}, collars: ${this.peltInfo.collars?.length || 0})`)
+
+        this.scars = this.collectPeltInfoLists(['scars1', 'scars2', 'scars3']);
+    }
+
+    copyPeltInfoList(sourceKey, targetKey) {
+        if (Array.isArray(this.peltInfo[sourceKey]) && this.peltInfo[sourceKey].length > 0) {
+            this[targetKey] = [...this.peltInfo[sourceKey]];
+        }
+    }
+
+    collectPeltInfoLists(keys) {
+        const values = [];
+        for (const key of keys) {
+            if (this.peltInfo[key]) values.push(...this.peltInfo[key]);
+        }
+        return values;
+    }
+
+    extractPeltPatternsFromPeltInfo() {
         if (Array.isArray(this.peltInfo.patterns) && this.peltInfo.patterns.length > 0) {
             this.peltNames = [...this.peltInfo.patterns];
             if (this.peltNames.includes('SingleColour') && !this.peltNames.includes('TwoColour')) {
@@ -297,54 +344,6 @@ class SpriteMapper {
                 this.peltNames.splice(singleIndex + 1, 0, 'TwoColour');
             }
         }
-        if (Array.isArray(this.peltInfo.colors) && this.peltInfo.colors.length > 0) {
-            this.colours = [...this.peltInfo.colors];
-        }
-        if (Array.isArray(this.peltInfo.eyes) && this.peltInfo.eyes.length > 0) {
-            this.eyeColours = [...this.peltInfo.eyes];
-        }
-        if (Array.isArray(this.peltInfo.skin) && this.peltInfo.skin.length > 0) {
-            this.skinColours = [...this.peltInfo.skin];
-        }
-        if (Array.isArray(this.peltInfo.white) && this.peltInfo.white.length > 0) {
-            const pointsSet = new Set(this.peltInfo.point_markings || this.points);
-            const vitiligoSet = new Set(this.peltInfo.vitiligo || this.vitiligo);
-            this.whitePatches = this.peltInfo.white.filter(patch => !pointsSet.has(patch) && !vitiligoSet.has(patch));
-        }
-        if (Array.isArray(this.peltInfo.point_markings) && this.peltInfo.point_markings.length > 0) {
-            this.points = [...this.peltInfo.point_markings];
-        }
-        if (Array.isArray(this.peltInfo.vitiligo) && this.peltInfo.vitiligo.length > 0) {
-            this.vitiligo = [...this.peltInfo.vitiligo];
-        }
-        if (Array.isArray(this.peltInfo.tortie_masks) && this.peltInfo.tortie_masks.length > 0) {
-            this.tortieMasks = [...this.peltInfo.tortie_masks];
-        }
-        
-        // Extract accessories - combine all types
-        this.accessories = [];
-        if (this.peltInfo.plant_accessories) {
-            this.accessories.push(...this.peltInfo.plant_accessories);
-        }
-        if (this.peltInfo.wild_accessories) {
-            this.accessories.push(...this.peltInfo.wild_accessories);
-        }
-        if (this.peltInfo.collars) {
-            this.accessories.push(...this.peltInfo.collars);
-        }
-        if (this.peltInfo.extra_accessories) {
-            this.accessories.push(...this.peltInfo.extra_accessories);
-        }
-        console.log(`Loaded ${this.accessories.length} accessories from peltInfo (plant: ${this.peltInfo.plant_accessories?.length || 0}, wild: ${this.peltInfo.wild_accessories?.length || 0}, collars: ${this.peltInfo.collars?.length || 0})`)
-        
-        // Don't overwrite white patches from spritesIndex - peltInfo doesn't have them
-        // The white patches should already be loaded from spritesIndex
-        
-        // Extract scars
-        this.scars = [];
-        if (this.peltInfo.scars1) this.scars.push(...this.peltInfo.scars1);
-        if (this.peltInfo.scars2) this.scars.push(...this.peltInfo.scars2);
-        if (this.peltInfo.scars3) this.scars.push(...this.peltInfo.scars3);
     }
     
     /**
@@ -478,39 +477,7 @@ class SpriteMapper {
     buildSpriteName(type, name, color) {
         // Handle different naming conventions
         if (type === 'pelt') {
-            if (name === 'SingleColour') {
-                return `single${color}`;
-            } else if (name === 'TwoColour') {
-                return `single${color}`;  // TwoColour uses single sprites
-            } else if (name === 'Tabby') {
-                return `tabby${color}`;
-            } else if (name === 'Rosette') {
-                return `rosette${color}`;
-            } else if (name === 'Smoke') {
-                return `smoke${color}`;
-            } else if (name === 'Ticked') {
-                return `ticked${color}`;
-            } else if (name === 'Speckled') {
-                return `speckled${color}`;
-            } else if (name === 'Bengal') {
-                return `bengal${color}`;
-            } else if (name === 'Mackerel') {
-                return `mackerel${color}`;
-            } else if (name === 'Classic') {
-                return `classic${color}`;
-            } else if (name === 'Sokoke') {
-                return `sokoke${color}`;
-            } else if (name === 'Agouti') {
-                return `agouti${color}`;
-            } else if (name === 'Singlestripe') {
-                return `singlestripe${color}`;
-            } else if (name === 'Masked') {
-                return `masked${color}`;
-            } else if (name === 'Marbled') {
-                return `marbled${color}`;
-            }
-            // Default pattern name
-            return `${name.toLowerCase()}${color}`;
+            return this.buildPeltSpriteName(name, color);
         } else if (type === 'eyes') {
             return `eyes${color}`;
         } else if (type === 'skin') {
@@ -526,6 +493,14 @@ class SpriteMapper {
         }
         
         return `${type}${name}`;
+    }
+
+    buildPeltSpriteName(name, color) {
+        // Both colour-only pelts use single sprites; other prefixes are lowercase.
+        if (name === 'SingleColour' || name === 'TwoColour') {
+            return `single${color}`;
+        }
+        return `${name.toLowerCase()}${color}`;
     }
     
     /**

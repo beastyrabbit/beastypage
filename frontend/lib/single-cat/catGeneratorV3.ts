@@ -145,6 +145,38 @@ function splitPayload(
   return payload;
 }
 
+function setLegacyAppearanceParams(urlParams: URLSearchParams, params: CatParams): void {
+  if (params.peltName) urlParams.set('peltName', String(params.peltName));
+  if (params.spriteNumber !== undefined) urlParams.set('spriteNumber', String(params.spriteNumber));
+  if (params.poseName) urlParams.set('poseName', String(params.poseName));
+  if (params.colour) urlParams.set('colour', String(params.colour));
+  if (params.tint && params.tint !== 'none') urlParams.set('tint', String(params.tint));
+  if (params.skinColour) urlParams.set('skinColour', String(params.skinColour));
+  if (params.eyeColour) urlParams.set('eyeColour', String(params.eyeColour));
+
+  if (params.eyeColour2) urlParams.set('eyeColour2', String(params.eyeColour2));
+  if (params.whitePatches) urlParams.set('whitePatches', String(params.whitePatches));
+  if (params.points) urlParams.set('points', String(params.points));
+  if (params.whitePatchesTint && params.whitePatchesTint !== 'none') {
+    urlParams.set('whitePatchesTint', String(params.whitePatchesTint));
+  }
+  if (params.vitiligo) urlParams.set('vitiligo', String(params.vitiligo));
+}
+
+function setLegacySlotParam(
+  urlParams: URLSearchParams,
+  key: string,
+  values: unknown,
+  fallback: unknown,
+): void {
+  const slots = Array.isArray(values) ? values : [];
+  if (slots.length > 0) {
+    urlParams.set(key, String(slots[0]));
+  } else if (fallback) {
+    urlParams.set(key, String(fallback));
+  }
+}
+
 function buildLegacyUrl(params: CatParams | null | undefined): string {
   if (!params) return '';
   // The external legacy builder cannot represent renderer-derived coats.
@@ -165,35 +197,9 @@ function buildLegacyUrl(params: CatParams | null | undefined): string {
   urlParams.set('isTortie', bool(params.isTortie));
   urlParams.set('backgroundColour', 'rgb(0 0 0 / 0)');
 
-  if (params.peltName) urlParams.set('peltName', String(params.peltName));
-  if (params.spriteNumber !== undefined) urlParams.set('spriteNumber', String(params.spriteNumber));
-  if (params.poseName) urlParams.set('poseName', String(params.poseName));
-  if (params.colour) urlParams.set('colour', String(params.colour));
-  if (params.tint && params.tint !== 'none') urlParams.set('tint', String(params.tint));
-  if (params.skinColour) urlParams.set('skinColour', String(params.skinColour));
-  if (params.eyeColour) urlParams.set('eyeColour', String(params.eyeColour));
-
-  if (params.eyeColour2) urlParams.set('eyeColour2', String(params.eyeColour2));
-  if (params.whitePatches) urlParams.set('whitePatches', String(params.whitePatches));
-  if (params.points) urlParams.set('points', String(params.points));
-  if (params.whitePatchesTint && params.whitePatchesTint !== 'none') {
-    urlParams.set('whitePatchesTint', String(params.whitePatchesTint));
-  }
-  if (params.vitiligo) urlParams.set('vitiligo', String(params.vitiligo));
-
-  const accessories = Array.isArray(params.accessories) ? params.accessories : [];
-  if (accessories.length > 0) {
-    urlParams.set('accessory', String(accessories[0]));
-  } else if (params.accessory) {
-    urlParams.set('accessory', String(params.accessory));
-  }
-
-  const scars = Array.isArray(params.scars) ? params.scars : [];
-  if (scars.length > 0) {
-    urlParams.set('scar', String(scars[0]));
-  } else if (params.scar) {
-    urlParams.set('scar', String(params.scar));
-  }
+  setLegacyAppearanceParams(urlParams, params);
+  setLegacySlotParam(urlParams, 'accessory', params.accessories, params.accessory);
+  setLegacySlotParam(urlParams, 'scar', params.scars, params.scar);
 
   if (params.isTortie) {
     if (params.tortieMask) urlParams.set('tortieMask', String(params.tortieMask));
