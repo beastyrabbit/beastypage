@@ -36,8 +36,8 @@ spec:
         connectionLimit: 30
         passwordSecret:
           name: beastypage-postgres-app-role
-      # Phase one: keep this tombstone so CNPG drops the PostgreSQL role.
-      # Delete the entry entirely after reconciliation confirms the role is gone.
+      # Deploy the release that revokes the role's privileges before merging
+      # this tombstone; then delete the entry, orphaned Secrets and Infisical key.
       - name: beastypage_import
         ensure: absent
 

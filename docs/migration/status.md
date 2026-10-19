@@ -16,8 +16,9 @@ a separate contract migration removes them.
   `frontend/server/auth/identity.ts`; this requires a Clerk dashboard change.
 - Remove `CONVEX_DEPLOY_KEY` and `CONVEX_DEPLOYMENT` from Infisical prod and
   `/ci` if they still exist. This is outside the repository.
-- The kub-homelab change is PR #579 (phase one: `ensure: absent`). After it
-  reconciles, delete the role entry, the orphaned
+- Deploy this release first so the frontend init container revokes the retired
+  role's privileges. Then merge the kub-homelab change in PR #579 (phase one:
+  `ensure: absent`). After it reconciles, delete the role entry, the orphaned
   `beastypage-postgres-import-role` and `beastypage-postgres-import-url`
   Secrets in namespace `webpage`, and the
   `BEASTYPAGE_DB_IMPORT_PASSWORD` key in Infisical.

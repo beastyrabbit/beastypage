@@ -8,6 +8,7 @@ import { readSchemaState, SCHEMA_VERSION } from "./schema-version";
 
 const databaseUrl = inject("databaseUrl");
 let pool: pg.Pool;
+const retiredRolesForCleanup = new Set<string>();
 
 beforeAll(() => {
   pool = createPool(
@@ -16,6 +17,16 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
+  for (const role of retiredRolesForCleanup) {
+    const present = await pool.query<{ present: boolean }>(
+      "select exists(select 1 from pg_roles where rolname = $1) as present",
+      [role],
+    );
+    if (present.rows[0]?.present) {
+      await pool.query(`drop owned by ${quoteIdentifier(role)}`);
+      await pool.query(`drop role ${quoteIdentifier(role)}`);
+    }
+  }
   await pool.end();
 });
 
@@ -140,6 +151,84 @@ describe("migration runner", () => {
         await pool.query(`drop owned by ${quoteIdentifier(role)}`);
         await pool.query(`drop role ${quoteIdentifier(role)}`);
       }
+    }
+  });
+
+  it("cleans up privileges and dependencies for retired roles", async () => {
+    const suffix = randomBytes(4).toString("hex");
+    const ownerRole = `beastypage_retired_owner_${suffix}`;
+    const retiredRole = `beastypage_retired_${suffix}`;
+    const ownerPassword = randomBytes(12).toString("hex");
+    const database = `beastypage_retired_${suffix}`;
+    let ownerPool: pg.Pool | undefined;
+    retiredRolesForCleanup.add(retiredRole);
+    try {
+      await createLoginRole(ownerRole, ownerPassword);
+      await pool.query(
+        `create role ${quoteIdentifier(retiredRole)} nologin nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
+      );
+      await pool.query(
+        `create database ${quoteIdentifier(database)} owner ${quoteIdentifier(ownerRole)}`,
+      );
+
+      const ownerUrl = new URL(databaseUrl);
+      ownerUrl.pathname = `/${database}`;
+      ownerUrl.username = ownerRole;
+      ownerUrl.password = ownerPassword;
+      ownerPool = createPool(
+        readDatabaseConfig("migrate", {
+          DATABASE_URL: ownerUrl.toString(),
+          DATABASE_POOL_MAX: "1",
+        }),
+      );
+
+      const owner = await ownerPool.connect();
+      try {
+        await runMigrations(owner, "retired-role-setup", { retiredRoles: [] });
+        await owner.query(
+          `grant usage on schema public to ${quoteIdentifier(retiredRole)}`,
+        );
+        await owner.query(
+          `grant select, insert, update, delete, truncate on all tables in schema public to ${quoteIdentifier(retiredRole)}`,
+        );
+        await owner.query(
+          `grant usage, select on all sequences in schema public to ${quoteIdentifier(retiredRole)}`,
+        );
+        await owner.query(
+          `alter default privileges for role ${quoteIdentifier(ownerRole)} in schema public grant select, insert, update, delete, truncate on tables to ${quoteIdentifier(retiredRole)}`,
+        );
+        await owner.query(
+          `alter default privileges for role ${quoteIdentifier(ownerRole)} in schema public grant usage, select on sequences to ${quoteIdentifier(retiredRole)}`,
+        );
+        await runMigrations(owner, "retired-role-cleanup", {
+          retiredRoles: [retiredRole],
+        });
+      } finally {
+        owner.release();
+      }
+
+      const dependencies = await pool.query<{ count: number }>(
+        `select count(*)::int as count
+           from pg_shdepend
+          where refclassid = 'pg_authid'::regclass
+            and refobjid = (select oid from pg_roles where rolname = $1)`,
+        [retiredRole],
+      );
+      expect(dependencies.rows[0]?.count).toBe(0);
+      await expect(
+        pool.query(`drop role ${quoteIdentifier(retiredRole)}`),
+      ).resolves.toBeDefined();
+
+      const ownerTable = await ownerPool.query<{ present: boolean }>(
+        "select to_regclass('public.live_events') is not null as present",
+      );
+      expect(ownerTable.rows[0]?.present).toBe(true);
+    } finally {
+      await ownerPool?.end();
+      await pool.query(
+        `drop database if exists ${quoteIdentifier(database)} with (force)`,
+      );
+      await pool.query(`drop role if exists ${quoteIdentifier(ownerRole)}`);
     }
   });
 

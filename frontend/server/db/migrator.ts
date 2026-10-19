@@ -25,8 +25,12 @@ export interface MigrationResult {
 export interface MigrationOptions {
   /** Role used by the frontend. Defaults to the documented app role. */
   appRole?: string;
+  /** Retired roles to clean up. Defaults to the historical import role. */
+  retiredRoles?: readonly string[];
   log?: (line: string) => void;
 }
+
+const RETIRED_ROLES = ["beastypage_import"] as const;
 
 function quoteIdentifier(identifier: string): string {
   return `"${identifier.replaceAll('"', '""')}"`;
@@ -78,6 +82,46 @@ export async function applyRoleGrants(
     options.appRole ?? process.env.DATABASE_APP_ROLE ?? "beastypage_app",
     log,
   );
+}
+
+/** Revoke privileges and dependencies left by roles retired from the cluster. */
+export async function revokeRetiredRolePrivileges(
+  client: pg.PoolClient,
+  options: MigrationOptions = {},
+): Promise<void> {
+  const log = options.log ?? ((line: string) => console.log(line));
+  const roles = options.retiredRoles ?? RETIRED_ROLES;
+
+  for (const role of roles) {
+    const present = await client.query<{ present: boolean }>(
+      "select exists(select 1 from pg_roles where rolname = $1) as present",
+      [role],
+    );
+    if (!present.rows[0]?.present) continue;
+
+    const target = quoteIdentifier(role);
+    const owner = quoteIdentifier(
+      (await client.query<{ role: string }>("select current_user as role"))
+        .rows[0]?.role ?? "",
+    );
+    await client.query(
+      `revoke all privileges on all tables in schema public from ${target}`,
+    );
+    await client.query(
+      `revoke all privileges on all sequences in schema public from ${target}`,
+    );
+    await client.query(`revoke all privileges on schema public from ${target}`);
+    await client.query(
+      `alter default privileges for role ${owner} in schema public revoke all privileges on tables from ${target}`,
+    );
+    await client.query(
+      `alter default privileges for role ${owner} in schema public revoke all privileges on sequences from ${target}`,
+    );
+    // DROP OWNED also revokes privileges, but requires object-drop authority
+    // that the bootstrap owner does not have. The explicit revokes above clear
+    // the ACL dependencies without risking objects owned by another role.
+    log(`[db:migrate] revoked privileges from retired role ${role}`);
+  }
 }
 
 /**
@@ -134,6 +178,7 @@ export async function runMigrations(
       );
     }
     await applyRoleGrants(client, options);
+    await revokeRetiredRolePrivileges(client, options);
     return { before, after };
   } finally {
     await client.query("select pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);
