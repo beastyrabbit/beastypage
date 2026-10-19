@@ -5,7 +5,7 @@ import { errorResponse } from "@/server/http";
 import { parseJsonBody } from "@/server/request";
 import { requestPerfectMatchup } from "@/server/services/games";
 export const dynamic = "force-dynamic";
-const schema = z.object({ clientId: z.string().max(128).optional() });
+const schema = z.object({ clientId: z.string().min(1).max(128) });
 export async function POST(request: Request) {
   try {
     const body = await parseJsonBody(request, schema);

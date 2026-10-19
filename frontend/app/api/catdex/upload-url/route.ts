@@ -12,7 +12,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await parseJsonBody(
       request,
-      z.object({ clientKey: z.string().optional() }).default({}),
+      z
+        .object({
+          clientKey: z
+            .string()
+            .regex(/^[A-Za-z0-9_-]{16,80}$/)
+            .optional(),
+        })
+        .default({}),
     );
     const uploadUrl = await issueCatdexUploadUrl(
       getDb(),

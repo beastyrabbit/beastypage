@@ -124,6 +124,9 @@ describe("games API routes", () => {
           clientId: "x".repeat(129),
         }),
       ),
+      perfectMatchup.POST(
+        json("http://localhost/api/perfect-cats/matchup", {}),
+      ),
       perfectVote.POST(
         json("http://localhost/api/perfect-cats/vote", { clientId: "x" }),
       ),

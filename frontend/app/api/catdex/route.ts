@@ -3,18 +3,14 @@ import { z } from "zod";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody, parseSearchParams } from "@/server/request";
-import {
-  createCatdex,
-  listCatdex,
-  listCatdexLegacy,
-} from "@/server/services/catalog";
+import { createCatdex, listCatdex } from "@/server/services/catalog";
 
 export const dynamic = "force-dynamic";
 
 const cardSchema = z.object({
   storageId: z.string().uuid(),
   fileName: z.string().min(1).max(255),
-  uploadToken: z.string().optional(),
+  uploadToken: z.string().min(1).max(100),
 });
 
 const createSchema = z.object({
@@ -34,13 +30,9 @@ export async function GET(request: NextRequest) {
       z.object({
         cursor: z.string().optional(),
         pageSize: z.coerce.number().int().positive().optional(),
-        limit: z.coerce.number().int().positive().optional(),
         approved: z.enum(["true", "false"]).optional(),
       }),
     );
-    if (params.limit !== undefined && params.cursor === undefined) {
-      return NextResponse.json(await listCatdexLegacy(getDb(), params.limit));
-    }
     const result = await listCatdex(getDb(), {
       cursor: params.cursor,
       pageSize: params.pageSize,

@@ -25,7 +25,6 @@ import {
   deleteUpload,
   insertCatdex,
   insertUploadReservation,
-  lockUploadByFileId,
   lockUploadByToken,
   selectCatdexById,
   selectCatdexByLegacyId,
@@ -43,7 +42,6 @@ import { storeUploadedFile } from "./files";
 
 const UPLOAD_TTL_MS = 60 * 60 * 1000;
 const MAX_UPLOADS_PER_CLIENT_PER_HOUR = 12;
-const MAX_UNKEYED_UPLOADS_PER_HOUR = 60;
 const MAX_GLOBAL_UPLOADS_PER_HOUR = 600;
 const MAX_THUMBNAIL_ATTEMPTS = 3;
 const THUMBNAIL_RETRY_AFTER_MS = 30 * 60 * 1000;
@@ -355,13 +353,6 @@ export async function listCatdex(
   };
 }
 
-export async function listCatdexLegacy(db: Database, limit = 48) {
-  const result = await listCatdex(db, {
-    pageSize: Math.min(48, Math.max(1, limit)),
-  });
-  return result.page.sort((a, b) => b.updated - a.updated);
-}
-
 export async function listCatdexForOwner(
   db: Database,
   owner: string,
@@ -445,7 +436,7 @@ export async function getCatdexByLink(
 export interface UploadCardInput {
   storageId: string;
   fileName: string;
-  uploadToken?: string;
+  uploadToken: string;
 }
 
 export interface CreateCatdexInput {
@@ -462,9 +453,7 @@ async function consumeUpload(
   tx: import("../db/transaction").Transaction,
   card: UploadCardInput,
 ) {
-  const upload = card.uploadToken
-    ? await lockUploadByToken(tx, card.uploadToken)
-    : await lockUploadByFileId(tx, card.storageId);
+  const upload = await lockUploadByToken(tx, card.uploadToken);
   if (
     upload?.status !== "attached" ||
     upload.fileId !== card.storageId ||
@@ -591,23 +580,20 @@ export async function issueCatdexUploadUrl(
 ): Promise<string> {
   const now = Date.now();
   const since = new Date(now - 60 * 60 * 1000);
-  const anonymousRateKey =
-    clientKey && /^[A-Za-z0-9_-]{16,80}$/.test(clientKey)
-      ? `client:${clientKey}`
-      : null;
   const rateKey = identity.tokenIdentifier
     ? `identity:${identity.tokenIdentifier}`
-    : anonymousRateKey;
+    : clientKey && /^[A-Za-z0-9_-]{16,80}$/.test(clientKey)
+      ? `client:${clientKey}`
+      : null;
+  if (!rateKey)
+    throw new ServiceError("invalid_input", "A client key is required");
   const token = randomUUID();
   await withTransaction(db, async (tx) => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended('beastypage:catdex:upload-rate', 0))`,
     );
     const count = await countRecentUploads(tx, rateKey, since);
-    if (
-      count >=
-      (rateKey ? MAX_UPLOADS_PER_CLIENT_PER_HOUR : MAX_UNKEYED_UPLOADS_PER_HOUR)
-    ) {
+    if (count >= MAX_UPLOADS_PER_CLIENT_PER_HOUR) {
       throw new ServiceError(
         "rate_limited",
         "Too many pending uploads; try again later",
@@ -844,15 +830,6 @@ async function processCatdexThumbnail(
     // Invalid or undecodable source images are permanent failures.
     return null;
   }
-}
-
-export async function listCollectionLegacy(db: Database, limit = 200) {
-  const bounded = Math.max(1, Math.min(limit, 200));
-  const rows = await selectCollectionPage(db, {
-    cursor: null,
-    pageSize: bounded,
-  });
-  return rows.slice(0, bounded).map(collectionPayload);
 }
 
 export async function setCollectionFocus(

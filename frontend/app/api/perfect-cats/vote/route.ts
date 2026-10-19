@@ -6,10 +6,10 @@ import { parseJsonBody } from "@/server/request";
 import { submitPerfectVote } from "@/server/services/games";
 export const dynamic = "force-dynamic";
 const schema = z.object({
-  clientId: z.string().max(128),
+  clientId: z.string().min(1).max(128),
   winnerId: z.string().min(1),
   loserId: z.string().min(1),
-  matchupToken: z.string().optional(),
+  matchupToken: z.string().min(1).max(128),
 });
 export async function POST(request: Request) {
   try {
