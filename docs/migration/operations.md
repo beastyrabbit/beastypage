@@ -96,6 +96,10 @@ kept in the historical cutover record.
 Staging has one CNPG instance. Its cold volume-snapshot procedure therefore
 fences the only instance for the duration of a snapshot; use it for the timed
 restore drill only and schedule the interruption during the rehearsal window.
+Once the restored staging cluster is `Ready`, run the revoke-and-drop block
+from production restore step 3 below, using `-n beastypage-staging` in both
+`kubectl` calls and `cnpg.io/cluster=beastypage-staging-postgres` in the primary
+pod selector; it must succeed before continuing the drill.
 
 Templates: `deploy/postgres/staging/`. Production templates are in
 `deploy/postgres/production/`. Both go into kub-homelab through a reviewed
