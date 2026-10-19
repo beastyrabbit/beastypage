@@ -48,12 +48,14 @@ the frontend, renderer, media service, Discord bot, and palette watcher, then
 opens the worktree-specific Portless URL after every service is ready. The exact
 URL is printed in the terminal; it is intentionally not hard-coded.
 
-The frontend uses PostgreSQL through the Drizzle data layer. The production CNPG
-cluster is `beastypage-postgres` in the `webpage` namespace; migrations run in
-the frontend init container before the application starts. The default full
-development setup gets database and runtime values from Infisical paths
-`/kubernetes/webpage/beastypage-postgres` and
-`/kubernetes/webpage/beastypage-frontend-runtime-config`.
+The frontend uses PostgreSQL through the Drizzle data layer. In production, it
+runs against the `beastypage-postgres` CNPG cluster in the `webpage` namespace,
+with migrations in the frontend init container; production runtime values come
+from Infisical paths `/kubernetes/webpage/beastypage-postgres` and
+`/kubernetes/webpage/beastypage-frontend-runtime-config`. The local full
+development setup instead injects the `dev` environment paths `/frontend`,
+`/media`, and `/discord-bot` in the BeastyPage Infisical project through the
+root scripts; see [Local development notes](docs/local-development.md).
 
 ### Frontend only
 
