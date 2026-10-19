@@ -37,6 +37,7 @@ import {
   mutateBuilderParams,
   synchronizeBuilderParams,
 } from "@/lib/cat-builder/genericTraitEditor";
+import { createTortieLayer } from "@/lib/cat-builder/tortieLayers";
 import {
   catDataToLegacyPersistence,
   catParamsToLegacyPersistence,
@@ -661,28 +662,12 @@ export function GuidedBuilderClient() {
   );
 
   const computeDefaultTortieLayer = useCallback(
-    (index: number, base: CatParams): TortieLayer => {
-      const patternOptions = options?.pelts ?? [];
-      const maskOptions = options?.tortieMasks ?? [];
-      const palette = getPaletteForMode(tortiePaletteMode);
-      const defaultPattern = patternOptions.includes("SingleColour")
-        ? "SingleColour"
-        : (patternOptions[0] ?? base.peltName ?? "SingleColour");
-      const defaultColour = palette.includes("GINGER")
-        ? "GINGER"
-        : (palette[0] ?? base.colour ?? "GINGER");
-      const maskPreferences = ["ONE", "TWO", "THREE", "FOUR"];
-      const preferredMask = maskPreferences[index];
-      const defaultMask =
-        preferredMask && maskOptions.includes(preferredMask)
-          ? preferredMask
-          : (maskOptions[0] ?? "ONE");
-      return {
-        pattern: defaultPattern,
-        colour: defaultColour,
-        mask: defaultMask,
-      };
-    },
+    (layers: readonly TortieLayer[], base: CatParams) =>
+      createTortieLayer(layers, base, {
+        pelts: options?.pelts ?? [],
+        masks: options?.tortieMasks ?? [],
+        colours: getPaletteForMode(tortiePaletteMode),
+      }),
     [getPaletteForMode, options, tortiePaletteMode],
   );
 
@@ -1003,11 +988,13 @@ export function GuidedBuilderClient() {
 
   const seedTortieLayers = useCallback(
     (count: number) => {
-      const layers = tortieLayers.slice(0, count).map((layer, idx) => ({
-        ...(layer ?? computeDefaultTortieLayer(idx, params)),
-      }));
-      while (layers.length < count) {
-        layers.push(computeDefaultTortieLayer(layers.length, params));
+      const layers = tortieLayers
+        .slice(0, count)
+        .map((layer) => ({ ...layer }));
+      while (layers.length < Math.min(count, MAX_TORTIE_LAYERS)) {
+        const layer = computeDefaultTortieLayer(layers, params);
+        if (!layer) break;
+        layers.push(layer);
       }
       return layers;
     },
@@ -1017,9 +1004,11 @@ export function GuidedBuilderClient() {
   const forceUnlockLayer = useCallback(
     (targetIndex: number) => {
       if (targetIndex < 0 || targetIndex >= MAX_TORTIE_LAYERS) return;
-      const desiredCount = Math.min(MAX_TORTIE_LAYERS, targetIndex + 1);
+      const layers = seedTortieLayers(targetIndex + 1);
+      if (layers.length <= targetIndex) return;
+      const desiredCount = layers.length;
       setDesiredTortieLayers(desiredCount);
-      applyTortieLayers(seedTortieLayers(desiredCount), true);
+      applyTortieLayers(layers, true);
       for (
         let i = 0;
         i <= targetIndex && i < TORTIE_LAYER_STEPS.length;
@@ -1091,7 +1080,9 @@ export function GuidedBuilderClient() {
   const handleTortieToggle = useCallback(
     (enabled: boolean) => {
       if (enabled) {
-        const nextLayers = [computeDefaultTortieLayer(0, params)];
+        const firstLayer = computeDefaultTortieLayer([], params);
+        if (!firstLayer) return;
+        const nextLayers = [firstLayer];
         setDesiredTortieLayers(1);
         applyTortieLayers(nextLayers, true);
         TORTIE_LAYER_STEPS.forEach((stepId, index) => {
@@ -1120,21 +1111,16 @@ export function GuidedBuilderClient() {
 
   const handleTortieLayerUpdate = useCallback(
     (layerIndex: number, mutator: (layer: TortieLayer) => void) => {
+      if (layerIndex < 0 || layerIndex >= MAX_TORTIE_LAYERS) return;
+      const nextLayers = seedTortieLayers(
+        Math.max(tortieLayers.length, layerIndex + 1),
+      );
+      const target = nextLayers[layerIndex];
+      if (!target) return;
       const ensuredCount = Math.max(desiredTortieLayers, layerIndex + 1);
       if (ensuredCount !== desiredTortieLayers) {
         setDesiredTortieLayers(ensuredCount);
       }
-      const nextLayers = Array.from(
-        { length: Math.max(tortieLayers.length, layerIndex + 1) },
-        (_, idx) => {
-          const existing = tortieLayers[idx];
-          return {
-            ...(existing ?? computeDefaultTortieLayer(idx, params)),
-          } as TortieLayer;
-        },
-      );
-      const target =
-        nextLayers[layerIndex] ?? computeDefaultTortieLayer(layerIndex, params);
       const mutated = { ...target };
       mutator(mutated);
       nextLayers[layerIndex] = mutated;
@@ -1153,12 +1139,12 @@ export function GuidedBuilderClient() {
     },
     [
       applyTortieLayers,
-      computeDefaultTortieLayer,
       desiredTortieLayers,
       ensureTortieSync,
       evaluateStep,
       markStepState,
       params,
+      seedTortieLayers,
       tortieLayers,
       unlockNextRelevantStep,
     ],
@@ -1408,7 +1394,7 @@ export function GuidedBuilderClient() {
             Enable tortie layering
           </h3>
           <p className="text-sm text-neutral-300">
-            Unlock up to three layered coats for complex torties.
+            Unlock up to {MAX_TORTIE_LAYERS} layered coats for complex torties.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -1447,8 +1433,9 @@ export function GuidedBuilderClient() {
                         : "border-slate-700 bg-slate-800/70 text-slate-200 hover:border-amber-400/70 hover:text-amber-100",
                     )}
                     onClick={() => {
-                      setDesiredTortieLayers(count);
-                      applyTortieLayers(seedTortieLayers(count), true);
+                      const layers = seedTortieLayers(count);
+                      setDesiredTortieLayers(layers.length);
+                      applyTortieLayers(layers, true);
                       TORTIE_LAYER_STEPS.forEach((stepId, index) => {
                         if (index === 0 && count > 0) {
                           unlockStep(stepId);
@@ -1470,7 +1457,10 @@ export function GuidedBuilderClient() {
                 if (desiredTortieLayers >= MAX_TORTIE_LAYERS) return;
                 forceUnlockLayer(desiredTortieLayers);
               }}
-              disabled={desiredTortieLayers >= MAX_TORTIE_LAYERS}
+              disabled={
+                desiredTortieLayers >= MAX_TORTIE_LAYERS ||
+                !computeDefaultTortieLayer(tortieLayers, params)
+              }
             >
               Custom + layer (max {MAX_TORTIE_LAYERS})
             </button>
