@@ -139,6 +139,7 @@ import {
 import { useVariants } from "../../utils/variants";
 import { LayerCountModeSelector } from "../common/LayerCountModeSelector";
 import { VariantBar } from "../common/VariantBar";
+import { buildCatShareUrl, ensureLegacyShareEncoding } from "./shareUrl";
 
 export type { AfterlifeOption } from "../../utils/singleCatVariants";
 
@@ -492,20 +493,6 @@ function appOrigin(): string {
 
 function withOrigin(origin: string, path: string): string {
   return origin ? `${origin}${path}` : path;
-}
-
-/** The existing encoding, else a fresh one; `existing` when encoding fails. */
-function encodeLegacyShare(
-  payload: ReturnType<typeof buildSharePayload>,
-  existing: string | null,
-): string | null {
-  if (existing) return existing;
-  try {
-    return encodeCatShare(payload);
-  } catch (err) {
-    console.warn("Failed to encode share payload", err);
-    return existing;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2452,9 +2439,10 @@ export function SingleCatPlusClient({
         };
       }
 
-      const legacyEncoded = encodeLegacyShare(
+      const legacyEncoded = ensureLegacyShareEncoding(
+        state.legacyEncoded,
         payload,
-        state.legacyEncoded ?? null,
+        encodeCatShare,
       );
       if (generationIdRef.current !== persistToken) return;
       if (legacyEncoded && catStateRef.current) {
@@ -2961,122 +2949,16 @@ export function SingleCatPlusClient({
     }
   }, [generateSpritePreviews, spritePreviewLoading, spriteVariations.length]);
 
-  const persistShareMapper = useCallback(
-    async (
-      state: CatState,
-      payload: ReturnType<typeof buildSharePayload>,
-      shareSlug: string | null,
-      legacyEncoded: string | null,
-      origin: string,
-    ) => {
-      try {
-        const result = await createMapper({
-          catData: catDataToLegacyPersistence(
-            shareSlug ? { ...payload, shareSlug } : payload,
-          ),
-          catName: state.catName ?? undefined,
-          creatorName: state.creatorName ?? undefined,
-        });
-        if (result) {
-          const shareToken =
-            (result as { shareToken?: string }).shareToken ??
-            result.slug ??
-            result.id;
-          const url = withOrigin(origin, `/view/${shareToken}`);
-          catStateRef.current = {
-            ...state,
-            profileId: result.id,
-            mapperSlug: shareToken,
-            editToken: result.editToken ?? state.editToken ?? null,
-            legacyEncoded,
-            shareUrl: url,
-            catShareSlug: shareSlug ?? state.catShareSlug ?? null,
-          };
-          setShareLink(url);
-          return url;
-        }
-      } catch (err) {
-        console.warn("Failed to persist share payload to PostgreSQL", err);
-      }
-      return null;
-    },
+  const buildShareUrl = useCallback(
+    () =>
+      buildCatShareUrl(
+        catStateRef,
+        { createMapper, createShare: createCatShare, encode: encodeCatShare },
+        setShareLink,
+        setError,
+      ),
     [createMapper],
   );
-
-  const buildShareUrl = useCallback(async () => {
-    const state = catStateRef.current;
-    if (!state) return null;
-    if (state.shareUrl) return state.shareUrl;
-    const origin = appOrigin();
-
-    let shareSlug: string | null = state.catShareSlug ?? null;
-
-    const slugCandidate = state.mapperSlug ?? state.profileId ?? null;
-    if (slugCandidate) {
-      const url = withOrigin(origin, `/view/${slugCandidate}`);
-      catStateRef.current = { ...state, shareUrl: url };
-      setShareLink(url);
-      return url;
-    }
-
-    const payload = buildSharePayload(state);
-    const legacyEncoded = encodeLegacyShare(
-      payload,
-      state.legacyEncoded ?? null,
-    );
-    const mapperUrl = await persistShareMapper(
-      state,
-      payload,
-      shareSlug,
-      legacyEncoded,
-      origin,
-    );
-    if (mapperUrl) return mapperUrl;
-
-    if (!shareSlug) {
-      const shareRecord = await createCatShare({
-        params: payload.params,
-        accessorySlots: payload.accessorySlots,
-        scarSlots: payload.scarSlots,
-        tortieSlots: payload.tortieSlots,
-        counts: payload.counts,
-      });
-      if (shareRecord?.slug) {
-        shareSlug = shareRecord.slug;
-        if (catStateRef.current) {
-          catStateRef.current = {
-            ...catStateRef.current,
-            catShareSlug: shareSlug,
-          };
-        }
-      }
-    }
-
-    if (shareSlug) {
-      const url = withOrigin(origin, `/visual-builder?share=${shareSlug}`);
-      if (catStateRef.current) {
-        catStateRef.current = {
-          ...catStateRef.current,
-          catShareSlug: shareSlug,
-          shareUrl: url,
-          legacyEncoded:
-            catStateRef.current.legacyEncoded ?? legacyEncoded ?? null,
-        };
-      }
-      setShareLink(url);
-      return url;
-    }
-
-    if (legacyEncoded) {
-      const url = withOrigin(origin, `/view?cat=${legacyEncoded}`);
-      catStateRef.current = { ...state, legacyEncoded, shareUrl: url };
-      setShareLink(url);
-      return url;
-    }
-
-    setError("Unable to build share link right now.");
-    return null;
-  }, [persistShareMapper]);
 
   const handleCopyShareLink = useCallback(async () => {
     const url = await buildShareUrl();
