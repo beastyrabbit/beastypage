@@ -239,8 +239,8 @@ same Cluster name. Keep the frontend in maintenance throughout.
    loudly on a missing backup where `initdb` would silently start an empty
    database.
 
-After restoring a backup created before 2026-10-19, run the following command
-as the `postgres` superuser through the primary pod:
+After any restore, run the following command as the `postgres` superuser
+through the primary pod; it is a no-op when the role is already absent:
 
 ```bash
 kubectl -n webpage exec "$(kubectl -n webpage get pod \
