@@ -1,0 +1,72 @@
+/* Preserve the fallback families and metrics from Next.js 16.3.8's Google font loader. */
+@font-face {
+  font-family: "Geist Fallback";
+  src: local("Arial");
+  ascent-override: 95.94%;
+  descent-override: 28.16%;
+  line-gap-override: 0.00%;
+  size-adjust: 104.76%;
+}
+
+@font-face {
+  font-family: "Geist Mono Fallback";
+  src: local("Arial");
+  ascent-override: 74.67%;
+  descent-override: 21.92%;
+  line-gap-override: 0.00%;
+  size-adjust: 134.59%;
+}
+
+@font-face {
+  font-family: "EB Garamond Fallback";
+  src: local("Times New Roman");
+  ascent-override: 106.26%;
+  descent-override: 31.44%;
+  line-gap-override: 0.00%;
+  size-adjust: 94.77%;
+}
+
+@font-face {
+  font-family: "Cormorant Garamond Fallback";
+  src: local("Times New Roman");
+  ascent-override: 95.27%;
+  descent-override: 29.59%;
+  line-gap-override: 0.00%;
+  size-adjust: 96.98%;
+}
+
+@font-face {
+  font-family: "Press Start 2P Fallback";
+  src: local("Arial");
+  ascent-override: 44.58%;
+  descent-override: 0.00%;
+  line-gap-override: 0.00%;
+  size-adjust: 224.32%;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono Fallback";
+  src: local("Arial");
+  ascent-override: 76.16%;
+  descent-override: 20.43%;
+  line-gap-override: 0.00%;
+  size-adjust: 134.59%;
+}
+
+@font-face {
+  font-family: "Caveat Fallback";
+  src: local("Arial");
+  ascent-override: 124.77%;
+  descent-override: 38.99%;
+  line-gap-override: 0.00%;
+  size-adjust: 76.94%;
+}
+
+@font-face {
+  font-family: "Special Elite Fallback";
+  src: local("Arial");
+  ascent-override: 60.00%;
+  descent-override: 25.33%;
+  line-gap-override: 0.00%;
+  size-adjust: 117.20%;
+}
