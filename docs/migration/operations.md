@@ -96,6 +96,10 @@ kept in the historical cutover record.
 Staging has one CNPG instance. Its cold volume-snapshot procedure therefore
 fences the only instance for the duration of a snapshot; use it for the timed
 restore drill only and schedule the interruption during the rehearsal window.
+Once the restored staging cluster is `Ready`, run the revoke-and-drop block
+from production restore step 3 below, using `-n beastypage-staging` in both
+`kubectl` calls and `cnpg.io/cluster=beastypage-staging-postgres` in the primary
+pod selector; it must succeed before continuing the drill.
 
 Templates: `deploy/postgres/staging/`. Production templates are in
 `deploy/postgres/production/`. Both go into kub-homelab through a reviewed
@@ -110,8 +114,8 @@ explicit approval.** Nothing in this repository applies them.
 - Roles:
   - `beastypage_owner`: bootstrap owner, used for migrations.
   - `beastypage_app`: DML only, connection limit 30.
-  - `beastypage_import` is retired; the migration runner revokes its legacy
-    privileges before the CNPG tombstone removes it from the cluster.
+  - `beastypage_import` was dropped; the migration runner's legacy privilege
+    revoke step is a no-op when the role is absent.
 - The migration runner applies these grants as the owner after every schema
   migration (the SQL is shown here for operator verification):
 
@@ -226,13 +230,26 @@ same Cluster name. Keep the frontend in maintenance throughout.
    `Cluster` manifest with `bootstrap.recovery.backup.name` set to the chosen
    Backup, reconcile Flux, and wait for `beastypage-postgres` to be `Ready`.
    Confirm the generated `beastypage-postgres-ca` secret contains `ca.crt`.
-3. Run `pnpm --dir frontend run db:migrate --status` against the unchanged
+3. **Revoke restored grants and drop the retired import role.** After any
+   restore, run the following block as the `postgres` superuser through the
+   primary pod. It is a no-op when the role is absent and must succeed before
+   continuing. The CloudNativePG manifest no longer manages this retired role,
+   and the migration runner only revokes its privileges.
+
+   ```bash
+   kubectl -n webpage exec "$(kubectl -n webpage get pod \
+     -l cnpg.io/cluster=beastypage-postgres,cnpg.io/instanceRole=primary \
+     -o jsonpath='{.items[0].metadata.name}')" -c postgres -- \
+     psql -U postgres -d beastypage -c "do \$\$ begin if exists (select 1 from pg_roles where rolname = 'beastypage_import') then execute 'drop owned by beastypage_import'; execute 'drop role beastypage_import'; end if; end \$\$;"
+   ```
+
+4. Run `pnpm --dir frontend run db:migrate --status` against the unchanged
    `beastypage-postgres-rw.webpage.svc` service, then run the verification
    queries in the restore runbook: row counts, file hashes and relationships.
-4. Restart the frontend so its `/etc/postgres-ca/ca.crt` projected volume and
+5. Restart the frontend so its `/etc/postgres-ca/ca.crt` projected volume and
    TLS connection use the replacement cluster. Do not edit the Infisical URL
    targets: they already point at the original service and are Flux-owned.
-5. Record the measured restore time against the 1-hour RTO and lift
+6. Record the measured restore time against the 1-hour RTO and lift
    maintenance. Leave the `bootstrap.recovery` stanza in the committed
    Cluster manifest: CNPG only uses `bootstrap` when it creates a cluster,
    and if the cluster is ever recreated from Git, a recovery stanza fails
