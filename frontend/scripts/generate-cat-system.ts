@@ -380,6 +380,41 @@ function materializeRenderCatalogAssets(
   return result;
 }
 
+function resolveCompositeCatalog(
+  id: string,
+  definition: Extract<CatalogDefinition, { source: "composite" }>,
+  catalogDefinitions: Readonly<Record<string, CatalogDefinition>>,
+  resolveOne: (
+    id: string,
+    definition: CatalogDefinition,
+  ) => PublicCatalogElement[],
+): PublicCatalogElement[] {
+  const byElementId = new Map<string, PublicCatalogElement>();
+  const selectableCatalogs = definition.selectableCatalogs
+    ? new Set(definition.selectableCatalogs)
+    : null;
+  for (const catalogId of definition.catalogs) {
+    const dependency = catalogDefinitions[catalogId];
+    if (!dependency)
+      throw new Error(`${id} includes unknown catalog ${catalogId}`);
+    for (const element of resolveOne(catalogId, dependency)) {
+      const candidate =
+        selectableCatalogs && !selectableCatalogs.has(catalogId)
+          ? { ...element, randomSelectable: false }
+          : element;
+      const existing = byElementId.get(element.id);
+      if (
+        !existing ||
+        (existing.randomSelectable === false &&
+          candidate.randomSelectable !== false)
+      ) {
+        byElementId.set(element.id, candidate);
+      }
+    }
+  }
+  return [...byElementId.values()];
+}
+
 function resolveCatalogs(): Record<string, PublicCatalogElement[]> {
   const dataRoot = resolve(frontendRoot, "public/sprite-data");
   const peltInfo = readJson<Record<string, unknown>>(
@@ -454,30 +489,12 @@ function resolveCatalogs(): Record<string, PublicCatalogElement[]> {
         }));
         break;
       case "composite": {
-        const byElementId = new Map<string, PublicCatalogElement>();
-        const selectableCatalogs = definition.selectableCatalogs
-          ? new Set(definition.selectableCatalogs)
-          : null;
-        for (const catalogId of definition.catalogs) {
-          const dependency = catalogDefinitions[catalogId];
-          if (!dependency)
-            throw new Error(`${id} includes unknown catalog ${catalogId}`);
-          for (const element of resolveOne(catalogId, dependency)) {
-            const candidate =
-              selectableCatalogs && !selectableCatalogs.has(catalogId)
-                ? { ...element, randomSelectable: false }
-                : element;
-            const existing = byElementId.get(element.id);
-            if (
-              !existing ||
-              (existing.randomSelectable === false &&
-                candidate.randomSelectable !== false)
-            ) {
-              byElementId.set(element.id, candidate);
-            }
-          }
-        }
-        elements = [...byElementId.values()];
+        elements = resolveCompositeCatalog(
+          id,
+          definition,
+          catalogDefinitions,
+          resolveOne,
+        );
         break;
       }
       case "static":
@@ -527,6 +544,156 @@ function selectableCatalogElements(
   return selectable;
 }
 
+function gachaCatalogIds(trait: AnyCatTraitDefinition): readonly string[] {
+  switch (trait.gacha.strategy) {
+    case "catalogChoice":
+      return [
+        trait.gacha.catalog,
+        ...(trait.gacha.conditionalCatalogs ?? []).map(
+          (conditional) => conditional.catalog,
+        ),
+      ];
+    case "slotList":
+      return [trait.gacha.catalog];
+    case "tortieList":
+      return [
+        trait.gacha.maskCatalog,
+        trait.gacha.peltCatalog,
+        trait.gacha.colourCatalog,
+      ];
+    default:
+      return [];
+  }
+}
+
+function validateGachaPoseReachability(
+  trait: AnyCatTraitDefinition,
+  selectableByCatalog: ReadonlyMap<string, readonly PublicCatalogElement[]>,
+  selectablePoses: readonly string[],
+): void {
+  if (trait.id !== "pose" && selectablePoses.length > 0) {
+    for (const [catalogId, selectable] of selectableByCatalog) {
+      const globallyReachable = selectable.some(
+        (element) =>
+          element.poses === undefined ||
+          element.poses.some((pose) => selectablePoses.includes(pose)),
+      );
+      if (!globallyReachable) {
+        throw new Error(
+          `${trait.id}.gacha catalog ${catalogId} has no non-deprecated value reachable from an allowed gacha pose`,
+        );
+      }
+    }
+  }
+}
+
+function isProvenCoatChoiceProjection(
+  target: AnyCatTraitDefinition,
+  element: PublicCatalogElement,
+  valueIds: ReadonlySet<string>,
+  catalogs: ResolvedCatalogs,
+): boolean {
+  if (
+    target.gacha.strategy !== "derived" ||
+    target.gacha.resolver !== "coatChoiceProjection"
+  ) {
+    return false;
+  }
+  const projected = resolveCoatChoice(element.id);
+  if (!valueIds.has(projected.peltName)) return false;
+  if (projected.coatPattern === undefined) return true;
+  if (!target.value.schema.safeParse(projected.coatPattern).success) {
+    return false;
+  }
+  const targetCatalogId = target.value.catalog;
+  if (!targetCatalogId) return true;
+  return Boolean(
+    catalogs[targetCatalogId]?.some(
+      (candidate) => candidate.id === projected.coatPattern,
+    ),
+  );
+}
+
+function validateGachaCatalogChoice(
+  trait: AnyCatTraitDefinition,
+  catalogs: ResolvedCatalogs,
+  derivedBySource: ReadonlyMap<string, readonly AnyCatTraitDefinition[]>,
+  selectableByCatalog: ReadonlyMap<string, readonly PublicCatalogElement[]>,
+): void {
+  if (trait.gacha.strategy === "catalogChoice" && trait.value.catalog) {
+    const valueElements = catalogs[trait.value.catalog];
+    if (!valueElements) {
+      throw new Error(
+        `${trait.id}.value cannot resolve catalog ${trait.value.catalog} during generation`,
+      );
+    }
+    const valueIds = new Set(valueElements.map((element) => element.id));
+    const projections = (derivedBySource.get(trait.id) ?? []).filter(
+      (target) => target.gacha.strategy === "derived",
+    );
+    const unproven = gachaCatalogIds(trait)
+      .flatMap((catalogId) => selectableByCatalog.get(catalogId) ?? [])
+      .filter((element) => {
+        if (valueIds.has(element.id)) return false;
+        return !projections.some((target) =>
+          isProvenCoatChoiceProjection(target, element, valueIds, catalogs),
+        );
+      });
+    if (unproven.length > 0) {
+      throw new Error(
+        `${trait.id}.gacha catalog ${trait.gacha.catalog} can emit values outside value catalog ${trait.value.catalog} without a proven projection: ${unproven.map((element) => element.id).join(", ")}`,
+      );
+    }
+  }
+}
+
+function validateGachaSlotList(
+  trait: AnyCatTraitDefinition,
+  catalogs: ResolvedCatalogs,
+  selectableByCatalog: ReadonlyMap<string, readonly PublicCatalogElement[]>,
+  selectablePoses: readonly string[],
+): void {
+  if (trait.gacha.strategy !== "slotList") return;
+  const valueCatalogId = trait.value.catalog;
+  if (!valueCatalogId) {
+    throw new Error(
+      `${trait.id}.gacha slotList requires a value catalog for output validation`,
+    );
+  }
+  const valueElements = catalogs[valueCatalogId];
+  if (!valueElements) {
+    throw new Error(
+      `${trait.id}.value cannot resolve catalog ${valueCatalogId} during generation`,
+    );
+  }
+  const valueIds = new Set(valueElements.map((element) => element.id));
+  const selectable = selectableByCatalog.get(trait.gacha.catalog) ?? [];
+  const outsideValueCatalog = selectable.filter(
+    (element) => !valueIds.has(element.id),
+  );
+  if (outsideValueCatalog.length > 0) {
+    throw new Error(
+      `${trait.id}.gacha catalog ${trait.gacha.catalog} is not compatible with value catalog ${valueCatalogId}: ${outsideValueCatalog.map((element) => element.id).join(", ")}`,
+    );
+  }
+
+  if (!trait.gacha.availableForPose || selectablePoses.length === 0) {
+    return;
+  }
+  const uncoveredPoses = selectablePoses.filter(
+    (pose) =>
+      !selectable.some(
+        (element) =>
+          element.poses === undefined || element.poses.includes(pose),
+      ),
+  );
+  if (uncoveredPoses.length > 0) {
+    throw new Error(
+      `${trait.id}.gacha catalog ${trait.gacha.catalog} has no selectable value for poses: ${uncoveredPoses.join(", ")}`,
+    );
+  }
+}
+
 /**
  * Proves that every catalog-backed gacha strategy can produce a value accepted
  * by the generated document contract. This runs after source catalogs and
@@ -556,133 +723,28 @@ export function validateGachaCatalogContracts(
         ).map((element) => element.id)
       : [];
 
-  const catalogIds = (trait: AnyCatTraitDefinition): readonly string[] => {
-    switch (trait.gacha.strategy) {
-      case "catalogChoice":
-        return [
-          trait.gacha.catalog,
-          ...(trait.gacha.conditionalCatalogs ?? []).map(
-            (conditional) => conditional.catalog,
-          ),
-        ];
-      case "slotList":
-        return [trait.gacha.catalog];
-      case "tortieList":
-        return [
-          trait.gacha.maskCatalog,
-          trait.gacha.peltCatalog,
-          trait.gacha.colourCatalog,
-        ];
-      default:
-        return [];
-    }
-  };
-
   for (const trait of traits) {
     const selectableByCatalog = new Map(
-      catalogIds(trait).map((catalogId) => [
+      gachaCatalogIds(trait).map((catalogId) => [
         catalogId,
         selectableCatalogElements(trait.id, catalogId, catalogs),
       ]),
     );
-    if (trait.id !== "pose" && selectablePoses.length > 0) {
-      for (const [catalogId, selectable] of selectableByCatalog) {
-        const globallyReachable = selectable.some(
-          (element) =>
-            element.poses === undefined ||
-            element.poses.some((pose) => selectablePoses.includes(pose)),
-        );
-        if (!globallyReachable) {
-          throw new Error(
-            `${trait.id}.gacha catalog ${catalogId} has no non-deprecated value reachable from an allowed gacha pose`,
-          );
-        }
-      }
-    }
+    validateGachaPoseReachability(trait, selectableByCatalog, selectablePoses);
 
-    if (trait.gacha.strategy === "catalogChoice" && trait.value.catalog) {
-      const valueElements = catalogs[trait.value.catalog];
-      if (!valueElements) {
-        throw new Error(
-          `${trait.id}.value cannot resolve catalog ${trait.value.catalog} during generation`,
-        );
-      }
-      const valueIds = new Set(valueElements.map((element) => element.id));
-      const projections = (derivedBySource.get(trait.id) ?? []).filter(
-        (target) => target.gacha.strategy === "derived",
-      );
-      const unproven = catalogIds(trait)
-        .flatMap((catalogId) => selectableByCatalog.get(catalogId) ?? [])
-        .filter((element) => {
-          if (valueIds.has(element.id)) return false;
-          return !projections.some((target) => {
-            if (
-              target.gacha.strategy !== "derived" ||
-              target.gacha.resolver !== "coatChoiceProjection"
-            ) {
-              return false;
-            }
-            const projected = resolveCoatChoice(element.id);
-            if (!valueIds.has(projected.peltName)) return false;
-            if (projected.coatPattern === undefined) return true;
-            if (!target.value.schema.safeParse(projected.coatPattern).success) {
-              return false;
-            }
-            const targetCatalogId = target.value.catalog;
-            if (!targetCatalogId) return true;
-            return Boolean(
-              catalogs[targetCatalogId]?.some(
-                (candidate) => candidate.id === projected.coatPattern,
-              ),
-            );
-          });
-        });
-      if (unproven.length > 0) {
-        throw new Error(
-          `${trait.id}.gacha catalog ${trait.gacha.catalog} can emit values outside value catalog ${trait.value.catalog} without a proven projection: ${unproven.map((element) => element.id).join(", ")}`,
-        );
-      }
-    }
-
-    if (trait.gacha.strategy !== "slotList") continue;
-    const valueCatalogId = trait.value.catalog;
-    if (!valueCatalogId) {
-      throw new Error(
-        `${trait.id}.gacha slotList requires a value catalog for output validation`,
-      );
-    }
-    const valueElements = catalogs[valueCatalogId];
-    if (!valueElements) {
-      throw new Error(
-        `${trait.id}.value cannot resolve catalog ${valueCatalogId} during generation`,
-      );
-    }
-    const valueIds = new Set(valueElements.map((element) => element.id));
-    const selectable = selectableByCatalog.get(trait.gacha.catalog) ?? [];
-    const outsideValueCatalog = selectable.filter(
-      (element) => !valueIds.has(element.id),
+    validateGachaCatalogChoice(
+      trait,
+      catalogs,
+      derivedBySource,
+      selectableByCatalog,
     );
-    if (outsideValueCatalog.length > 0) {
-      throw new Error(
-        `${trait.id}.gacha catalog ${trait.gacha.catalog} is not compatible with value catalog ${valueCatalogId}: ${outsideValueCatalog.map((element) => element.id).join(", ")}`,
-      );
-    }
 
-    if (!trait.gacha.availableForPose || selectablePoses.length === 0) {
-      continue;
-    }
-    const uncoveredPoses = selectablePoses.filter(
-      (pose) =>
-        !selectable.some(
-          (element) =>
-            element.poses === undefined || element.poses.includes(pose),
-        ),
+    validateGachaSlotList(
+      trait,
+      catalogs,
+      selectableByCatalog,
+      selectablePoses,
     );
-    if (uncoveredPoses.length > 0) {
-      throw new Error(
-        `${trait.id}.gacha catalog ${trait.gacha.catalog} has no selectable value for poses: ${uncoveredPoses.join(", ")}`,
-      );
-    }
   }
 }
 
@@ -804,6 +866,111 @@ function validateStrategies(
   }
 }
 
+function validateJsonSchemaString(
+  value: unknown,
+  schema: Record<string, unknown>,
+  path: string,
+): string[] {
+  if (typeof value !== "string") return [`${path} must be a string`];
+  if (typeof schema.minLength === "number" && value.length < schema.minLength) {
+    return [`${path} is shorter than ${schema.minLength}`];
+  }
+  if (typeof schema.maxLength === "number" && value.length > schema.maxLength) {
+    return [`${path} is longer than ${schema.maxLength}`];
+  }
+  if (
+    typeof schema.pattern === "string" &&
+    !new RegExp(schema.pattern).test(value)
+  ) {
+    return [`${path} does not match ${schema.pattern}`];
+  }
+  return [];
+}
+
+function validateJsonSchemaNumber(
+  value: unknown,
+  schema: Record<string, unknown>,
+  path: string,
+): string[] {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return [`${path} must be a finite number`];
+  }
+  if (schema.type === "integer" && !Number.isInteger(value)) {
+    return [`${path} must be an integer`];
+  }
+  if (typeof schema.minimum === "number" && value < schema.minimum) {
+    return [`${path} must be at least ${schema.minimum}`];
+  }
+  if (typeof schema.maximum === "number" && value > schema.maximum) {
+    return [`${path} must be at most ${schema.maximum}`];
+  }
+  return [];
+}
+
+function validateJsonSchemaArray(
+  value: unknown,
+  schema: Record<string, unknown>,
+  path: string,
+): string[] {
+  if (!Array.isArray(value)) return [`${path} must be an array`];
+  const errors: string[] = [];
+  if (typeof schema.minItems === "number" && value.length < schema.minItems) {
+    errors.push(`${path} needs at least ${schema.minItems} items`);
+  }
+  if (typeof schema.maxItems === "number" && value.length > schema.maxItems) {
+    errors.push(`${path} allows at most ${schema.maxItems} items`);
+  }
+  if (isRecord(schema.items)) {
+    value.forEach((entry, index) => {
+      errors.push(
+        ...validateJsonSchema(
+          entry,
+          schema.items as Record<string, unknown>,
+          `${path}[${index}]`,
+        ),
+      );
+    });
+  }
+  return errors;
+}
+
+function validateJsonSchemaObject(
+  value: unknown,
+  schema: Record<string, unknown>,
+  path: string,
+): string[] {
+  if (!isRecord(value)) return [`${path} must be an object`];
+  const properties = isRecord(schema.properties) ? schema.properties : {};
+  const required = Array.isArray(schema.required)
+    ? schema.required.map(String)
+    : [];
+  const errors = required
+    .filter((key) => !(key in value))
+    .map((key) => `${path}.${key} is required`);
+  if (schema.additionalProperties === false) {
+    for (const key of Object.keys(value)) {
+      if (!(key in properties)) errors.push(`${path}.${key} is not allowed`);
+    }
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    const propertySchema = properties[key];
+    if (isRecord(propertySchema)) {
+      errors.push(
+        ...validateJsonSchema(entry, propertySchema, `${path}.${key}`),
+      );
+    } else if (isRecord(schema.additionalProperties)) {
+      errors.push(
+        ...validateJsonSchema(
+          entry,
+          schema.additionalProperties,
+          `${path}.${key}`,
+        ),
+      );
+    }
+  }
+  return errors;
+}
+
 function validateJsonSchema(
   value: unknown,
   schema: Record<string, unknown>,
@@ -827,103 +994,24 @@ function validateJsonSchema(
     return [`${path} must be one of ${schema.enum.map(String).join(", ")}`];
   }
 
-  const type = schema.type;
-  if (type === "null") return value === null ? [] : [`${path} must be null`];
-  if (type === "string") {
-    if (typeof value !== "string") return [`${path} must be a string`];
-    if (
-      typeof schema.minLength === "number" &&
-      value.length < schema.minLength
-    ) {
-      return [`${path} is shorter than ${schema.minLength}`];
-    }
-    if (
-      typeof schema.maxLength === "number" &&
-      value.length > schema.maxLength
-    ) {
-      return [`${path} is longer than ${schema.maxLength}`];
-    }
-    if (
-      typeof schema.pattern === "string" &&
-      !new RegExp(schema.pattern).test(value)
-    ) {
-      return [`${path} does not match ${schema.pattern}`];
-    }
-    return [];
-  }
-  if (type === "boolean") {
-    return typeof value === "boolean" ? [] : [`${path} must be a boolean`];
-  }
-  if (type === "integer" || type === "number") {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      return [`${path} must be a finite number`];
-    }
-    if (type === "integer" && !Number.isInteger(value)) {
-      return [`${path} must be an integer`];
-    }
-    if (typeof schema.minimum === "number" && value < schema.minimum) {
-      return [`${path} must be at least ${schema.minimum}`];
-    }
-    if (typeof schema.maximum === "number" && value > schema.maximum) {
-      return [`${path} must be at most ${schema.maximum}`];
-    }
-    return [];
-  }
-  if (type === "array") {
-    if (!Array.isArray(value)) return [`${path} must be an array`];
-    const errors: string[] = [];
-    if (typeof schema.minItems === "number" && value.length < schema.minItems) {
-      errors.push(`${path} needs at least ${schema.minItems} items`);
-    }
-    if (typeof schema.maxItems === "number" && value.length > schema.maxItems) {
-      errors.push(`${path} allows at most ${schema.maxItems} items`);
-    }
-    if (isRecord(schema.items)) {
-      value.forEach((entry, index) => {
-        errors.push(
-          ...validateJsonSchema(
-            entry,
-            schema.items as Record<string, unknown>,
-            `${path}[${index}]`,
-          ),
-        );
-      });
-    }
-    return errors;
-  }
-  if (type === "object" || isRecord(schema.properties)) {
-    if (!isRecord(value)) return [`${path} must be an object`];
-    const properties = isRecord(schema.properties) ? schema.properties : {};
-    const required = Array.isArray(schema.required)
-      ? schema.required.map(String)
-      : [];
-    const errors = required
-      .filter((key) => !(key in value))
-      .map((key) => `${path}.${key} is required`);
-    if (schema.additionalProperties === false) {
-      for (const key of Object.keys(value)) {
-        if (!(key in properties)) errors.push(`${path}.${key} is not allowed`);
+  switch (schema.type) {
+    case "null":
+      return value === null ? [] : [`${path} must be null`];
+    case "string":
+      return validateJsonSchemaString(value, schema, path);
+    case "boolean":
+      return typeof value === "boolean" ? [] : [`${path} must be a boolean`];
+    case "integer":
+    case "number":
+      return validateJsonSchemaNumber(value, schema, path);
+    case "array":
+      return validateJsonSchemaArray(value, schema, path);
+    default:
+      if (schema.type === "object" || isRecord(schema.properties)) {
+        return validateJsonSchemaObject(value, schema, path);
       }
-    }
-    for (const [key, entry] of Object.entries(value)) {
-      const propertySchema = properties[key];
-      if (isRecord(propertySchema)) {
-        errors.push(
-          ...validateJsonSchema(entry, propertySchema, `${path}.${key}`),
-        );
-      } else if (isRecord(schema.additionalProperties)) {
-        errors.push(
-          ...validateJsonSchema(
-            entry,
-            schema.additionalProperties,
-            `${path}.${key}`,
-          ),
-        );
-      }
-    }
-    return errors;
+      return [];
   }
-  return [];
 }
 
 function spriteAssetError(
@@ -1129,6 +1217,76 @@ function pngDimensions(path: string): { width: number; height: number } {
   return { width: header.readUInt32BE(16), height: header.readUInt32BE(20) };
 }
 
+function validateCatalogElementPoses(
+  catalogId: string,
+  element: PublicCatalogElement,
+  knownPoses: ReadonlySet<string>,
+): void {
+  const declaredPoses = element.poses ?? [];
+  if (new Set(declaredPoses).size !== declaredPoses.length) {
+    throw new Error(
+      `${catalogId}.${element.id} declares a pose more than once`,
+    );
+  }
+  for (const pose of declaredPoses) {
+    if (!knownPoses.has(pose)) {
+      throw new Error(`${catalogId}.${element.id} uses unknown pose ${pose}`);
+    }
+  }
+}
+
+function validateSpritePoseBounds(
+  catalogId: string,
+  element: PublicCatalogElement,
+  indexEntry: SpriteIndexEntry,
+  poseOffsets: Record<string, unknown>,
+  tileSize: number,
+  sheetSize: { width: number; height: number },
+): void {
+  const declaredPoses = element.poses ?? [];
+  for (const pose of declaredPoses) {
+    const rawOffset = poseOffsets[pose];
+    if (!isRecord(rawOffset)) {
+      throw new Error(
+        `${catalogId}.${element.id} declares unsupported ${indexEntry.poseLayout ?? "named"} pose ${pose}`,
+      );
+    }
+    const x = Number(indexEntry.xOffset ?? 0) + Number(rawOffset.x) * tileSize;
+    const y = Number(indexEntry.yOffset ?? 0) + Number(rawOffset.y) * tileSize;
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      x < 0 ||
+      y < 0 ||
+      x + tileSize > sheetSize.width ||
+      y + tileSize > sheetSize.height
+    ) {
+      throw new Error(
+        `${catalogId}.${element.id} pose ${pose} is outside ${indexEntry.spritesheet}.png`,
+      );
+    }
+  }
+}
+
+function spriteSheetDimensions(
+  spriteKey: string,
+  indexEntry: SpriteIndexEntry,
+  dimensions: Map<string, { width: number; height: number }>,
+): { width: number; height: number } {
+  const frontendSheet = resolve(
+    frontendRoot,
+    "public/sprites",
+    `${indexEntry.spritesheet}.png`,
+  );
+  if (!existsSync(frontendSheet)) {
+    throw new Error(`${spriteKey} references missing ${frontendSheet}`);
+  }
+  const sheetSize =
+    dimensions.get(frontendSheet) ?? pngDimensions(frontendSheet);
+  dimensions.set(frontendSheet, sheetSize);
+  return sheetSize;
+}
+
 function validateCatalogAssets(
   catalogs: Record<string, PublicCatalogElement[]>,
   inventory: SpriteAssetInventory,
@@ -1152,19 +1310,7 @@ function validateCatalogAssets(
 
   for (const [catalogId, elements] of Object.entries(catalogs)) {
     for (const element of elements) {
-      const declaredPoses = element.poses ?? [];
-      if (new Set(declaredPoses).size !== declaredPoses.length) {
-        throw new Error(
-          `${catalogId}.${element.id} declares a pose more than once`,
-        );
-      }
-      for (const pose of declaredPoses) {
-        if (!knownPoses.has(pose)) {
-          throw new Error(
-            `${catalogId}.${element.id} uses unknown pose ${pose}`,
-          );
-        }
-      }
+      validateCatalogElementPoses(catalogId, element, knownPoses);
       if (!element.spriteKey) continue;
       assertSpriteAsset(
         element.spriteKey,
@@ -1172,45 +1318,21 @@ function validateCatalogAssets(
         inventory,
       );
       const indexEntry = spriteIndex[element.spriteKey];
-      const frontendSheet = resolve(
-        frontendRoot,
-        "public/sprites",
-        `${indexEntry.spritesheet}.png`,
+      const sheetSize = spriteSheetDimensions(
+        element.spriteKey,
+        indexEntry,
+        dimensions,
       );
-      if (!existsSync(frontendSheet)) {
-        throw new Error(
-          `${element.spriteKey} references missing ${frontendSheet}`,
-        );
-      }
-      const sheetSize =
-        dimensions.get(frontendSheet) ?? pngDimensions(frontendSheet);
-      dimensions.set(frontendSheet, sheetSize);
       const poseOffsets =
         indexEntry.poseLayout === "legacy" ? legacyOffsets : namedOffsets;
-      for (const pose of declaredPoses) {
-        const rawOffset = poseOffsets[pose];
-        if (!isRecord(rawOffset)) {
-          throw new Error(
-            `${catalogId}.${element.id} declares unsupported ${indexEntry.poseLayout ?? "named"} pose ${pose}`,
-          );
-        }
-        const x =
-          Number(indexEntry.xOffset ?? 0) + Number(rawOffset.x) * tileSize;
-        const y =
-          Number(indexEntry.yOffset ?? 0) + Number(rawOffset.y) * tileSize;
-        if (
-          !Number.isFinite(x) ||
-          !Number.isFinite(y) ||
-          x < 0 ||
-          y < 0 ||
-          x + tileSize > sheetSize.width ||
-          y + tileSize > sheetSize.height
-        ) {
-          throw new Error(
-            `${catalogId}.${element.id} pose ${pose} is outside ${indexEntry.spritesheet}.png`,
-          );
-        }
-      }
+      validateSpritePoseBounds(
+        catalogId,
+        element,
+        indexEntry,
+        poseOffsets,
+        tileSize,
+        sheetSize,
+      );
     }
   }
 }
@@ -1280,15 +1402,73 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function catalogValues(
+  catalogs: Readonly<Record<string, readonly PublicCatalogElement[]>>,
+  traitId: string,
+  catalogId: string,
+): string[] {
+  const elements = catalogs[catalogId];
+  if (!elements || elements.length === 0) {
+    throw new Error(`${traitId} has empty or unresolved catalog ${catalogId}`);
+  }
+  return elements.map((element) => element.id);
+}
+
+function applyValueCatalogEnum(
+  trait: AnyCatTraitDefinition,
+  traitSchema: Record<string, unknown>,
+  catalogs: Readonly<Record<string, readonly PublicCatalogElement[]>>,
+): void {
+  const catalogId = trait.value.catalog;
+  if (catalogId) {
+    const values = catalogValues(catalogs, trait.id, catalogId);
+    if (trait.value.kind === "string") {
+      traitSchema.enum = values;
+    } else if (trait.value.kind === "stringList") {
+      if (!isRecord(traitSchema.items)) {
+        throw new Error(
+          `${trait.id} has no item schema for catalog ${catalogId}`,
+        );
+      }
+      traitSchema.items.enum = values;
+    } else {
+      throw new Error(
+        `${trait.id} cannot apply catalog ${catalogId} to ${trait.value.kind}`,
+      );
+    }
+  }
+}
+
+function applyTortieCatalogEnums(
+  trait: AnyCatTraitDefinition,
+  traitSchema: Record<string, unknown>,
+  catalogs: Readonly<Record<string, readonly PublicCatalogElement[]>>,
+): void {
+  if (trait.gacha.strategy !== "tortieList") return;
+  if (!isRecord(traitSchema.items) || !isRecord(traitSchema.items.properties)) {
+    throw new Error(`${trait.id} has no compound item schema for tortieList`);
+  }
+  for (const [property, nestedCatalogId] of [
+    ["mask", trait.gacha.maskCatalog],
+    ["pattern", trait.gacha.peltCatalog],
+    ["colour", trait.gacha.colourCatalog],
+  ] as const) {
+    const propertySchema = traitSchema.items.properties[property];
+    if (!isRecord(propertySchema)) {
+      throw new Error(
+        `${trait.id} tortieList item schema is missing ${property}`,
+      );
+    }
+    propertySchema.enum = catalogValues(catalogs, trait.id, nestedCatalogId);
+  }
+}
+
 export function addCatalogEnumsToDocumentSchema(
   rawSchema: Record<string, unknown>,
   catalogs: Readonly<Record<string, readonly PublicCatalogElement[]>>,
   traits: readonly AnyCatTraitDefinition[],
 ): Record<string, unknown> {
-  const schema = JSON.parse(JSON.stringify(rawSchema)) as Record<
-    string,
-    unknown
-  >;
+  const schema = structuredClone(rawSchema);
   const rootProperties = isRecord(schema.properties) ? schema.properties : {};
   const traitsObject = isRecord(rootProperties.traits)
     ? rootProperties.traits
@@ -1297,18 +1477,7 @@ export function addCatalogEnumsToDocumentSchema(
     ? traitsObject.properties
     : {};
 
-  const catalogValues = (traitId: string, catalogId: string): string[] => {
-    const elements = catalogs[catalogId];
-    if (!elements || elements.length === 0) {
-      throw new Error(
-        `${traitId} has empty or unresolved catalog ${catalogId}`,
-      );
-    }
-    return elements.map((element) => element.id);
-  };
-
   for (const trait of traits) {
-    const catalogId = trait.value.catalog;
     const traitSchema = traitProperties[trait.id];
     if (!isRecord(traitSchema)) {
       throw new Error(`${trait.id} is missing from the cat document schema`);
@@ -1321,44 +1490,9 @@ export function addCatalogEnumsToDocumentSchema(
       traitSchema.uniqueItems = true;
     }
 
-    if (catalogId) {
-      const values = catalogValues(trait.id, catalogId);
-      if (trait.value.kind === "string") {
-        traitSchema.enum = values;
-      } else if (trait.value.kind === "stringList") {
-        if (!isRecord(traitSchema.items)) {
-          throw new Error(
-            `${trait.id} has no item schema for catalog ${catalogId}`,
-          );
-        }
-        traitSchema.items.enum = values;
-      } else {
-        throw new Error(
-          `${trait.id} cannot apply catalog ${catalogId} to ${trait.value.kind}`,
-        );
-      }
-    }
+    applyValueCatalogEnum(trait, traitSchema, catalogs);
 
-    if (trait.gacha.strategy !== "tortieList") continue;
-    if (
-      !isRecord(traitSchema.items) ||
-      !isRecord(traitSchema.items.properties)
-    ) {
-      throw new Error(`${trait.id} has no compound item schema for tortieList`);
-    }
-    for (const [property, nestedCatalogId] of [
-      ["mask", trait.gacha.maskCatalog],
-      ["pattern", trait.gacha.peltCatalog],
-      ["colour", trait.gacha.colourCatalog],
-    ] as const) {
-      const propertySchema = traitSchema.items.properties[property];
-      if (!isRecord(propertySchema)) {
-        throw new Error(
-          `${trait.id} tortieList item schema is missing ${property}`,
-        );
-      }
-      propertySchema.enum = catalogValues(trait.id, nestedCatalogId);
-    }
+    applyTortieCatalogEnums(trait, traitSchema, catalogs);
   }
   return schema;
 }
