@@ -41,7 +41,7 @@ h1 .back-button {
   font-size: 0.8em;
   text-decoration: none;
   color: white;
-  background: #6366f1;
+  background: #6164ec;
   width: 45px;
   height: 45px;
   display: inline-flex;
@@ -88,7 +88,7 @@ h1 .back-button:hover {
   gap: 10px;
   padding: 18px 70px 18px 36px;
   background: #d4af37;
-  color: white;
+  color: #171717;
   text-decoration: none;
   border-radius: 12px;
   font-weight: 600;
@@ -161,14 +161,15 @@ h1 .back-button:hover {
 }
 
 .csgo-spinner-button:hover {
-  background: linear-gradient(135deg, #c2410c, #ea580c);
+  background: linear-gradient(135deg, #da5b10, #ea580c);
   transform: translateY(-3px);
   box-shadow: 0 8px 30px rgba(249, 115, 22, 0.3);
   opacity: 1;
 }
 
 .back-button {
-  background: #6366f1;
+  background: #6164ec;
+  color: #ffffff;
   box-shadow: 0 5px 20px rgba(99, 102, 241, 0.3);
   padding: 14px 18px;
   font-size: 1.5em;
@@ -188,7 +189,8 @@ h1 .back-button:hover {
 }
 
 .twitch-button {
-  background: linear-gradient(135deg, #7c3aed, #9146ff);
+  background: linear-gradient(135deg, #7c3aed, #8640f0);
+  color: #ffffff;
   box-shadow: 0 5px 20px rgba(145, 70, 255, 0.2);
   opacity: 0.9;
 }
@@ -295,7 +297,7 @@ h1 .back-button:hover {
   background-color: #d4af37;
   border: none;
   border-radius: 50%;
-  color: white;
+  color: #171717;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
@@ -326,6 +328,7 @@ h1 .back-button:hover {
   opacity: 1;
   cursor: not-allowed;
   background-color: #6b5cf6;
+  color: #ffffff;
 }
 
 .spin-button:disabled svg {
@@ -494,7 +497,7 @@ tr:nth-child(7) .prize-name {
 
 .close-button {
   background: #d4af37;
-  color: white;
+  color: #171717;
   border: none;
   padding: 15px 30px;
   border-radius: 10px;
@@ -506,6 +509,7 @@ tr:nth-child(7) .prize-name {
 
 .close-button:hover {
   background: #7c3aed;
+  color: #ffffff;
   transform: translateY(-2px);
 }
 

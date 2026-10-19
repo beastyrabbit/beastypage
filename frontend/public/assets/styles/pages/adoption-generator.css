@@ -166,14 +166,14 @@
 }
 
 .adoption-generator .palette-toggle.active {
-  background: rgba(249, 115, 22, 0.2);
+  background: #493225;
   border-color: rgba(249, 115, 22, 0.5);
   color: #ffedd5;
 }
 
 .adoption-generator .palette-reset {
   border: none;
-  background: rgba(255, 255, 255, 0.12);
+  background: #34343f;
   color: rgba(255, 255, 255, 0.8);
   padding: 6px 14px;
   border-radius: 999px;
@@ -251,7 +251,7 @@
   height: 56px;
   border-radius: 50%;
   border: 2px solid rgba(248, 113, 113, 0.9);
-  background: rgba(248, 113, 113, 0.2);
+  background: #452b34;
   color: #fca5a5;
   font-size: 1.6rem;
   line-height: 1;
@@ -265,7 +265,7 @@
 }
 
 .adoption-generator .cat-remove:hover {
-  background: rgba(248, 113, 113, 0.35);
+  background: #663740;
   color: #fee2e2;
 }
 
@@ -616,7 +616,7 @@ body.overlay-open {
 }
 
 .cat-detail-overlay .overlay-close:hover {
-  background: rgba(59, 130, 246, 0.3);
+  background: #1c375b;
   color: #fff;
 }
 
@@ -782,6 +782,6 @@ body.overlay-open {
 }
 
 .quick-preview-close:hover {
-  background: rgba(248, 113, 113, 0.25);
+  background: #492d3c;
   color: #fca5a5;
 }

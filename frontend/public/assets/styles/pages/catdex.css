@@ -693,7 +693,7 @@ select:focus {
   color: #d4af37;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(212, 175, 55, 0.1);
+  background: #29271e;
   border: 1px solid rgba(212, 175, 55, 0.3);
   display: inline-block;
 }
