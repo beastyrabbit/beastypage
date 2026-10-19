@@ -114,6 +114,8 @@ export default function CatdexPage() {
   const submitHoldTimerRef = useRef<number | null>(null);
   const submitHoldTriggeredRef = useRef(false);
   const searchTrackTimerRef = useRef<number | null>(null);
+  const detailDialogRef = useRef<HTMLDialogElement>(null);
+  const detailCloseRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!search) return;
@@ -272,16 +274,17 @@ export default function CatdexPage() {
 
   useEffect(() => {
     if (!activeCat) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setActiveCat(null);
-      }
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const dialog = detailDialogRef.current;
+    dialog?.showModal();
+    detailCloseRef.current?.focus({ preventScroll: true });
+    document.body.style.overflow = "hidden";
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus({ preventScroll: true });
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeCat]);
 
   const isLoading =
@@ -622,9 +625,18 @@ export default function CatdexPage() {
       <CreditBanner />
 
       {activeCat && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-10 backdrop-blur-sm">
-          <div className="glass-card relative w-full max-w-3xl overflow-hidden">
+        <dialog
+          ref={detailDialogRef}
+          aria-labelledby="catdex-detail-title"
+          className="fixed inset-0 z-50 m-0 flex h-dvh max-h-none w-full max-w-none items-center justify-center overflow-hidden border-0 bg-black/60 px-4 py-10 text-inherit backdrop-blur-sm backdrop:bg-transparent"
+          onCancel={(event) => {
+            event.preventDefault();
+            handleCloseDrawer();
+          }}
+        >
+          <div className="glass-card relative flex max-h-full w-full max-w-3xl flex-col overflow-hidden">
             <button
+              ref={detailCloseRef}
               type="button"
               className="absolute right-4 top-4 z-20 rounded-full bg-black/70 p-2 text-white shadow-lg transition hover:bg-black/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               onClick={handleCloseDrawer}
@@ -632,7 +644,7 @@ export default function CatdexPage() {
             >
               <XIcon size={16} />
             </button>
-            <div className="grid gap-6 p-6 md:grid-cols-[1.1fr,1fr]">
+            <div className="grid min-h-0 auto-rows-max gap-6 overflow-y-auto overscroll-contain p-6 md:grid-cols-[1.1fr,1fr]">
               <ProgressiveImage
                 lowSrc={buildImageSources(activeCat, activeVariant).thumb}
                 highSrc={buildImageSources(activeCat, activeVariant).full}
@@ -642,7 +654,10 @@ export default function CatdexPage() {
               />
               <div className="flex flex-col gap-4">
                 <div>
-                  <h2 className="text-2xl font-semibold capitalize">
+                  <h2
+                    id="catdex-detail-title"
+                    className="text-2xl font-semibold capitalize"
+                  >
                     {activeCat.cat_name ?? "Unnamed"}
                   </h2>
                   <p className="text-sm text-muted-foreground">
@@ -711,7 +726,7 @@ export default function CatdexPage() {
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </main>
   );

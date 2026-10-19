@@ -116,6 +116,31 @@ function fixtureResponse(body: unknown, status = 200) {
   );
 }
 
+function catdexResponse(url: URL) {
+  if (!new URL(location.href).searchParams.has("detailRegression")) {
+    return fixtureResponse({
+      results: [catdexCard],
+      nextCursor: "fixture-next",
+    });
+  }
+  const portrait = "/tests/browser/catdex-card.svg";
+  const cards = Array.from({ length: 69 }, (_, index) => ({
+    ...catdexCard,
+    id: `detail-cat-${index + 1}`,
+    cat_name: `Detail cat ${index + 1}`,
+    card_number: String(index + 1),
+    updated: 69 - index,
+    default_card_url: portrait,
+    default_card_thumb_url: portrait,
+    custom_card_url: "/sprites/fademask.png",
+  }));
+  const hasCursor = url.searchParams.has("cursor");
+  return fixtureResponse({
+    results: hasCursor ? cards.slice(48) : cards.slice(0, 48),
+    nextCursor: hasCursor ? null : "detail-next",
+  });
+}
+
 const nativeFetch = window.fetch.bind(window);
 window.fetch = (input, init) => {
   let inputUrl: string;
@@ -132,10 +157,7 @@ window.fetch = (input, init) => {
     });
   }
   if (url.pathname === "/api/catdex") {
-    return fixtureResponse({
-      results: [catdexCard],
-      nextCursor: "fixture-next",
-    });
+    return catdexResponse(url);
   }
   if (url.pathname === "/api/seasons") return fixtureResponse(seasons);
   if (url.pathname === "/api/rarities") return fixtureResponse(rarities);
