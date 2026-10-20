@@ -424,6 +424,8 @@ export function NineLivesClient() /* NOSONAR */ {
         startGame(GUEST_GAME_URL);
         return;
       }
+      // Clerk's modal lives outside the player's focus trap.
+      setPresentationMode("inline");
       setAwaitingSignIn(true);
       clerk.openSignIn();
     },
