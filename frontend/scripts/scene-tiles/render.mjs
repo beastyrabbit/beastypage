@@ -110,14 +110,19 @@ if (failed.length) {
   console.log("Not packing: fix the failed sheets and render again.");
   process.exit(1);
 }
-// The pack replaces the whole published index, so every sheet must exist.
-const missing = all.filter(
-  (sheet) => !existsSync(join(here, "out", "sheets", `${sheet}.png`)),
-);
+// The pack replaces the whole published index, so every sheet must hold
+// every tile the manifest asks for; a `run.py --key` debug render does not.
+const complete = (sheet) => {
+  const index = join(here, "out", "sheets", `${sheet}.json`);
+  if (!existsSync(index)) return false;
+  const { tiles } = JSON.parse(readFileSync(index, "utf8"));
+  return manifest.jobs.every((j) => j.sheet !== sheet || j.key in tiles);
+};
+const missing = all.filter((sheet) => !complete(sheet));
 if (missing.length) {
   console.log(
-    `Not packing: ${missing.length} sheets are not rendered yet ` +
-      `(${missing.slice(0, 5).join(", ")}…). Render them all, then pack.`,
+    `Not packing: ${missing.length} sheets are missing or incomplete ` +
+      `(${missing.slice(0, 5).join(", ")}…). Render them in full, then pack.`,
   );
   process.exit(0);
 }

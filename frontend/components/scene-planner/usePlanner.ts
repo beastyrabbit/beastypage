@@ -344,6 +344,8 @@ export function usePlannerState() {
       appear(next);
       setPlacements(next);
       setPainted(new Map());
+      // The old coverage belongs to the old cells; it is measured again.
+      setOverlay((o) => (o ? { ...o, coverage: null } : o));
       setSettings((s) => ({ ...s, cols: nextCols, rows: nextRows }));
     },
     [cols, rows, settings, placements, appear],
@@ -362,19 +364,23 @@ export function usePlannerState() {
     [ignored],
   );
 
-  /** Elements whose bottom row left their zones after a horizon change. */
+  /**
+   * Elements that left their zones after a horizon change: a block by its
+   * bottom row, a path by the row it starts on.
+   */
   const misplaced = useMemo(() => {
     const result = new Set<string>();
     for (const p of placements) {
       const element = ELEMENTS_BY_ID.get(p.elementId);
       // Riders follow their host's zone, so they cannot be out of place.
-      if (!element || element.on || !p.rect || p.key.includes("-hand-"))
-        continue;
-      const zone = zoneOfRow(p.rect.row + p.rect.h - 1, starts);
-      if (!element.zones.includes(zone)) result.add(p.key);
+      if (!element || element.on || p.key.includes("-hand-")) continue;
+      const row = p.rect
+        ? p.rect.row + p.rect.h - 1
+        : Math.floor(Math.min(...p.cells) / cols);
+      if (!element.zones.includes(zoneOfRow(row, starts))) result.add(p.key);
     }
     return result;
-  }, [placements, starts]);
+  }, [placements, starts, cols]);
 
   return {
     reduced,

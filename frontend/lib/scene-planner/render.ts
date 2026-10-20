@@ -1428,7 +1428,9 @@ function atEdge(
 /**
  * Overlays where neighbours meet: material edges (grass over a shore) and
  * combos (a waterfall splashing into a lake). Each is drawn on the receiving
- * cell; only settled groups take part, so stamp-ins stay clean.
+ * cell; only settled groups take part, so stamp-ins stay clean. They are
+ * drawn before objects, so on an object's cell a combo such as lamplight
+ * under a bench lies on the ground beneath it.
  */
 function paintOverlays(
   ctx: CanvasRenderingContext2D,
@@ -1441,7 +1443,7 @@ function paintOverlays(
   const { cols, rows, starts, atmosphere } = frame;
   for (let cell = 0; cell < cols * rows; cell++) {
     const target = groupOf.get(cell);
-    if (!receivesOverlays(target, settled)) continue;
+    if (target && !settled.has(target)) continue;
     const row = Math.floor(cell / cols);
     const far = row < starts.mid;
     const spot: OverlaySpot = {
@@ -1449,6 +1451,7 @@ function paintOverlays(
       set,
       frame,
       target,
+      onObject: TILE_SPECS[target?.elementId ?? ""]?.layer === "object",
       sky: zoneOfRow(row, starts) === "sky",
       p: palette(atmosphere, far ? 0.25 : 0),
       px: (cell % cols) * CELL,
@@ -1503,7 +1506,8 @@ function drawSide(
 ) {
   const { sheets } = spot.set.index;
   if (sheets.combos) drawCombos(spot, source, from, side);
-  if (sheets.edges) drawEdge(spot, source, side);
+  // Materials spill over ground cover only; objects stand above it.
+  if (sheets.edges && !spot.onObject) drawEdge(spot, source, side);
 }
 
 /** A cell receiving overlays, with what it needs to draw them. */
@@ -1513,24 +1517,12 @@ interface OverlaySpot {
   frame: SceneFrame;
   /** Group on the cell, or undefined for empty land or sky. */
   target: TileGroup | undefined;
+  /** The target is an object, which takes combos but no material edges. */
+  onObject: boolean;
   sky: boolean;
   p: Palette;
   px: number;
   py: number;
-}
-
-/**
- * Empty cells and settled ground cover take overlays. Objects stand on the
- * ground, so nothing spills over them.
- */
-function receivesOverlays(
-  target: TileGroup | undefined,
-  settled: Set<TileGroup>,
-) {
-  if (!target) return true;
-  return (
-    settled.has(target) && TILE_SPECS[target.elementId]?.layer !== "object"
-  );
 }
 
 /** The cell next to `cell` on a side, or null at the grid's edge. */
