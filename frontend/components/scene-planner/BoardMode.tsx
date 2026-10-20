@@ -475,6 +475,18 @@ export function BoardMode() {
     }
   }
 
+  // Leaving the page ends a running sequence: no further turns, and the
+  // current one finishes at once instead of waiting out its animations.
+  useEffect(
+    () => () => {
+      autoRef.current = false;
+      freeDone.current?.();
+      director.skip();
+      for (const controls of moving.current) controls.complete();
+    },
+    [director],
+  );
+
   const tokenPos = squarePosition(position);
 
   return (

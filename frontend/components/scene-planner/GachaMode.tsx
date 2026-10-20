@@ -1,7 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion, useAnimate } from "motion/react";
-import { useImperativeHandle, useRef, useState } from "react";
+import {
+  createRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 
 import SparklesIcon from "@/components/ui/sparkles-icon";
@@ -180,13 +187,11 @@ interface Flight {
 export function GachaMode() {
   const planner = usePlanner();
   const { director, settings, rolling, setRolling, reduced } = planner;
-  const reels = [
-    useRef<ReelHandle>(null),
-    useRef<ReelHandle>(null),
-    useRef<ReelHandle>(null),
-    useRef<ReelHandle>(null),
-    useRef<ReelHandle>(null),
-  ];
+  // One stable list of reel handles, so effects can depend on it.
+  const reels = useMemo(
+    () => Array.from({ length: 5 }, () => createRef<ReelHandle>()),
+    [],
+  );
   const [pathReel, setPathReel] = useState(true);
   const [rare, setRare] = useState(false);
   const [card, setCard] = useState<Card | null>(null);
@@ -297,6 +302,17 @@ export function GachaMode() {
     await director.wait(DURATION.place);
     return true;
   }
+
+  // Leaving the page ends a running sequence: no further pulls, and the
+  // current one finishes at once instead of waiting out its reels.
+  useEffect(
+    () => () => {
+      multi.current = false;
+      director.skip();
+      for (const reel of reels) reel.current?.finish();
+    },
+    [director, reels],
+  );
 
   async function run(untilFull: boolean) {
     if (rolling) return;

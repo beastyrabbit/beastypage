@@ -980,7 +980,9 @@ const PAINTERS: Record<string, Painter> = {
     rect(ctx, cx - 1, y + 4, 2, h - 4, p.c.builtDark);
     rect(ctx, cx - 3, y + h - 2, 6, 2, p.c.builtDark);
     rect(ctx, cx - 3, y + 2, 6, 3, p.c.builtDark);
-    const on = p.night && tick % 53 !== 0;
+    // A rare flicker off on the running clock; tick 0, which exports and
+    // reduced motion show, is always lit.
+    const on = p.night && tick % 53 !== 52;
     rect(ctx, cx - 2, y + 4, 4, 2, on ? GLOW : "#cbd5e1");
     if (on) disc(ctx, cx, y + 6, 6, "rgba(255,210,122,0.18)");
   },
