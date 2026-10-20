@@ -345,6 +345,23 @@ describe("helpers", () => {
     expect(outOfZone(corn, after, cols, keys)).toBe(true);
   });
 
+  it("judges a path by its recorded start, not a detour above it", () => {
+    const cols = 20;
+    const starts = zoneStarts(20, 0.3);
+    // A mid-distance trail from row 10 that a resize routed up into row 9.
+    const trail = {
+      key: "trail",
+      elementId: "trail",
+      cells: [183, 203, 223],
+      ends: [203, 223],
+    };
+    expect(zoneOfRow(9, starts)).toBe("far");
+    expect(zoneOfRow(10, starts)).toBe("mid");
+    expect(outOfZone(trail, starts, cols, new Set())).toBe(false);
+    const { ends: _, ...legacy } = trail;
+    expect(outOfZone(legacy, starts, cols, new Set())).toBe(true);
+  });
+
   it("keeps the seeded number stream stable", () => {
     // Shared seeds must keep rolling the same scene.
     const rng = createRng("test");

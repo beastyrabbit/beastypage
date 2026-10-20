@@ -278,7 +278,8 @@ export function outOfZone(
   if (!element || element.on) return false;
   if (p.fedBy && keys.has(p.fedBy)) return false;
   if (p.rect) return !zoneAllows(element, p.rect, starts);
-  const row = Math.floor(Math.min(...p.cells) / cols);
+  // A resized path may detour above its start; its first end is the start.
+  const row = Math.floor((p.ends?.[0] ?? Math.min(...p.cells)) / cols);
   return !element.zones.includes(zoneOfRow(row, starts));
 }
 
