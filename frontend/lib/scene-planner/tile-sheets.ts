@@ -34,7 +34,7 @@ export function loadTileSet() {
   loading ??= (async () => {
     try {
       const response = await fetch(`${BASE_URL}/tiles.json`);
-      if (!response.ok) return null;
+      if (!response.ok) throw new Error(`tiles.json: ${response.status}`);
       const index = (await response.json()) as TileIndex;
       const images = new Map<string, HTMLImageElement>();
       const glows = new Map<string, HTMLImageElement>();
@@ -57,6 +57,8 @@ export function loadTileSet() {
       return current;
     } catch (error) {
       console.warn("Scene Planner tiles unavailable", error);
+      // A later call may retry; procedural art covers the meantime.
+      loading = null;
       return null;
     }
   })();

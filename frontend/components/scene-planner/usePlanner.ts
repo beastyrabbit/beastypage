@@ -367,7 +367,9 @@ export function usePlannerState() {
     const result = new Set<string>();
     for (const p of placements) {
       const element = ELEMENTS_BY_ID.get(p.elementId);
-      if (!element || !p.rect || p.key.includes("-hand-")) continue;
+      // Riders follow their host's zone, so they cannot be out of place.
+      if (!element || element.on || !p.rect || p.key.includes("-hand-"))
+        continue;
       const zone = zoneOfRow(p.rect.row + p.rect.h - 1, starts);
       if (!element.zones.includes(zone)) result.add(p.key);
     }

@@ -103,11 +103,16 @@ export function Controls() {
   const loading = useRef(0);
   const clearOverlay = () => {
     loading.current++;
+    // Let the same file be picked again after removing it.
+    if (fileRef.current) fileRef.current.value = "";
     setOverlay(null);
   };
 
-  const loadOverlay = (src: string, name: string) => {
-    const request = ++loading.current;
+  const loadOverlay = (
+    src: string,
+    name: string,
+    request = ++loading.current,
+  ) => {
     const image = new Image();
     image.onload = () => {
       if (request !== loading.current) return;
@@ -126,10 +131,13 @@ export function Controls() {
 
   const onFile = (file: File | undefined) => {
     if (!file) return;
+    // The pick counts from now, not from when reading finishes.
+    const request = ++loading.current;
     const reader = new FileReader();
     reader.onload = () => {
+      if (request !== loading.current) return;
       if (typeof reader.result === "string")
-        loadOverlay(reader.result, file.name);
+        loadOverlay(reader.result, file.name, request);
     };
     reader.readAsDataURL(file);
   };

@@ -28,14 +28,20 @@ function sortKey(p: Placement) {
 
 /**
  * The element a placement actually feeds, such as the stream starting right
- * below a waterfall; undefined when no such placement exists.
+ * below a waterfall; undefined when no such placement exists. The stream
+ * must begin where the generator starts one: the row below the source,
+ * under its middle.
  */
 function fedBy(p: Placement, placements: Placement[], cols: number) {
   const feeds = ELEMENTS_BY_ID.get(p.elementId)?.feeds;
-  if (!feeds) return undefined;
-  const below = new Set(p.cells.map((cell) => cell + cols));
+  if (!feeds || !p.rect) return undefined;
+  const row = p.rect.row + p.rect.h;
+  const origin = row * cols + p.rect.col + Math.floor(p.rect.w / 2);
   const fed = placements.some(
-    (q) => q.elementId === feeds && q.cells.some((cell) => below.has(cell)),
+    (q) =>
+      q.elementId === feeds &&
+      q.cells.includes(origin) &&
+      Math.min(...q.cells) >= row * cols,
   );
   return fed ? feeds : undefined;
 }
