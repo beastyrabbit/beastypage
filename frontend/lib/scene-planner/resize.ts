@@ -98,7 +98,10 @@ function remapRiders(
     const { x, y } = scaled(p.cells[0], from, to);
     const distance = (cell: number) =>
       ((cell % to.cols) - x) ** 2 + (Math.floor(cell / to.cols) - y) ** 2;
-    const cell = free.reduce((a, b) => (distance(b) < distance(a) ? b : a));
+    const cell = free.reduce(
+      (best, next) => (distance(next) < distance(best) ? next : best),
+      free[0],
+    );
     ridden.add(cell);
     result.set(p.key, withCells(p, [cell], to.cols));
   }
