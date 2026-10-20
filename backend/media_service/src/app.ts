@@ -961,11 +961,14 @@ export function createApp(
 				.map((item, index) =>
 					item.mime.startsWith("video/")
 						? `<video controls playsinline preload="metadata" src="/i/${c.req.param("slug")}/${index}"></video>`
-						: `<img src="/i/${c.req.param("slug")}/${index}" alt="">`,
+						: `<a href="/i/${c.req.param("slug")}/${index}" aria-label="Open image ${index + 1}"><img src="/i/${c.req.param("slug")}/${index}" alt=""></a>`,
 				)
 				.join("");
+			// Clicking an image opens it in a full-window viewer; the link is the
+			// no-JS fallback. Arrow keys step through images, click or Esc closes.
+			const viewerScript = `const d=document.getElementById("viewer"),v=d.querySelector("img"),l=[...document.querySelectorAll("main a")];let i=0;const show=n=>{i=(n+l.length)%l.length;v.src=l[i].href};l.forEach((a,n)=>a.addEventListener("click",e=>{e.preventDefault();show(n);d.showModal()}));d.addEventListener("click",()=>d.close());document.addEventListener("keydown",e=>{if(!d.open)return;if(e.key==="ArrowRight")show(i+1);else if(e.key==="ArrowLeft")show(i-1)});`;
 			return c.html(
-				`<!doctype html><html><head><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared media</title><style>body{margin:0;background:#111;color:#eee;font-family:system-ui;padding:24px}main{max-width:1100px;margin:auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}img,video{display:block;width:100%;max-height:80vh;object-fit:contain;background:#000;border-radius:8px}</style></head><body><main>${cards}</main></body></html>`,
+				`<!doctype html><html><head><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared media</title><style>body{margin:0;background:#111;color:#eee;font-family:system-ui;padding:24px}main{max-width:1100px;margin:auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}img,video{display:block;width:100%;max-height:80vh;object-fit:contain;background:#000;border-radius:8px}main a{align-self:start;cursor:zoom-in}dialog{max-width:none;max-height:none;width:100vw;height:100dvh;margin:0;padding:0;border:0;background:transparent;cursor:zoom-out}dialog::backdrop{background:rgba(0,0,0,.92)}dialog img{width:100%;height:100%;max-height:none;background:transparent;border-radius:0}</style></head><body><main>${cards}</main><dialog id="viewer"><img alt=""></dialog><script>${viewerScript}</script></body></html>`,
 			);
 		}
 		if (!items[0]) return unavailable();

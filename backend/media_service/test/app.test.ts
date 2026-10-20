@@ -101,6 +101,35 @@ describe("raw media delivery", () => {
 		expect(head).toHaveBeenCalledWith("derivatives/later-item.png");
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
+	it("renders collections as a gallery whose images open in a viewer", async () => {
+		const item = (key: string, mime: string) => ({
+			key,
+			mime,
+			size: 4,
+			name: key,
+			expiresAt: Date.now() + 60_000,
+		});
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				controlResponse([
+					item("derivatives/a.png", "image/png"),
+					item("derivatives/b.mp4", "video/mp4"),
+				]),
+			),
+		);
+		const { app } = createApp(config, {} as ObjectStore);
+		const response = await app.request("/i/Abcdefg1");
+		const html = await response.text();
+		expect(response.status).toBe(200);
+		expect(html).toContain(
+			'<a href="/i/Abcdefg1/0" aria-label="Open image 1"><img src="/i/Abcdefg1/0"',
+		);
+		expect(html).toContain(
+			'<video controls playsinline preload="metadata" src="/i/Abcdefg1/1">',
+		);
+		expect(html).toContain('<dialog id="viewer">');
+	});
 	it("falls back to the legacy public operation only for unknown-operation 400s", async () => {
 		const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
 			const request = JSON.parse(String(init?.body));
