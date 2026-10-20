@@ -517,6 +517,22 @@ describe("roll labels and free draw", () => {
     expect(new Set(atlas).size).toBe(atlas.length);
   });
 
+  it("ignores picks from a free-draw picker that is fading out", async () => {
+    fixedTurn(7);
+    await render(<BoardMode />);
+    await click(button("Roll dice"));
+    await advance(1200);
+    animation.present = false;
+    await advance(200);
+    const rocks = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Rocks"]',
+    );
+    if (!rocks) throw new Error("Missing free-draw Rocks");
+    expect(rocks.closest("[inert]")).not.toBeNull();
+    await click(rocks);
+    expect(planner.tool.kind).not.toBe("place");
+  });
+
   it("restores focus when free draw expires without a placement", async () => {
     fixedTurn(7);
     await render(

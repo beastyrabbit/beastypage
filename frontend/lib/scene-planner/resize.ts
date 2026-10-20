@@ -98,29 +98,46 @@ function freeCells(taken: Set<number>, grid: Grid) {
   ).filter((cell) => !taken.has(cell));
 }
 
-function remapBlocks(placements: Placement[], from: Grid, to: Grid) {
-  const cells = sampleCentres(placements, from, to);
-  const taken = new Set([...cells.values()].flat());
-  const result = new Map<string, Placement>();
+/**
+ * The one cell for a block nothing sampled: the one under its corner if
+ * free. A shrink may drop such a block, but never a locked one, which takes
+ * the nearest free cell instead.
+ */
+function unsampledCell(p: Placement, taken: Set<number>, from: Grid, to: Grid) {
+  const corner = cornerCell(p.cells[0], from, to);
+  if (!taken.has(corner)) return corner;
+  const free = p.locked ? freeCells(taken, to) : [];
+  return free.length > 0
+    ? nearestCell(free, scaled(p.cells[0], from, to), to.cols)
+    : undefined;
+}
+
+/** Blocks take their samples, apart from cells already taken. */
+function remapBlocks(
+  placements: Placement[],
+  from: Grid,
+  to: Grid,
+  taken: Set<number>,
+  result: Map<string, Placement>,
+) {
+  const sampled = sampleCentres(placements, from, to);
+  const cells = new Map(
+    [...sampled].map(([key, list]) => [
+      key,
+      list.filter((cell) => !taken.has(cell)),
+    ]),
+  );
+  for (const cell of [...cells.values()].flat()) taken.add(cell);
   for (const p of placements) {
     let next = cells.get(p.key) ?? [];
     if (next.length === 0) {
-      let cell: number | undefined = cornerCell(p.cells[0], from, to);
-      // A shrink may drop a block nothing sampled, but never a locked one.
-      if (taken.has(cell) && p.locked) {
-        const free = freeCells(taken, to);
-        cell =
-          free.length > 0
-            ? nearestCell(free, scaled(p.cells[0], from, to), to.cols)
-            : undefined;
-      }
-      if (cell === undefined || taken.has(cell)) continue;
+      const cell = unsampledCell(p, taken, from, to);
+      if (cell === undefined) continue;
       taken.add(cell);
       next = [cell];
     }
     result.set(p.key, movedPlacement(p, next, from, to));
   }
-  return { result, taken };
 }
 
 function neighbours(cell: number, grid: Grid) {
@@ -205,26 +222,31 @@ function remapPath(
   return [...cells];
 }
 
+/** Locked elements first, all on the whole grid; unlocked ones fit around. */
+const lockedFirst = (placements: Placement[]) => [
+  placements.filter((p) => p.locked),
+  placements.filter((p) => !p.locked),
+];
+
 function remapGrounded(placements: Placement[], from: Grid, to: Grid) {
   const shapeOf = (p: Placement) => ELEMENTS_BY_ID.get(p.elementId)?.shape;
-  const blocks = placements.filter(
-    (p) => !["point", "path"].includes(shapeOf(p) ?? ""),
-  );
-  const { result, taken } = remapBlocks(blocks, from, to);
-  // Locked points and paths claim their cells before unlocked ones route.
-  const rest = placements
-    .filter((p) => !blocks.includes(p))
-    .sort((a, b) => Number(Boolean(b.locked)) - Number(Boolean(a.locked)));
-  for (const p of rest) {
-    if (result.has(p.key)) continue;
-    const free = freeCells(taken, to);
-    if (free.length === 0) break;
-    const cells =
-      shapeOf(p) === "path"
-        ? remapPath(p, free, taken, from, to)
-        : [nearestCell(free, scaled(p.cells[0], from, to), to.cols)];
-    for (const cell of cells) taken.add(cell);
-    result.set(p.key, movedPlacement(p, cells, from, to));
+  const isBlock = (p: Placement) =>
+    !["point", "path"].includes(shapeOf(p) ?? "");
+  const taken = new Set<number>();
+  const result = new Map<string, Placement>();
+  for (const group of lockedFirst(placements)) {
+    remapBlocks(group.filter(isBlock), from, to, taken, result);
+    for (const p of group) {
+      if (isBlock(p)) continue;
+      const free = freeCells(taken, to);
+      if (free.length === 0) break;
+      const cells =
+        shapeOf(p) === "path"
+          ? remapPath(p, free, taken, from, to)
+          : [nearestCell(free, scaled(p.cells[0], from, to), to.cols)];
+      for (const cell of cells) taken.add(cell);
+      result.set(p.key, movedPlacement(p, cells, from, to));
+    }
   }
   return result;
 }
@@ -242,7 +264,7 @@ function remapRiders(
 ) {
   const ridden = new Set<number>();
   const result = new Map<string, Placement>();
-  for (const p of riders) {
+  for (const p of lockedFirst(riders).flat()) {
     const host = hosts.find((h) => h.cells.includes(p.cells[0]));
     const free = (host ? (moved.get(host.key)?.cells ?? []) : []).filter(
       (cell) => !ridden.has(cell),

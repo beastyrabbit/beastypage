@@ -1,6 +1,11 @@
 "use client";
 
-import { AnimatePresence, motion, useAnimate } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  useAnimate,
+  useIsPresent,
+} from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -806,10 +811,14 @@ function FreeDrawPicker({ until }: Readonly<{ until: number }>) {
   );
   const active = planner.tool.kind === "place" ? planner.tool.elementId : null;
   const share = left / FREE_DRAW_MS;
+  // Once free draw ends the picker fades out; a pick then would reopen it.
+  const present = useIsPresent();
 
   return (
     <motion.div
       ref={picker}
+      inert={!present}
+      style={{ pointerEvents: present ? undefined : "none" }}
       className="flex w-full flex-col items-center gap-2"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -848,6 +857,7 @@ function FreeDrawPicker({ until }: Readonly<{ until: number }>) {
               aria-label={name.label}
               aria-pressed={active === e.id}
               onClick={() => {
+                if (!present) return;
                 planner.setTool({ kind: "place", elementId: e.id });
                 planner.stage.current?.focus();
               }}

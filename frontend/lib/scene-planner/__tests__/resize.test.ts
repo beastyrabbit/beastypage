@@ -258,25 +258,26 @@ describe("remapPlacements", () => {
     );
   });
 
+  const rocks = {
+    key: "rocks",
+    elementId: "rocks",
+    cells: [0],
+    rect: { col: 0, row: 0, w: 1, h: 1 },
+    locked: true,
+  };
+  const meadowB1 = {
+    key: "meadow",
+    elementId: "meadow",
+    cells: [1],
+    rect: { col: 1, row: 0, w: 1, h: 1 },
+  };
+
   it("moves a locked block the shrink did not sample to a free cell", () => {
-    // Shrinking 10 columns to 5, new A1 samples old B1: the meadow there
-    // wins it, and the locked rocks on old A1 move to the nearest free cell:
-    // A2, whose centre is closer to theirs than B1's.
-    const rocks = {
-      key: "rocks",
-      elementId: "rocks",
-      cells: [0],
-      rect: { col: 0, row: 0, w: 1, h: 1 },
-      locked: true,
-    };
-    const meadow = {
-      key: "meadow",
-      elementId: "meadow",
-      cells: [1],
-      rect: { col: 1, row: 0, w: 1, h: 1 },
-    };
+    // Shrinking 10 columns to 5, new A1 samples old B1: the locked meadow
+    // there wins it, and the locked rocks on old A1 move to the nearest free
+    // cell: A2, whose centre is closer to theirs than B1's.
     const next = remapPlacements(
-      [rocks, meadow],
+      [rocks, { ...meadowB1, locked: true }],
       { cols: 10, rows: 5 },
       { cols: 5, rows: 5 },
     );
@@ -285,6 +286,66 @@ describe("remapPlacements", () => {
     expect(movedMeadow.cells).toEqual([0]);
     expect(movedRocks).toMatchObject({ cells: [5], locked: true });
     expect(movedRocks.rect).toEqual({ col: 0, row: 1, w: 1, h: 1 });
+  });
+
+  it("keeps a locked block's cell over an unlocked block's sample", () => {
+    const next = remapPlacements(
+      [rocks, meadowB1],
+      { cols: 10, rows: 5 },
+      { cols: 5, rows: 5 },
+    );
+    // The unlocked meadow has no cell left, as any shrink can leave a block.
+    expect(next.map((p) => p.key)).toEqual(["rocks"]);
+    expect(next[0].cells).toEqual([0]);
+  });
+
+  it("fits a large unlocked block around locked elements on shrink", () => {
+    // A 20×20 meadow over rows 1–19, a locked fox at T20 and a locked house
+    // at A20; shrunk to 5×5, every sample but the last row hits the meadow.
+    const meadow = {
+      key: "meadow",
+      elementId: "meadow",
+      cells: Array.from({ length: 380 }, (_, cell) => cell),
+      rect: { col: 0, row: 0, w: 20, h: 19 },
+    };
+    const fox = { key: "fox", elementId: "fox", cells: [399], locked: true };
+    const house = {
+      key: "house",
+      elementId: "house",
+      cells: [380],
+      rect: { col: 0, row: 19, w: 1, h: 1 },
+      locked: true,
+    };
+    const next = remapPlacements(
+      [meadow, fox, house],
+      { cols: 20, rows: 20 },
+      { cols: 5, rows: 5 },
+    );
+    expect(next.map((p) => p.key)).toEqual(["meadow", "fox", "house"]);
+    const [movedMeadow, movedFox, movedHouse] = next;
+    expect(movedFox.cells).toEqual([24]);
+    expect(movedHouse.cells).toEqual([20]);
+    expect(movedMeadow.cells).not.toContain(24);
+    expect(movedMeadow.cells).not.toContain(20);
+  });
+
+  it("seats locked riders before unlocked ones on a shrunken host", () => {
+    // A two-cell pond under an unlocked duck and a locked one; the pond
+    // keeps one cell on 5×5, which the locked duck gets.
+    const pond = {
+      key: "pond",
+      elementId: "pond",
+      cells: [0, 1],
+      rect: { col: 0, row: 0, w: 2, h: 1 },
+    };
+    const loose = { key: "loose", elementId: "ducks", cells: [0] };
+    const kept = { key: "kept", elementId: "ducks", cells: [1], locked: true };
+    const next = remapPlacements(
+      [pond, loose, kept],
+      { cols: 20, rows: 20 },
+      { cols: 5, rows: 5 },
+    );
+    expect(next.map((p) => p.key)).toEqual(["pond", "kept"]);
   });
 
   it("describes a resized hairpin path by its ends", () => {
