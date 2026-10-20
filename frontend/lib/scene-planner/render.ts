@@ -1435,6 +1435,7 @@ function paintOverlays(
   set: TileSet,
   frame: SceneFrame,
   groupOf: Map<number, TileGroup>,
+  riderOf: Map<number, TileGroup>,
   settled: Set<TileGroup>,
 ) {
   const { cols, rows, starts, atmosphere } = frame;
@@ -1455,11 +1456,33 @@ function paintOverlays(
     };
     for (const side of SIDES) {
       const from = neighbourOf(cell, side, cols, rows);
-      const source = from === null ? undefined : groupOf.get(from);
-      if (from !== null && source && spills(source, target, settled))
-        drawSide(spot, source, from, side);
+      if (from !== null)
+        paintFrom(
+          spot,
+          from,
+          side,
+          groupOf.get(from),
+          riderOf.get(from),
+          settled,
+        );
     }
   }
+}
+
+/** Overlays the groups on a neighbouring cell throw onto the spot. */
+function paintFrom(
+  spot: OverlaySpot,
+  from: number,
+  side: Side,
+  source: TileGroup | undefined,
+  rider: TileGroup | undefined,
+  settled: Set<TileGroup>,
+) {
+  if (source && spills(source, spot.target, settled))
+    drawSide(spot, source, from, side);
+  // Riders throw combos too, such as a boat's wake on the water around it.
+  if (rider && settled.has(rider) && spot.set.index.sheets.combos)
+    drawCombos(spot, rider, from, side);
 }
 
 /** Whether a settled neighbouring group overlaps onto the target cell. */
@@ -1683,8 +1706,9 @@ export function renderScene(ctx: CanvasRenderingContext2D, frame: SceneFrame) {
   const isRider = (g: TileGroup) =>
     Boolean(ELEMENTS_BY_ID.get(g.elementId)?.on);
   const groupOf = new Map<number, TileGroup>();
+  const riderOf = new Map<number, TileGroup>();
   for (const g of groups)
-    if (!isRider(g)) for (const cell of g.cells) groupOf.set(cell, g);
+    for (const cell of g.cells) (isRider(g) ? riderOf : groupOf).set(cell, g);
   const isObject = (g: TileGroup) =>
     !isRider(g) && TILE_SPECS[g.elementId]?.layer === "object";
   // Ground cover first, then where it meets its neighbours, then everything
@@ -1696,7 +1720,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, frame: SceneFrame) {
   ];
 
   for (const [pass, list] of passes.entries()) {
-    if (pass === 1 && tiles) paintOverlays(ctx, tiles, frame, groupOf, settled);
+    if (pass === 1 && tiles)
+      paintOverlays(ctx, tiles, frame, groupOf, riderOf, settled);
     for (const g of list)
       paintGroup(ctx, g, frame, owners, settled.has(g), tiles);
   }

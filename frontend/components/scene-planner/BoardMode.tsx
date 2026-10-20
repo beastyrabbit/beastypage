@@ -181,8 +181,7 @@ interface Readout {
 
 export function BoardMode() {
   const planner = usePlanner();
-  const { director, settings, atmosphere, rolling, setRolling, reduced } =
-    planner;
+  const { director, settings, rolling, setRolling, reduced } = planner;
   const [position, setPosition] = useState(0);
   const [flash, setFlash] = useState<number | null>(null);
   const [flipped, setFlipped] = useState<{
@@ -196,6 +195,8 @@ export function BoardMode() {
   const [auto, setAuto] = useState(false);
   const autoRef = useRef(false);
   const freeDone = useRef<(() => void) | null>(null);
+  /** Themes whose roll found no room since the board last changed. */
+  const stuck = useRef(new Set<Theme>());
 
   const [tokenScope, animateToken] = useAnimate<HTMLDivElement>();
   const [dieA, animateA] = useAnimate<HTMLDivElement>();
@@ -267,6 +268,7 @@ export function BoardMode() {
         ? builder.roll(rng, { theme: category })
         : null;
     if (!chain) {
+      if (category) stuck.current.add(category);
       setReadout({
         title: "Nothing fits",
         detail: `No ${label.toLowerCase()} element has room left`,
@@ -276,7 +278,10 @@ export function BoardMode() {
       await director.wait(DURATION.step);
       return;
     }
-    const name = elementLabel(chain.element, atmosphere.time);
+    stuck.current.clear();
+    // A Weather square earlier in this run may have changed the time.
+    const { time } = planner.latest.current.atmosphere;
+    const name = elementLabel(chain.element, time);
     setFlipped({ index: positionRef.current, icon: name.icon });
     setReadout({
       title: name.label,
@@ -341,6 +346,7 @@ export function BoardMode() {
     } else if (kind === "weather") {
       const { rng } = planner.nextTurn();
       const next = rollAtmosphere(rng);
+      planner.latest.current.atmosphere = next;
       planner.setAtmosphere(next);
       note(`🌦️ ${next.time} · ${next.season} · ${next.weather}`);
     } else if (kind === "storm") {
@@ -353,11 +359,18 @@ export function BoardMode() {
       const victim = pick(rng, loose);
       const element = ELEMENTS_BY_ID.get(victim.elementId);
       planner.remove([victim.key]);
+      // The storm made room again.
+      stuck.current.clear();
       note(`🌪️ Storm took ${element?.label ?? victim.elementId}`);
       await director.wait(DURATION.place);
     } else if (kind === "free") {
       if (autoplay) {
         await rollElement(undefined, "Free draw");
+        return;
+      }
+      // Skip pressed earlier in this turn also skips the drawing time.
+      if (director.skipped) {
+        note("✏️ Free draw skipped");
         return;
       }
       placedAtStart.current = planner.latest.current.placements.length;
@@ -395,13 +408,16 @@ export function BoardMode() {
     setRolling(true);
     autoRef.current = autoplay;
     setAuto(autoplay);
+    stuck.current.clear();
     try {
       let turns = 0;
       do {
         await takeTurn(autoplay);
         turns++;
         const status = planner.boardStatus();
-        if (status.full || status.open.length === 0) break;
+        // Themes can stay open by count while none of their elements fits.
+        const open = status.open.filter((t) => !stuck.current.has(t));
+        if (status.full || open.length === 0) break;
       } while (autoRef.current && turns < 60);
     } finally {
       planner.setCue(null);

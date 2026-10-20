@@ -456,7 +456,9 @@ export function Stage() {
   // Overlay content
   // ---------------------------------------------------------------------
 
-  const ratio = overlay?.aspect ?? cols / rows;
+  // The stage keeps the grid's shape, as the export does; the foreground is
+  // stretched over it until "Match grid to image" fits the grid to the image.
+  const ratio = cols / rows;
   const selectedPlacement = placements.find((p) => p.key === selected);
   const hoverElement = elementOn(hover, placements, occupied);
   const transition = (ms: number, ease: readonly number[]) => ({

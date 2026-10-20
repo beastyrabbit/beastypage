@@ -244,8 +244,8 @@ export function usePlannerState() {
   );
 
   // Roll sequences are async and outlive renders; they read the board here.
-  const latest = useRef({ settings, ignored, placements });
-  latest.current = { settings, ignored, placements };
+  const latest = useRef({ settings, ignored, placements, atmosphere });
+  latest.current = { settings, ignored, placements, atmosphere };
 
   /** A builder that knows the current board, plus the next turn's dice. */
   const nextTurn = useCallback(() => {

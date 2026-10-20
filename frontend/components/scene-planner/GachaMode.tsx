@@ -204,6 +204,7 @@ export function GachaMode() {
     const { builder, rng } = planner.nextTurn();
     const chain = builder.roll(rng);
     if (!chain) {
+      setCard(null);
       setMessage("The machine is empty: nothing has room left.");
       return false;
     }
