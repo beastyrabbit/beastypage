@@ -33,7 +33,7 @@ import { loadTileSet } from "@/lib/scene-planner/tile-sheets";
 import { cn } from "@/lib/utils";
 
 import { DURATION, EASE, seconds } from "./motion";
-import { usePlanner } from "./usePlanner";
+import { type StageTool, usePlanner } from "./usePlanner";
 
 /** Perspective distance of the diorama and each zone's depth in px. */
 const PERSPECTIVE = 1400;
@@ -74,6 +74,13 @@ function walk(a: number, b: number, cols: number) {
   }
   return cells;
 }
+
+const TOOL_CURSORS: Record<StageTool["kind"], string> = {
+  paint: "cursor-cell",
+  place: "cursor-crosshair",
+  erase: "cursor-not-allowed",
+  inspect: "cursor-pointer",
+};
 
 /** Diorama tilt at rest; a steeper fixed view replaces pointer tilt. */
 function restingTilt(diorama: boolean, reduced: boolean) {
@@ -398,8 +405,11 @@ export function Stage() {
     setDraft(null);
   };
 
+  // The diorama tilts and spreads the layers in depth, so a pointer over it no
+  // longer lines up with the flat grid. Pointer tools work in the flat view;
+  // the keyboard cursor works in both.
   const onPointerDown = (event: React.PointerEvent) => {
-    const cell = cellAt(event);
+    const cell = diorama ? null : cellAt(event);
     if (cell === null) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     setKeyboard(false);
@@ -409,6 +419,7 @@ export function Stage() {
 
   const onPointerMove = (event: React.PointerEvent) => {
     onTilt(event);
+    if (diorama) return;
     const cell = cellAt(event);
     setHover(cell);
     if (cell !== null && event.currentTarget.hasPointerCapture(event.pointerId))
@@ -804,10 +815,7 @@ export function Stage() {
             ref={hitRef}
             className={cn(
               "absolute inset-0 touch-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-white/60",
-              tool.kind === "paint" && "cursor-cell",
-              tool.kind === "place" && "cursor-crosshair",
-              tool.kind === "erase" && "cursor-not-allowed",
-              tool.kind === "inspect" && "cursor-pointer",
+              !diorama && TOOL_CURSORS[tool.kind],
             )}
             aria-label="Scene grid. Arrow keys move the cursor, Enter or Space uses the current tool, Escape cancels."
             onPointerDown={onPointerDown}

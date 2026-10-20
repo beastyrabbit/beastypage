@@ -23,6 +23,8 @@ const FILLERS = 14;
 
 interface ReelHandle {
   spin: (result: string, pool: string[], ms: number) => Promise<void>;
+  /** Jumps a running spin to its result. */
+  finish: () => void;
 }
 
 const nextFrame = () =>
@@ -51,36 +53,45 @@ function Reel({
   /** Each spin builds a fresh strip; its faces are keyed by spin and slot. */
   const spins = useRef(0);
 
+  /** The running reel animation, and whether Skip asked to jump to the end. */
+  const playing = useRef<ReturnType<typeof animate> | null>(null);
+  const hurry = useRef(false);
+  const slide = async (y: number, ms: number, ease: readonly number[]) => {
+    const controls = animate(
+      scope.current,
+      { y },
+      {
+        duration: hurry.current ? 0 : seconds(ms),
+        ease: ease as [number, number, number, number],
+      },
+    );
+    playing.current = controls;
+    await controls;
+    playing.current = null;
+  };
+
   useImperativeHandle(ref, () => ({
     async spin(result, pool, ms) {
       const strip = [current.current];
       for (let i = 0; i < FILLERS; i++) strip.push(filler(pool));
       strip.push(result, filler(pool));
       const spin = ++spins.current;
+      hurry.current = ms <= 0;
       setLocked(false);
       setItems(strip.map((label, slot) => ({ key: `${spin}:${slot}`, label })));
       await nextFrame();
       await nextFrame();
-      const el = scope.current;
       const target = offset - (strip.length - 2) * ITEM_H;
-      if (ms <= 0) {
-        animate(el, { y: target }, { duration: 0 });
-      } else {
-        animate(el, { y: offset }, { duration: 0 });
-        // Run past the result by a third of a row, then spring back.
-        await animate(
-          el,
-          { y: target - ITEM_H * 0.35 },
-          { duration: seconds(ms), ease: EASE.reel },
-        );
-        await animate(
-          el,
-          { y: target },
-          { duration: seconds(DURATION.tick * 2), ease: EASE.spring },
-        );
-      }
+      animate(scope.current, { y: offset }, { duration: 0 });
+      // Run past the result by a third of a row, then spring back.
+      await slide(target - ITEM_H * 0.35, ms, EASE.reel);
+      await slide(target, DURATION.tick * 2, EASE.spring);
       current.current = result;
       setLocked(true);
+    },
+    finish() {
+      hurry.current = true;
+      playing.current?.complete();
     },
   }));
 
@@ -379,6 +390,8 @@ export function GachaMode() {
             type="button"
             onClick={() => {
               director.skip();
+              // Reels already spinning run on their own clock.
+              for (const reel of reels) reel.current?.finish();
             }}
             className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:bg-white/10"
           >

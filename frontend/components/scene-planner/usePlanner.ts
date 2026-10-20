@@ -272,12 +272,16 @@ export function usePlannerState() {
 
   const addChain = useCallback(
     (chain: RollChain) => {
-      const list = chain.fed
+      const rolled = chain.fed
         ? [chain.placement, chain.fed.placement]
         : [chain.placement];
+      // The board can change during the reveal; a rider whose host was
+      // removed meanwhile has nowhere to sit.
+      const next = withHosts([...latest.current.placements, ...rolled]);
+      const list = rolled.filter((p) => next.includes(p));
       appear(list, 260);
-      latest.current.placements = [...latest.current.placements, ...list];
-      setPlacements((current) => [...current, ...list]);
+      latest.current.placements = next;
+      setPlacements((current) => withHosts([...current, ...list]));
     },
     [appear],
   );

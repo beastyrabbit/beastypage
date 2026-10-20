@@ -41,6 +41,16 @@ const GLYPH = [
   ["se", 0],
 ] as const;
 
+/** How to place the picked element in the current view. */
+function placeHint(active: string | null, diorama: boolean) {
+  if (diorama)
+    return "In the diorama, place with the arrow keys and Enter, or switch to the flat grid to drag.";
+  if (!active)
+    return "Pick an element, then drag a box on the grid. Touching elements of the same kind merge.";
+  const label = ELEMENTS_BY_ID.get(active)?.label.toLowerCase();
+  return `Drag on the grid to place ${label}. Paths follow your pointer.`;
+}
+
 /** 3 × 3 glyph of a neighbour mask: centre plus the joined sides. */
 function MaskGlyph({ mask }: Readonly<{ mask: number }>) {
   return (
@@ -174,9 +184,7 @@ export function AtlasMode() {
           ))}
         </div>
         <p className="text-xs text-muted-foreground">
-          {active
-            ? `Drag on the grid to place ${ELEMENTS_BY_ID.get(active)?.label.toLowerCase()}. Paths follow your pointer.`
-            : "Pick an element, then drag a box on the grid. Touching elements of the same kind merge."}
+          {placeHint(active, planner.view === "diorama")}
         </p>
       </section>
 

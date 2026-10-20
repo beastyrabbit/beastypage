@@ -440,6 +440,9 @@ export class PlanBuilder {
 
   private rectFits(rect: Rect, element: SceneElement) {
     const { on } = element;
+    const bottom = rect.row + rect.h - 1;
+    // Riders keep to their zones too: no ducks on a far-off river.
+    if (!element.zones.includes(zoneOfRow(bottom, this.starts))) return false;
     if (on)
       return rectCells(rect, this.options.cols).every(
         (cell) =>
@@ -447,8 +450,6 @@ export class PlanBuilder {
           !this.ridden[cell] &&
           this.hosts(on, cell),
       );
-    const bottom = rect.row + rect.h - 1;
-    if (!element.zones.includes(zoneOfRow(bottom, this.starts))) return false;
     const inSky = zoneOfRow(rect.row, this.starts) === "sky";
     if (inSky && !element.zones.includes("sky") && !RISING.has(element.id)) {
       return false;
@@ -503,8 +504,15 @@ export class PlanBuilder {
     let { col, row } = origin;
     let drift = rng() < 0.5 ? -1 : 1;
     const cells = new Set<number>();
+    // The walk never steps back onto its own track, so its length counts
+    // distinct cells.
+    const track = new Set([row * cols + col]);
     const blocked = (c: number, r: number) =>
-      c < 0 || c >= cols || r >= rows || this.occupied[r * cols + c];
+      c < 0 ||
+      c >= cols ||
+      r >= rows ||
+      this.occupied[r * cols + c] ||
+      track.has(r * cols + c);
 
     this.stampPath(cells, element, thickness, col, row);
     let length = 1;
@@ -516,6 +524,7 @@ export class PlanBuilder {
       if (!next) break;
       col += next[0];
       row += next[1];
+      track.add(row * cols + col);
       length++;
       this.stampPath(cells, element, thickness, col, row);
       if (row === rows - 1 && rng() < 0.5) break;
@@ -540,7 +549,10 @@ export class PlanBuilder {
   ) {
     const { cols, ignored } = this.options;
     if (start) {
-      return { origin: start, candidates: [start.row * cols + start.col] };
+      // A fed stream starts right below its source or not at all.
+      const cell = start.row * cols + start.col;
+      if (this.occupied[cell]) return null;
+      return { origin: start, candidates: [cell] };
     }
     const row = pathStartRow(element.zones[0], this.starts);
     const free = Array.from({ length: cols }, (_, col) => col).filter(

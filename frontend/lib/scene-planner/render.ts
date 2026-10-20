@@ -1645,8 +1645,10 @@ function ownersOf(placements: Placement[], ghosts: Ghost[], cols: number) {
       });
     }
   };
-  for (const p of placements) add(p);
+  // Ghosts first: a fresh placement on the same cells owns them, so a
+  // same-seed re-roll stamps in instead of dissolving.
   for (const ghost of ghosts) add(ghost.placement, ghost);
+  for (const p of placements) add(p);
   return owners;
 }
 
@@ -1687,7 +1689,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, frame: SceneFrame) {
   ctx.imageSmoothingEnabled = false;
   paintBackground(ctx, frame);
 
-  const all = [...placements, ...ghosts.map((g) => g.placement)];
+  // Live placements last, so they own cells they share with a ghost.
+  const all = [...ghosts.map((g) => g.placement), ...placements];
   const owners = ownersOf(placements, ghosts, cols);
 
   const groups = groupTiles(all, cols, rows);
