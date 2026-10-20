@@ -248,10 +248,11 @@ export function usePlannerState() {
    * Commits a rolled chain. The board can change during the reveal: cells
    * painted as ignored meanwhile turn a block away (paths may run behind the
    * foreground), and a rider whose host was removed has nowhere to sit.
-   * Returns whether the rolled element was placed, so callers report it.
+   * Returns what was placed, so callers report it: the chain, the chain
+   * without the stream it feeds when only the stream no longer fits, or null.
    */
   const addChain = useCallback(
-    (chain: RollChain) => {
+    (chain: RollChain): RollChain | null => {
       const { ignored: ig, settings: s, placements: current } = latest.current;
       const open = (p: Placement, board: Placement[]) => {
         const unmasked =
@@ -263,16 +264,17 @@ export function usePlannerState() {
           canPlace(board, p.elementId, p.cells)
         );
       };
-      if (!open(chain.placement, current)) return false;
+      if (!open(chain.placement, current)) return null;
+      const { fed, ...source } = chain;
       const list = [chain.placement];
-      if (chain.fed && open(chain.fed.placement, [...current, ...list]))
-        list.push(chain.fed.placement);
+      const feeds = fed && open(fed.placement, [...current, ...list]);
+      if (feeds) list.push(fed.placement);
       const next = withHosts([...current, ...list]);
-      if (!next.includes(chain.placement)) return false;
+      if (!next.includes(chain.placement)) return null;
       appear(list, 260);
       latest.current.placements = next;
       setPlacements((current) => withHosts([...current, ...list]));
-      return true;
+      return feeds ? chain : source;
     },
     [appear],
   );

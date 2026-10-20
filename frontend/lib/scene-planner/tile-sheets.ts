@@ -77,9 +77,24 @@ async function load() {
   return current;
 }
 
-/** Starts one bounded loading run, including retries, shared by all callers. */
+/** Whether the index and every main sheet arrived; glows are optional. */
+function complete(set: TileSet | null) {
+  return (
+    set !== null &&
+    Object.keys(set.index.sheets).every((name) => set.images.has(name))
+  );
+}
+
+/**
+ * Starts one bounded loading run, including retries, shared by all callers.
+ * A run that ends without the index or a main sheet is forgotten, so a later
+ * caller tries again once an outage is over.
+ */
 export function loadTileSet() {
-  loading ??= load();
+  loading ??= load().then((set) => {
+    if (!complete(set)) loading = null;
+    return set;
+  });
   return loading;
 }
 

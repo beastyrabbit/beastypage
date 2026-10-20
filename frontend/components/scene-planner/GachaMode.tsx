@@ -323,7 +323,8 @@ export function GachaMode() {
       chain.element,
       planner.latest.current.atmosphere.time,
     );
-    if (!planner.addChain(chain)) {
+    const placed = planner.addChain(chain);
+    if (!placed) {
       // The board changed during the pull; the card goes, nothing landed.
       setCard(null);
       messageFor(
@@ -331,10 +332,13 @@ export function GachaMode() {
       );
       return true;
     }
+    // The stream it feeds can be crowded out on its own; the bonus goes too.
+    const landed = placed.fed ? next : { ...next, bonus: undefined };
+    if (landed !== next) setCard(landed);
     setHistory((current) =>
-      [{ ...next, ...committedName }, ...current].slice(0, 12),
+      [{ ...landed, ...committedName }, ...current].slice(0, 12),
     );
-    const bonus = next.bonus ? ` ${next.bonus}` : "";
+    const bonus = landed.bonus ? ` ${landed.bonus}` : "";
     planner.announce(`${committedName.label} at ${where}${bonus}`);
     await sequence.current.wait(director.wait(DURATION.place));
     return true;

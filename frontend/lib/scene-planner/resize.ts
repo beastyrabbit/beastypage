@@ -164,8 +164,11 @@ function connectStep(
   const end = previous.has(target)
     ? target
     : nearestCell(queue, point, grid.cols);
+  // Backtracking runs from the end; add the route in walking order.
+  const route: number[] = [];
   for (let cell = end; cell !== start; cell = previous.get(cell) as number)
-    cells.add(cell);
+    route.push(cell);
+  for (const cell of route.reverse()) cells.add(cell);
   return end;
 }
 

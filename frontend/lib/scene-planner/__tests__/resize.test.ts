@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ELEMENTS_BY_ID } from "../catalog";
-import { generatePlan } from "../generate";
+import { cellName, describeCells, generatePlan } from "../generate";
 import { remapPlacements } from "../resize";
 
 function expectConnected(cells: number[], cols: number) {
@@ -234,6 +234,28 @@ describe("remapPlacements", () => {
       cells: [18],
       rect: { col: 3, row: 3, w: 1, h: 1 },
     });
+  });
+
+  it("keeps a grown path's cells in walking order", () => {
+    // A two-cell trail down column 2 of a 5×5 grid, stretched to 5×10.
+    const trail = {
+      key: "trail",
+      elementId: "trail",
+      cells: [7, 12],
+      ends: [7, 12],
+    };
+    const [moved] = remapPlacements(
+      [trail],
+      { cols: 5, rows: 5 },
+      { cols: 5, rows: 10 },
+    );
+    const rows = moved.cells.map((cell) => Math.floor(cell / 5));
+    expect(rows).toEqual([...rows].sort((a, b) => a - b));
+    expect(moved.cells.length).toBeGreaterThan(2);
+    expectConnected(moved.cells, 5);
+    expect(describeCells(moved, 5)).toBe(
+      `${cellName(moved.ends?.[0] ?? -1, 5)} → ${cellName(moved.ends?.at(-1) ?? -1, 5)}`,
+    );
   });
 
   it("drops a rider whose host has no cell left", () => {

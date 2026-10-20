@@ -158,7 +158,7 @@ describe("placement validation", () => {
       planner.placeManual("rocks", [26]);
     });
     await act(async () => {
-      expect(planner.addChain(rolled)).toBe(false);
+      expect(planner.addChain(rolled)).toBeNull();
     });
     expect(planner.placements.map((p) => p.elementId)).toEqual(["rocks"]);
   });
@@ -166,26 +166,40 @@ describe("placement validation", () => {
   it("keeps the rider host rule when committing a chain", async () => {
     await render();
     await act(async () => {
-      expect(planner.addChain(chain("ducks"))).toBe(false);
+      expect(planner.addChain(chain("ducks"))).toBeNull();
     });
     await act(async () => {
       planner.placeManual("pond", [26]);
     });
     await act(async () => {
-      expect(planner.addChain(chain("ducks"))).toBe(true);
+      expect(planner.addChain(chain("ducks"))).not.toBeNull();
     });
     await act(async () => {
-      expect(planner.addChain(chain("ducks"))).toBe(false);
+      expect(planner.addChain(chain("ducks"))).toBeNull();
     });
   });
 
-  it("validates fed placements against the newly occupied board", async () => {
+  it("reports a fed placement crowded out by its source as not placed", async () => {
     await render();
     const rolled = { ...chain("rocks"), fed: chain("mushrooms") };
+    let placed: ReturnType<Planner["addChain"]> = null;
     await act(async () => {
-      expect(planner.addChain(rolled)).toBe(true);
+      placed = planner.addChain(rolled);
     });
+    expect(placed).toMatchObject({ placement: rolled.placement });
+    expect(placed).not.toHaveProperty("fed");
     expect(planner.placements).toHaveLength(1);
+  });
+
+  it("reports a fed placement that lands with its source", async () => {
+    await render();
+    const rolled = { ...chain("rocks"), fed: chain("mushrooms", [27]) };
+    let placed: ReturnType<Planner["addChain"]> = null;
+    await act(async () => {
+      placed = planner.addChain(rolled);
+    });
+    expect(placed).toBe(rolled);
+    expect(planner.placements).toHaveLength(2);
   });
 
   it("rejects out-of-grid cells and simultaneous manual overlaps", async () => {

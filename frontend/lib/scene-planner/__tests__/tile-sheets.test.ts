@@ -85,8 +85,25 @@ describe("loadTileSet", () => {
     expect(set?.images.has("barn")).toBe(false);
     expect(set?.images.has("birds")).toBe(true);
     expect(requests.get("/scene-planner/tiles/barn.png?v=test")).toBe(3);
-    await loadTileSet();
-    expect(requests.get("/scene-planner/tiles/barn.png?v=test")).toBe(3);
+  });
+
+  it("lets a later caller fetch a main sheet that recovered", async () => {
+    let down = true;
+    const requests = mockImages((src) => down && src.includes("/barn.png"));
+    const { loadTileSet, currentTileSet } = await import("../tile-sheets");
+    const first = loadTileSet();
+    await vi.runAllTimersAsync();
+    const partial = await first;
+    expect(currentTileSet()).toBe(partial);
+    down = false;
+    const second = loadTileSet();
+    expect(second).not.toBe(first);
+    await vi.runAllTimersAsync();
+    const set = await second;
+    expect(set?.images.has("barn")).toBe(true);
+    expect(currentTileSet()).toBe(set);
+    expect(requests.get("/scene-planner/tiles/barn.png?v=test")).toBe(4);
+    expect(loadTileSet()).toBe(second);
   });
 
   it("retries a transient index failure inside the original call", async () => {
@@ -100,7 +117,8 @@ describe("loadTileSet", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("stops retrying a permanently unavailable index", async () => {
+  it("stops after three attempts, then lets a later caller try again", async () => {
+    mockImages(() => false);
     const fetch = vi.mocked(globalThis.fetch);
     fetch.mockRejectedValue(new Error("offline"));
     const { loadTileSet, currentTileSet } = await import("../tile-sheets");
@@ -109,7 +127,10 @@ describe("loadTileSet", () => {
     expect(await pending).toBeNull();
     expect(currentTileSet()).toBeNull();
     expect(fetch).toHaveBeenCalledTimes(3);
-    await loadTileSet();
-    expect(fetch).toHaveBeenCalledTimes(3);
+    fetch.mockResolvedValue({ ok: true, json: async () => index } as Response);
+    const retried = loadTileSet();
+    await vi.runAllTimersAsync();
+    expect((await retried)?.images.size).toBe(2);
+    expect(fetch).toHaveBeenCalledTimes(4);
   });
 });

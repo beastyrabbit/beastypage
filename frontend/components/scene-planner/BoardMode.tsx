@@ -355,13 +355,13 @@ export function BoardMode() {
         : `Location ${where}`,
       tone: "element",
     });
-    const onPlaced = () => {
+    const onPlaced = (placed: RollChain) => {
       const committed = elementLabel(
         chain.element,
         planner.latest.current.atmosphere.time,
       );
       note(
-        `${committed.icon} ${committed.label} at ${where}${chain.fed ? " + stream" : ""}`,
+        `${committed.icon} ${committed.label} at ${where}${placed.fed ? " + stream" : ""}`,
       );
     };
     if (!(await revealOnStage(planner, chain, onPlaced, sequence.current))) {
