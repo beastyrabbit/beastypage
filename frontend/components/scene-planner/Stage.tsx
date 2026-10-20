@@ -236,6 +236,8 @@ export function Stage() {
     null,
   );
   const paintValue = useRef(true);
+  /** Whether the open draft came from keys; a ref so blur sees it at once. */
+  const keyDraft = useRef(false);
   /** Shows the keyboard cursor; a mouse click focuses the grid too. */
   const [keyboard, setKeyboard] = useState(false);
   const occupied = useMemo(() => {
@@ -343,6 +345,7 @@ export function Stage() {
     if (cell === null) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     setKeyboard(false);
+    keyDraft.current = false;
     begin(cell);
   };
 
@@ -377,7 +380,10 @@ export function Stage() {
       if (draft) finish(draft);
       else if (placeElement?.shape === "point")
         finish({ cells: draftCells(at, at, [at]) });
-      else begin(at);
+      else {
+        keyDraft.current = true;
+        begin(at);
+      }
     } else if (event.key === "Escape") {
       setDraft(null);
     }
@@ -765,9 +771,10 @@ export function Stage() {
             }}
             onBlur={() => {
               // Leaving the grid may change the tool or its size; a
-              // keyboard draft from before would be stale.
+              // keyboard draft from before would be stale. Safari blurs the
+              // grid when a mouse drag starts, so pointer drafts stay.
               setKeyboard(false);
-              setDraft(null);
+              if (keyDraft.current) setDraft(null);
             }}
           />
         </div>
