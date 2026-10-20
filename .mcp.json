@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "clerk": {
+      "type": "http",
+      "url": "https://mcp.clerk.com/mcp"
+    },
+    "posthog": {
+      "type": "http",
+      "url": "https://mcp.posthog.com/mcp"
+    }
+  }
+}
