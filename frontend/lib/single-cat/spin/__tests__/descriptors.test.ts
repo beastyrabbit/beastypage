@@ -23,6 +23,7 @@ import {
   buildRegistrySlotDescriptors,
   buildStringLayerDescriptors,
   buildTortieSlotSpin,
+  commitRegistrySlots,
   commitStringLayers,
   commitTortieSlots,
   createInitialProgressiveParams,
@@ -414,8 +415,7 @@ describe("spin descriptor builders", () => {
 
   it("reproduces the overlay's registry string slot descriptors", () => {
     const def = { ...definition("accessory"), id: "probeSlot" };
-    // Registry writes reject duplicate list items, so the committed value is
-    // not among the choices here (the overlay would throw the same way).
+    // Keep the reference fixture collision-free; duplicate previews are tested below.
     const choices = ["MAPLE LEAF", "BLUE BERRIES", "CATTAIL"];
     const base = createInitialProgressiveParams(rolledCat());
     const built = buildRegistrySlotDescriptors(
@@ -491,6 +491,59 @@ describe("spin descriptor builders", () => {
       startColour: "GREY",
       maskPatternColour: "GREY",
     });
+  });
+
+  it("deduplicates transient tortie frames without changing the final layers", () => {
+    const base = createInitialProgressiveParams(rolledCat());
+    const committed = [
+      { mask: "ONE", pattern: "SingleColour", colour: "WHITE" },
+    ];
+    const target = { ...committed[0], colour: "BLACK" };
+    commitTortieSlots(base, committed);
+    const before = structuredClone(base);
+    const spin = buildTortieSlotSpin(
+      pools,
+      base,
+      committed,
+      target,
+      1,
+      () => 0,
+    );
+    for (const stage of spin.stages) {
+      const collision = stage.descriptors.find(
+        (descriptor) => descriptor.params.tortie?.length === 1,
+      );
+      expect(collision?.params.tortie).toEqual(committed);
+      expect(collision?.params.traits?.tortie).toEqual(committed);
+    }
+    expect(base).toEqual(before);
+    expect(spin.result).toEqual(target);
+    commitTortieSlots(base, [...committed, spin.result]);
+    expect(base.tortie).toEqual([...committed, target]);
+    expect(() =>
+      commitTortieSlots(base, [...committed, ...committed]),
+    ).toThrow();
+  });
+
+  it("deduplicates transient registry slot candidates while keeping commits strict", () => {
+    const def = { ...definition("accessory"), id: "probeSlot" };
+    const base = createInitialProgressiveParams(rolledCat());
+    commitRegistrySlots(base, def, ["HOLLY"]);
+    const before = structuredClone(base);
+    const descriptors = buildRegistrySlotDescriptors(
+      def,
+      pools.accessories,
+      base,
+      ["HOLLY"],
+      "CATTAIL",
+      1,
+    );
+    const collision = descriptors.find(
+      (descriptor) => descriptor.option.raw === "HOLLY",
+    );
+    expect(collision?.params.traits?.accessories).toEqual(["HOLLY"]);
+    expect(base).toEqual(before);
+    expect(() => commitRegistrySlots(base, def, ["HOLLY", "HOLLY"])).toThrow();
   });
 
   it("resolves rolled slots from selections first, then params", () => {

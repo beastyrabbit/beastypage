@@ -23,6 +23,7 @@ import {
   type TortieSlot,
 } from "@/components/stream-control/obs/spinSupport";
 import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system";
+import { deduplicateTortieLayers } from "@/lib/cat-system/tortieLayers";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
   getRegistryRevealOptions,
@@ -238,7 +239,7 @@ export function buildRegistrySlotDescriptors(
     if (typeof option.raw === "string" && !isNoneString(option.raw)) {
       nextValues.push(option.raw);
     }
-    setRegistryRevealValue(params, definition, nextValues);
+    setRegistryRevealValue(params, definition, [...new Set(nextValues)]);
     return {
       id: `${definition.traitId}-${index}-${variantIndex}`,
       option,
@@ -413,7 +414,8 @@ export function tortieStageOptions(
 }
 
 function setTortieLayers(params: Params, layers: TortieSlot[]): void {
-  params.tortie = layers;
+  // A spinning candidate can briefly repeat a committed layer exactly.
+  params.tortie = deduplicateTortieLayers(layers);
   params.isTortie = true;
   // Legacy single-layer fields show the layer being spun (the last one).
   const candidate = layers.at(-1);

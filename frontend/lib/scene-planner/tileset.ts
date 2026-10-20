@@ -7,7 +7,7 @@
 // elements meet, such as a waterfall splashing into a lake.
 
 import type { TimeOfDay } from "./catalog";
-import { E, FILL, type Material, N, S, type ShapeClass, W } from "./tiles";
+import { FILL, type Material, type ShapeClass } from "./tiles";
 
 export type TileLayer = "ground" | "object";
 
@@ -343,8 +343,6 @@ export const EDGE_ORDER: Material[] = [
 export type Side = "N" | "E" | "S" | "W";
 
 export const SIDES: Side[] = ["N", "E", "S", "W"];
-
-export const SIDE_BITS: Record<Side, number> = { N, E, S, W };
 
 /** Edge tiles are frames of animation only where water moves. */
 export function edgeFrames(from: Material, onto: Material) {

@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import {
+  ELEMENTS_BY_ID,
   elementLabel,
   SCENE_ELEMENTS,
   THEMES,
@@ -21,7 +22,7 @@ import { columnName, type RollChain } from "@/lib/scene-planner/generate";
 import { cn } from "@/lib/utils";
 
 import { DRIFT_ARROW } from "./choreography";
-import { DURATION, EASE, seconds } from "./motion";
+import { DURATION, EASE, Sequence, SequenceCancelled, seconds } from "./motion";
 import { usePlanner } from "./usePlanner";
 
 const ITEM_H = 52;
@@ -46,6 +47,7 @@ function Reel({
   idle,
   rare,
   still,
+  result,
   ref,
 }: Readonly<{
   label: string;
@@ -53,6 +55,7 @@ function Reel({
   rare?: boolean;
   /** Reduced motion: the rare border stays put instead of spinning. */
   still?: boolean;
+  result?: string;
   ref: React.Ref<ReelHandle>;
 }>) {
   const [items, setItems] = useState([{ key: "idle", label: "?" }]);
@@ -62,6 +65,11 @@ function Reel({
   const current = useRef("?");
   /** Each spin builds a fresh strip; its faces are keyed by spin and slot. */
   const spins = useRef(0);
+  const sequence = useRef(new Sequence());
+  useEffect(() => {
+    sequence.current = new Sequence();
+    return () => sequence.current.cancel();
+  }, []);
 
   /** The running reel animation, and whether Skip asked to jump to the end. */
   const playing = useRef<ReturnType<typeof animate> | null>(null);
@@ -76,7 +84,7 @@ function Reel({
       },
     );
     playing.current = controls;
-    await controls;
+    await sequence.current.wait(controls.then(() => {}));
     playing.current = null;
   };
 
@@ -88,9 +96,14 @@ function Reel({
       const spin = ++spins.current;
       hurry.current = ms <= 0;
       setLocked(false);
-      setItems(strip.map((label, slot) => ({ key: `${spin}:${slot}`, label })));
-      await nextFrame();
-      await nextFrame();
+      setItems(
+        strip.map((label, slot) => ({
+          key: slot === strip.length - 2 ? `${spin}:result` : `${spin}:${slot}`,
+          label,
+        })),
+      );
+      await sequence.current.wait(nextFrame());
+      await sequence.current.wait(nextFrame());
       const target = offset - (strip.length - 2) * ITEM_H;
       animate(scope.current, { y: offset }, { duration: 0 });
       // Run past the result by a third of a row, then spring back.
@@ -153,7 +166,7 @@ function Reel({
               className="flex items-center justify-center truncate px-1 text-center text-xl font-bold"
               style={{ height: ITEM_H }}
             >
-              {item.label}
+              {item.key.endsWith(":result") && result ? result : item.label}
             </div>
           ))}
         </div>
@@ -170,6 +183,7 @@ function Reel({
 
 interface Card {
   id: number;
+  elementId: string;
   icon: string;
   label: string;
   where: string;
@@ -194,6 +208,7 @@ export function GachaMode() {
   );
   const [pathReel, setPathReel] = useState(true);
   const [rare, setRare] = useState(false);
+  const [elementId, setElementId] = useState<string | null>(null);
   const [card, setCard] = useState<Card | null>(null);
   const [flight, setFlight] = useState<Flight | null>(null);
   const [history, setHistory] = useState<Card[]>([]);
@@ -201,6 +216,11 @@ export function GachaMode() {
   const cardRef = useRef<HTMLDivElement>(null);
   const multi = useRef(false);
   const serial = useRef(0);
+  const sequence = useRef(new Sequence());
+  const messageFor = (text: string) => {
+    setMessage(text);
+    planner.announce(text);
+  };
 
   async function fly(icon: string, chain: RollChain) {
     const from = cardRef.current?.getBoundingClientRect();
@@ -214,7 +234,7 @@ export function GachaMode() {
     const ms = director.scale(DURATION.fly);
     if (!from || !to || ms <= 0) return;
     setFlight({ id: serial.current++, icon, from, to });
-    await director.wait(DURATION.fly);
+    await sequence.current.wait(director.wait(DURATION.fly));
     setFlight(null);
   }
 
@@ -223,7 +243,7 @@ export function GachaMode() {
     const chain = builder.roll(rng);
     if (!chain) {
       setCard(null);
-      setMessage("The machine is empty: nothing has room left.");
+      messageFor("The machine is empty: nothing has room left.");
       return false;
     }
     // The time can change while "Pull until full" runs.
@@ -239,6 +259,7 @@ export function GachaMode() {
     const row = Math.floor(first / settings.cols);
     const isRare = chain.element.weight <= 1;
     setPathReel(Boolean(chain.path));
+    setElementId(chain.element.id);
     setRare(isRare);
     setCard(null);
 
@@ -266,12 +287,14 @@ export function GachaMode() {
       [String(row + 1), rowPool],
       [lengthResult, chain.path ? lengthPool : ["—"]],
     ] as const;
-    await Promise.all(
-      spins.map(([result, pool], i) =>
-        reels[i].current?.spin(
-          result,
-          [...pool],
-          director.scale(DURATION.reel + i * DURATION.stagger),
+    await sequence.current.wait(
+      Promise.all(
+        spins.map(([result, pool], i) =>
+          reels[i].current?.spin(
+            result,
+            [...pool],
+            director.scale(DURATION.reel + i * DURATION.stagger),
+          ),
         ),
       ),
     );
@@ -281,6 +304,7 @@ export function GachaMode() {
       : `${columnName(col)}${row + 1}`;
     const next: Card = {
       id: serial.current++,
+      elementId: chain.element.id,
       icon: name.icon,
       label: name.label,
       where,
@@ -288,18 +312,31 @@ export function GachaMode() {
       bonus: chain.fed ? `+ ${chain.fed.element.label}` : undefined,
     };
     setCard(next);
-    await director.wait(DURATION.place);
+    await sequence.current.wait(director.wait(DURATION.place));
     planner.setCue({ zones: chain.element.zones });
-    await fly(name.icon, chain);
+    await fly(
+      elementLabel(chain.element, planner.latest.current.atmosphere.time).icon,
+      chain,
+    );
     planner.setCue(null);
+    const committedName = elementLabel(
+      chain.element,
+      planner.latest.current.atmosphere.time,
+    );
     if (!planner.addChain(chain)) {
       // The board changed during the pull; the card goes, nothing landed.
       setCard(null);
-      setMessage(`${name.label} no longer fits there: nothing was placed.`);
+      messageFor(
+        `${committedName.label} no longer fits there: nothing was placed.`,
+      );
       return true;
     }
-    setHistory((current) => [next, ...current].slice(0, 12));
-    await director.wait(DURATION.place);
+    setHistory((current) =>
+      [{ ...next, ...committedName }, ...current].slice(0, 12),
+    );
+    const bonus = next.bonus ? ` ${next.bonus}` : "";
+    planner.announce(`${committedName.label} at ${where}${bonus}`);
+    await sequence.current.wait(director.wait(DURATION.place));
     return true;
   }
 
@@ -308,6 +345,7 @@ export function GachaMode() {
   useEffect(
     () => () => {
       multi.current = false;
+      sequence.current.cancel();
       director.skip();
       for (const reel of reels) reel.current?.finish();
     },
@@ -319,10 +357,11 @@ export function GachaMode() {
     // "Pull until full" on a full scene would overfill it by one.
     if (untilFull && planner.boardStatus().full) {
       setCard(null);
-      setMessage("The scene is already full.");
+      messageFor("The scene is already full.");
       return;
     }
     director.reset();
+    sequence.current = new Sequence();
     setRolling(true);
     setMessage(null);
     multi.current = untilFull;
@@ -332,6 +371,8 @@ export function GachaMode() {
         if (!multi.current) break;
         if (planner.boardStatus().full) break;
       }
+    } catch (error) {
+      if (!(error instanceof SequenceCancelled)) throw error;
     } finally {
       planner.setCue(null);
       setRolling(false);
@@ -340,11 +381,26 @@ export function GachaMode() {
     }
   }
 
+  const cardElement = card && ELEMENTS_BY_ID.get(card.elementId);
+  const cardName = cardElement
+    ? elementLabel(cardElement, planner.atmosphere.time)
+    : card;
+  const reelElement = elementId && ELEMENTS_BY_ID.get(elementId);
+  const reelIcon = reelElement
+    ? elementLabel(reelElement, planner.atmosphere.time).icon
+    : undefined;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2 rounded-2xl border border-white/10 bg-gradient-to-b from-violet-500/10 to-transparent p-3">
         <Reel ref={reels[0]} label="Category" />
-        <Reel ref={reels[1]} label="Variant" rare={rare} still={reduced} />
+        <Reel
+          ref={reels[1]}
+          label="Variant"
+          rare={rare}
+          still={reduced}
+          result={reelIcon}
+        />
         <Reel ref={reels[2]} label="Column" />
         <Reel ref={reels[3]} label="Row" />
         <Reel ref={reels[4]} label="Length" idle={!pathReel} />
@@ -370,10 +426,10 @@ export function GachaMode() {
                 ease: EASE.spring,
               }}
             >
-              <span className="text-3xl">{card.icon}</span>
+              <span className="text-3xl">{cardName?.icon}</span>
               <span className="flex flex-col">
                 <span className="flex items-center gap-1.5 font-bold">
-                  {card.label}
+                  {cardName?.label}
                   {card.rare && (
                     <SparklesIcon size={16} className="text-amber-200" />
                   )}
@@ -499,7 +555,7 @@ export function GachaMode() {
               ease: EASE.inout,
             }}
           >
-            {flight.icon}
+            {cardName?.icon ?? flight.icon}
           </motion.div>,
           document.body,
         )}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type Placement, rectCells, zoneStarts } from "../generate";
+import { selectTile } from "../render";
 import {
   atlasEntries,
   cellMask,
@@ -70,9 +71,56 @@ describe("tiles", () => {
 
   it("lists each tile variant once with its count", () => {
     const groups = groupTiles([block("a", "lake", 1, 1, 3, 3)], COLS, ROWS);
-    const entries = atlasEntries(groups, COLS, ROWS);
+    const entries = atlasEntries(groups, COLS, ROWS, selectTile);
     expect(entries).toHaveLength(9);
     expect(entries.reduce((sum, e) => sum + e.count, 0)).toBe(9);
+  });
+
+  it("resolves point shapes and counts each alternative separately", () => {
+    const groups = groupTiles(
+      [{ key: "flowers", elementId: "flowers", cells: [34, 35, 42, 43] }],
+      8,
+      8,
+    );
+    const entries = atlasEntries(groups, 8, 8, selectTile);
+    expect(entries.map((entry) => [entry.key, entry.count])).toEqual([
+      ["flowers:single:0:base:1", 2],
+      ["flowers:single:0:base:2", 1],
+      ["flowers:single:0:base:0", 1],
+    ]);
+    for (const entry of entries) {
+      expect(entry.shape).toBe("single");
+      expect(entry.mask).toBe(0);
+      expect(entry.variant).toBe("base");
+      expect(entry.key).toBe(
+        `flowers:${selectTile(groups[0], entry.cell, 8, 8).key}`,
+      );
+    }
+  });
+
+  it("includes the atmosphere variant in atlas identities", () => {
+    const groups = groupTiles(
+      [block("sun", "celestial", 0, 0, 1, 1)],
+      COLS,
+      ROWS,
+    );
+    const [day] = atlasEntries(groups, COLS, ROWS, selectTile);
+    const [night] = atlasEntries(groups, COLS, ROWS, (g, cell, cols, rows) =>
+      selectTile(g, cell, cols, rows, "night"),
+    );
+    expect(day.variant).toBe("base");
+    expect(night.variant).toBe("moon");
+    expect(night.key).not.toBe(day.key);
+  });
+
+  it("keeps row-based alternatives consistent across a tulip row", () => {
+    const groups = groupTiles([block("t", "tulips", 1, 6, 4, 2)], COLS, ROWS);
+    for (const row of [6, 7]) {
+      const tiles = groups[0].cells
+        .filter((cell) => Math.floor(cell / COLS) === row)
+        .map((cell) => selectTile(groups[0], cell, COLS, ROWS));
+      expect(new Set(tiles.map((tile) => tile.alt)).size).toBe(1);
+    }
   });
 
   it("finds the materials that meet", () => {

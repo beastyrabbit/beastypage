@@ -1,7 +1,7 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { type ReactNode, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -36,22 +36,28 @@ function Segmented<T extends string>({
   value,
   onChange,
   id,
+  label,
   disabled,
 }: Readonly<{
   items: { id: T; label: string; hint?: string }[];
   value: T;
   onChange: (value: T) => void;
   id: string;
+  label: string;
   disabled?: boolean;
 }>) {
   return (
-    <div className="flex rounded-full border border-white/10 bg-black/30 p-1">
+    <fieldset
+      aria-label={label}
+      className="flex rounded-full border border-white/10 bg-black/30 p-1"
+    >
       {items.map((item) => (
         <button
           key={item.id}
           type="button"
           title={item.hint}
           disabled={disabled}
+          aria-pressed={value === item.id}
           onClick={() => onChange(item.id)}
           className={cn(
             "relative rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed",
@@ -70,7 +76,35 @@ function Segmented<T extends string>({
           <span className="relative">{item.label}</span>
         </button>
       ))}
-    </div>
+    </fieldset>
+  );
+}
+
+function ModePanel({
+  children,
+  reduced,
+}: Readonly<{ children: ReactNode; reduced: boolean }>) {
+  const present = useIsPresent();
+  return (
+    <motion.div
+      inert={!present}
+      style={{ pointerEvents: present ? undefined : "none" }}
+      onClickCapture={(event) => {
+        if (!present) event.stopPropagation();
+      }}
+      onKeyDownCapture={(event) => {
+        if (!present) event.stopPropagation();
+      }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{
+        duration: reduced ? 0 : seconds(DURATION.snap),
+        ease: EASE.out,
+      }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -91,6 +125,7 @@ export function ScenePlannerClient() {
         <div className="glass-card flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:translate-none">
           <Segmented
             id="mode"
+            label="Mode"
             items={MODES}
             value={mode}
             onChange={changeMode}
@@ -99,12 +134,14 @@ export function ScenePlannerClient() {
           <div className="flex flex-wrap items-center gap-2">
             <Segmented
               id="view"
+              label="View"
               items={VIEWS}
               value={planner.view}
               onChange={planner.setView}
             />
             <Segmented
               id="tempo"
+              label="Tempo"
               items={TEMPOS}
               value={planner.tempo}
               onChange={planner.setTempo}
@@ -118,20 +155,11 @@ export function ScenePlannerClient() {
           </div>
           <div className="glass-card overflow-hidden p-4 hover:translate-none sm:p-6">
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={mode}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{
-                  duration: planner.reduced ? 0 : seconds(DURATION.snap),
-                  ease: EASE.out,
-                }}
-              >
+              <ModePanel key={mode} reduced={planner.reduced}>
                 {mode === "board" && <BoardMode />}
                 {mode === "gacha" && <GachaMode />}
                 {mode === "atlas" && <AtlasMode />}
-              </motion.div>
+              </ModePanel>
             </AnimatePresence>
           </div>
         </div>

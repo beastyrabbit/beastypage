@@ -319,26 +319,50 @@ export interface AtlasEntry {
   elementId: string;
   shape: ShapeClass;
   mask: number;
+  variant: string;
+  alt: number;
   /** One cell that uses this tile, to sample it from the live board. */
   cell: number;
   count: number;
 }
 
-/** Every distinct tile (element, silhouette, neighbour mask) on the board. */
-export function atlasEntries(groups: TileGroup[], cols: number, rows: number) {
+export interface TileSelection {
+  key: string;
+  shape: ShapeClass;
+  mask: number;
+  variant: string;
+  alt: number;
+}
+
+export type TileSelector = (
+  group: TileGroup,
+  cell: number,
+  cols: number,
+  rows: number,
+) => TileSelection;
+
+/** Every distinct resolved tile, including atmosphere and alternatives. */
+export function atlasEntries(
+  groups: TileGroup[],
+  cols: number,
+  rows: number,
+  select: TileSelector,
+) {
   const entries = new Map<string, AtlasEntry>();
   for (const g of groups) {
     for (const cell of g.cells) {
-      const mask = tileMask(g, cell, cols, rows);
-      const key = `${g.elementId}:${g.shape}:${mask}`;
+      const tile = select(g, cell, cols, rows);
+      const key = `${g.elementId}:${tile.key}`;
       const entry = entries.get(key);
       if (entry) entry.count++;
       else
         entries.set(key, {
           key,
           elementId: g.elementId,
-          shape: g.shape,
-          mask,
+          shape: tile.shape,
+          mask: tile.mask,
+          variant: tile.variant,
+          alt: tile.alt,
           cell,
           count: 1,
         });

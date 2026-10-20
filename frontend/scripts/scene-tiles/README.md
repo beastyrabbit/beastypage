@@ -30,7 +30,7 @@ docstring at the top of `tilekit.py` for the coordinate contract and
 Render and check one sheet (from `frontend/`):
 
 ```sh
-blender -b --factory-startup -P scripts/scene-tiles/run.py -- --sheet lake --threads 3
+blender -b --factory-startup --python-exit-code 1 -P scripts/scene-tiles/run.py -- --sheet lake --threads 3
 # sheet:   scripts/scene-tiles/out/sheets/lake.png
 # preview: scripts/scene-tiles/out/preview/lake.png (sample groups, every frame, 4x)
 ```
@@ -58,3 +58,20 @@ BLENDER=/opt/blender/blender node scripts/scene-tiles/render.mjs --jobs 6 --thre
 ```
 
 `node scripts/scene-tiles/render.mjs --help` prints usage without rendering or packing.
+
+`--jobs` and `--threads` require positive integers. The Python runner also
+requires a positive `--supersample`. Keep `--python-exit-code 1` before `-P`
+when invoking Blender directly so Python exceptions fail the command.
+
+The pack checks every indexed row, frame count, PNG dimension, and image
+decode before writing. It stages the complete set beside the target, then
+replaces the target directory, restoring the previous set if the move fails.
+To check a render without changing `public/`, use a temporary target:
+
+```sh
+SCENE_TILES_TARGET="$(mktemp -d)/tiles" pnpm exec tsx scripts/scene-tiles/pack.ts
+```
+
+`SCENE_TILES_SOURCE` and `SCENE_TILES_MANIFEST` override the default
+`scripts/scene-tiles/out/sheets` and `scripts/scene-tiles/out/manifest.json`
+paths. Tests can also call `packTiles({ source, target, manifest })` directly.

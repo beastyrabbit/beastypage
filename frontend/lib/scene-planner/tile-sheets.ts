@@ -5,6 +5,7 @@
 import type { TileIndex } from "./tileset";
 
 const BASE_URL = "/scene-planner/tiles";
+const RETRY_DELAYS = [250, 1000];
 
 export interface TileSet {
   index: TileIndex;
@@ -29,39 +30,56 @@ function image(src: string) {
   });
 }
 
-/** Starts loading once; later calls share the same promise. */
-export function loadTileSet() {
-  loading ??= (async () => {
+/** Three attempts per resource, with a pause between transient failures. */
+async function retry<T>(load: () => Promise<T>): Promise<T | null> {
+  for (const delay of [...RETRY_DELAYS, null]) {
     try {
-      const response = await fetch(`${BASE_URL}/tiles.json`);
-      if (!response.ok) throw new Error(`tiles.json: ${response.status}`);
-      const index = (await response.json()) as TileIndex;
-      const images = new Map<string, HTMLImageElement>();
-      const glows = new Map<string, HTMLImageElement>();
-      const v = `?v=${index.version}`;
-      await Promise.all(
-        Object.entries(index.sheets).flatMap(([name, sheet]) => [
-          image(`${BASE_URL}/${sheet.file}${v}`).then((img) =>
-            images.set(name, img),
-          ),
-          ...(sheet.glow
-            ? [
-                image(`${BASE_URL}/${sheet.glow}${v}`).then((img) =>
-                  glows.set(name, img),
-                ),
-              ]
-            : []),
-        ]),
-      );
-      current = { index, images, glows };
-      return current;
+      return await load();
     } catch (error) {
-      console.warn("Scene Planner tiles unavailable", error);
-      // A later call may retry; procedural art covers the meantime.
-      loading = null;
-      return null;
+      if (delay === null) {
+        console.warn("Scene Planner tile resource unavailable", error);
+        return null;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
-  })();
+  }
+  return null;
+}
+
+async function loadImage(
+  images: Map<string, HTMLImageElement>,
+  name: string,
+  src: string,
+) {
+  const loaded = await retry(() => image(src));
+  if (loaded) images.set(name, loaded);
+}
+
+async function load() {
+  const index = await retry(async () => {
+    const response = await fetch(`${BASE_URL}/tiles.json`);
+    if (!response.ok) throw new Error(`tiles.json: ${response.status}`);
+    return (await response.json()) as TileIndex;
+  });
+  if (!index) return null;
+  const images = new Map<string, HTMLImageElement>();
+  const glows = new Map<string, HTMLImageElement>();
+  const v = `?v=${index.version}`;
+  await Promise.all(
+    Object.entries(index.sheets).flatMap(([name, sheet]) => [
+      loadImage(images, name, `${BASE_URL}/${sheet.file}${v}`),
+      ...(sheet.glow
+        ? [loadImage(glows, name, `${BASE_URL}/${sheet.glow}${v}`)]
+        : []),
+    ]),
+  );
+  current = { index, images, glows };
+  return current;
+}
+
+/** Starts one bounded loading run, including retries, shared by all callers. */
+export function loadTileSet() {
+  loading ??= load();
   return loading;
 }
 
@@ -82,7 +100,7 @@ export function gradedSheet(source: HTMLImageElement, name: string, g: Grade) {
   const key = `${name}|${g.light.join(",")}|${g.haze.join(",")}|${g.hazeAmount}|${g.filter}`;
   const cached = tinted.get(key);
   if (cached) return cached;
-  if (tinted.size > 240) tinted.clear();
+  if (tinted.size >= 240) tinted.clear();
 
   const canvas = document.createElement("canvas");
   canvas.width = source.width;

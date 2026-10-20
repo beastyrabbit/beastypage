@@ -501,10 +501,15 @@ export class PlanBuilder {
       (this.counts.get(placement.elementId) ?? 0) + 1,
     );
     // Riders sit on cells their host already covers.
-    if (!rider)
+    if (!rider) {
       this.covered += placement.cells.filter(
         (cell) => !this.options.ignored[cell],
       ).length;
+      for (const element of this.pool) {
+        if (element.on?.includes(placement.elementId))
+          this.exhausted.delete(element.id);
+      }
+    }
     this.placements.push(placement);
   }
 
@@ -670,9 +675,13 @@ export class PlanBuilder {
       Math.max(0, c - Math.floor((width - 1) / 2)),
       cols - width,
     );
+    let first = c;
+    let last = c;
+    const free = (x: number) => !this.occupied[r * cols + x];
+    while (first > Math.max(0, left) && free(first - 1)) first--;
+    while (last + 1 < Math.min(cols, left + width) && free(last + 1)) last++;
     const section: number[] = [];
-    for (let x = Math.max(0, left); x < Math.min(cols, left + width); x++) {
-      if (this.occupied[r * cols + x]) continue;
+    for (let x = first; x <= last; x++) {
       cells.add(r * cols + x);
       section.push(r * cols + x);
     }

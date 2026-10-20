@@ -1,6 +1,6 @@
 """Renders Scene Planner tile sheets in Blender.
 
-    blender -b --factory-startup -P scripts/scene-tiles/run.py -- \
+    blender -b --factory-startup --python-exit-code 1 -P scripts/scene-tiles/run.py -- \
         --sheet lake [--sheet pond] [--key square:] [--threads 4]
 
 Each sheet is built by a module: elements/<element>.py for element tiles,
@@ -39,6 +39,13 @@ import tilekit as kit  # noqa: E402
 CELL = 16
 
 
+def positive_integer(value):
+    number = int(value)
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
+
+
 def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     parser = argparse.ArgumentParser()
@@ -46,8 +53,8 @@ def parse_args():
     parser.add_argument("--out", default=os.path.join(HERE, "out"))
     parser.add_argument("--sheet", action="append", required=True)
     parser.add_argument("--key", default="", help="only render keys containing this")
-    parser.add_argument("--threads", type=int, default=4)
-    parser.add_argument("--supersample", type=int, default=4)
+    parser.add_argument("--threads", type=positive_integer, default=4)
+    parser.add_argument("--supersample", type=positive_integer, default=4)
     return parser.parse_args(argv)
 
 

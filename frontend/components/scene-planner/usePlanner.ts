@@ -77,6 +77,7 @@ export type StageTool =
 export type ViewMode = "flat" | "diorama";
 
 export interface StageHandle {
+  focus: () => void;
   /** Screen rectangle of a cell range, for card flights. */
   cellRect: (rect: Rect) => DOMRect | null;
   /** The rendered scene at 16 px per cell. */
@@ -93,6 +94,14 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 const STAGGER_MS = 70;
+
+/** Whether every cell lies on a grid of this size. */
+function inGrid(cells: number[], grid: { cols: number; rows: number }) {
+  return cells.every(
+    (cell) =>
+      Number.isInteger(cell) && cell >= 0 && cell < grid.cols * grid.rows,
+  );
+}
 
 export function usePlannerState() {
   const reduced = useReducedMotion() ?? false;
@@ -111,6 +120,10 @@ export function usePlannerState() {
   const [tempo, setTempo] = useState<Tempo>("cinematic");
   const [rolling, setRolling] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [status, setStatus] = useState({ id: 0, text: "" });
+  const announce = useCallback((text: string) => {
+    setStatus((current) => ({ id: current.id + 1, text }));
+  }, []);
 
   const turn = useRef(0);
   /** Makes placement keys unique across rolls and turns. */
@@ -239,18 +252,23 @@ export function usePlannerState() {
    */
   const addChain = useCallback(
     (chain: RollChain) => {
-      const { ignored: ig } = latest.current;
-      const open = (p: Placement) =>
-        ELEMENTS_BY_ID.get(p.elementId)?.shape === "path" ||
-        p.cells.every((cell) => !ig[cell]);
-      if (!open(chain.placement)) return false;
-      const rolled =
-        chain.fed && open(chain.fed.placement)
-          ? [chain.placement, chain.fed.placement]
-          : [chain.placement];
-      const next = withHosts([...latest.current.placements, ...rolled]);
-      const list = rolled.filter((p) => next.includes(p));
-      if (!list.includes(chain.placement)) return false;
+      const { ignored: ig, settings: s, placements: current } = latest.current;
+      const open = (p: Placement, board: Placement[]) => {
+        const unmasked =
+          ELEMENTS_BY_ID.get(p.elementId)?.shape === "path" ||
+          p.cells.every((cell) => !ig[cell]);
+        return (
+          inGrid(p.cells, s) &&
+          unmasked &&
+          canPlace(board, p.elementId, p.cells)
+        );
+      };
+      if (!open(chain.placement, current)) return false;
+      const list = [chain.placement];
+      if (chain.fed && open(chain.fed.placement, [...current, ...list]))
+        list.push(chain.fed.placement);
+      const next = withHosts([...current, ...list]);
+      if (!next.includes(chain.placement)) return false;
       appear(list, 260);
       latest.current.placements = next;
       setPlacements((current) => withHosts([...current, ...list]));
@@ -288,7 +306,9 @@ export function usePlannerState() {
   /** Places an element by hand. Returns false when a cell is taken. */
   const placeManual = useCallback(
     (elementId: string, cells: number[], rect?: Rect) => {
-      if (!canPlace(placements, elementId, cells)) return false;
+      const { settings: s, placements: current } = latest.current;
+      if (!inGrid(cells, s) || !canPlace(current, elementId, cells))
+        return false;
       const placement: Placement = {
         key: `${elementId}-hand-${manual.current++}`,
         elementId,
@@ -306,7 +326,7 @@ export function usePlannerState() {
       setPlacements((current) => [...current, placement]);
       return true;
     },
-    [placements, appear],
+    [appear],
   );
 
   const resizeGrid = useCallback(
@@ -316,6 +336,8 @@ export function usePlannerState() {
         cols: nextCols,
         rows: nextRows,
       });
+      latest.current.settings = { ...settings, cols: nextCols, rows: nextRows };
+      latest.current.placements = next;
       appear(next);
       setPlacements(next);
       setPainted(new Map());
@@ -376,6 +398,8 @@ export function usePlannerState() {
     rolling,
     setRolling,
     selected,
+    status,
+    announce,
     setSelected,
     director,
     stage,

@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { chainLocation, DRIFT_ARROW, revealOnStage } from "./choreography";
-import { DURATION, EASE, seconds } from "./motion";
+import { DURATION, EASE, Sequence, SequenceCancelled, seconds } from "./motion";
 import { usePlanner } from "./usePlanner";
 
 type SquareKind = Theme | "start" | "storm" | "bloom" | "free" | "weather";
@@ -174,6 +174,7 @@ function Die({
 
 interface Readout {
   title: string;
+  elementId?: string;
   icon?: string;
   detail?: string;
   tone?: "event" | "empty" | "element";
@@ -195,6 +196,16 @@ export function BoardMode() {
   const [auto, setAuto] = useState(false);
   const autoRef = useRef(false);
   const freeDone = useRef<(() => void) | null>(null);
+  const sequence = useRef(new Sequence());
+  const wait = (ms: number) => sequence.current.wait(director.wait(ms));
+  const freeReturn = useRef<HTMLElement | null>(null);
+  const turnFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!rolling && freeReturn.current) {
+      freeReturn.current.focus();
+      freeReturn.current = null;
+    }
+  }, [rolling]);
   /**
    * Themes whose roll found no room, and the board they failed on. Any
    * change since (a placement, a removal, a painted mask, a moved horizon)
@@ -223,7 +234,7 @@ export function BoardMode() {
   const track = async (controls: ReturnType<typeof animateA>) => {
     moving.current.add(controls);
     try {
-      await controls;
+      await sequence.current.wait(controls.then(() => {}));
     } finally {
       moving.current.delete(controls);
     }
@@ -240,6 +251,7 @@ export function BoardMode() {
   const note = (text: string) => {
     const id = logId.current++;
     setLog((current) => [{ id, text }, ...current].slice(0, 6));
+    planner.announce(text);
   };
 
   async function tumble(a: number, b: number) {
@@ -293,6 +305,16 @@ export function BoardMode() {
   }
 
   async function rollElement(theme: Theme | undefined, label: string) {
+    if (theme && !planner.latest.current.settings.themes.includes(theme)) {
+      setReadout({
+        title: "Closed",
+        detail: `${label} is switched off`,
+        tone: "empty",
+      });
+      note(`${label}: closed`);
+      await wait(DURATION.step);
+      return;
+    }
     const { builder, rng } = planner.nextTurn();
     const open = builder.openThemes();
     const category = theme ?? (open.length > 0 ? pick(rng, open) : undefined);
@@ -308,7 +330,7 @@ export function BoardMode() {
         tone: "empty",
       });
       note(`${label}: no room`);
-      await director.wait(DURATION.step);
+      await wait(DURATION.step);
       return;
     }
     // A Weather square earlier in this run may have changed the time.
@@ -317,32 +339,75 @@ export function BoardMode() {
     setFlipped({ index: positionRef.current, icon: name.icon });
     setReadout({
       title: name.label,
+      elementId: chain.element.id,
       icon: name.icon,
       detail: `${squareInfo(chain.theme).label} · variant`,
       tone: "element",
     });
-    await director.wait(DURATION.flip + DURATION.step);
+    await wait(DURATION.flip + DURATION.step);
     const where = chainLocation(chain, settings.cols);
     setReadout({
       title: name.label,
+      elementId: chain.element.id,
       icon: name.icon,
       detail: chain.path
         ? `${where} · ${chain.path.length} cells ${DRIFT_ARROW[chain.path.drift]}`
         : `Location ${where}`,
       tone: "element",
     });
-    if (!(await revealOnStage(planner, chain))) {
+    const onPlaced = () => {
+      const committed = elementLabel(
+        chain.element,
+        planner.latest.current.atmosphere.time,
+      );
+      note(
+        `${committed.icon} ${committed.label} at ${where}${chain.fed ? " + stream" : ""}`,
+      );
+    };
+    if (!(await revealOnStage(planner, chain, onPlaced, sequence.current))) {
+      const currentName = elementLabel(
+        chain.element,
+        planner.latest.current.atmosphere.time,
+      );
       setReadout({
         title: "Not placed",
-        detail: `The board changed under ${name.label.toLowerCase()}`,
+        detail: `The board changed under ${currentName.label.toLowerCase()}`,
         tone: "empty",
       });
-      note(`${name.icon} ${name.label}: board changed, not placed`);
+      note(
+        `${currentName.icon} ${currentName.label}: board changed, not placed`,
+      );
+    }
+  }
+
+  async function drawFree(autoplay: boolean) {
+    if (autoplay) {
+      await rollElement(undefined, "Free draw");
       return;
     }
-    note(
-      `${name.icon} ${name.label} at ${where}${chain.fed ? " + stream" : ""}`,
+    if (director.skipped) {
+      note("✏️ Free draw skipped");
+      return;
+    }
+    placedAtStart.current = new Set(
+      planner.latest.current.placements.map((p) => p.key),
     );
+    freeReturn.current = turnFocus.current;
+    setFreeDraw({ until: Date.now() + FREE_DRAW_MS });
+    planner.announce("Free draw. Pick an element, then draw on the grid.");
+    await sequence.current.wait(
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, FREE_DRAW_MS);
+        freeDone.current = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      }),
+    );
+    freeDone.current = null;
+    setFreeDraw(null);
+    planner.setTool({ kind: "inspect" });
+    note("✏️ Free draw done");
   }
 
   async function playSquare(kind: SquareKind, autoplay: boolean) {
@@ -357,7 +422,7 @@ export function BoardMode() {
           tone: "empty",
         });
         note(`${info.label}: closed`);
-        await director.wait(DURATION.step);
+        await wait(DURATION.step);
         return;
       }
       setReadout({
@@ -366,7 +431,7 @@ export function BoardMode() {
         detail: "Category",
         tone: "element",
       });
-      await director.wait(DURATION.step);
+      await wait(DURATION.step);
       await rollElement(theme, info.label);
       return;
     }
@@ -377,7 +442,7 @@ export function BoardMode() {
       detail: info.hint,
       tone: "event",
     });
-    await director.wait(DURATION.step * 1.5);
+    await wait(DURATION.step * 1.5);
 
     if (kind === "start") {
       await rollElement(undefined, "Wild");
@@ -400,33 +465,13 @@ export function BoardMode() {
       const victim = pick(rng, loose);
       const element = ELEMENTS_BY_ID.get(victim.elementId);
       planner.remove([victim.key]);
-      note(`🌪️ Storm took ${element?.label ?? victim.elementId}`);
-      await director.wait(DURATION.place);
+      const label = element
+        ? elementLabel(element, planner.latest.current.atmosphere.time).label
+        : victim.elementId;
+      note(`🌪️ Storm took ${label}`);
+      await wait(DURATION.place);
     } else if (kind === "free") {
-      if (autoplay) {
-        await rollElement(undefined, "Free draw");
-        return;
-      }
-      // Skip pressed earlier in this turn also skips the drawing time.
-      if (director.skipped) {
-        note("✏️ Free draw skipped");
-        return;
-      }
-      placedAtStart.current = new Set(
-        planner.latest.current.placements.map((p) => p.key),
-      );
-      setFreeDraw({ until: Date.now() + FREE_DRAW_MS });
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, FREE_DRAW_MS);
-        freeDone.current = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-      });
-      freeDone.current = null;
-      setFreeDraw(null);
-      planner.setTool({ kind: "inspect" });
-      note("✏️ Free draw done");
+      await drawFree(autoplay);
     }
   }
 
@@ -451,6 +496,11 @@ export function BoardMode() {
       return;
     }
     director.reset();
+    sequence.current = new Sequence();
+    turnFocus.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setRolling(true);
     autoRef.current = autoplay;
     setAuto(autoplay);
@@ -466,6 +516,8 @@ export function BoardMode() {
         const open = status.open.filter((t) => !blocked.has(t));
         if (status.full || open.length === 0) break;
       } while (autoRef.current && turns < 60);
+    } catch (error) {
+      if (!(error instanceof SequenceCancelled)) throw error;
     } finally {
       planner.setCue(null);
       setRolling(false);
@@ -480,6 +532,7 @@ export function BoardMode() {
   useEffect(
     () => () => {
       autoRef.current = false;
+      sequence.current.cancel();
       freeDone.current?.();
       director.skip();
       for (const controls of moving.current) controls.complete();
@@ -488,6 +541,16 @@ export function BoardMode() {
   );
 
   const tokenPos = squarePosition(position);
+  const readoutElement =
+    readout?.elementId && ELEMENTS_BY_ID.get(readout.elementId);
+  const readoutName = readoutElement
+    ? elementLabel(readoutElement, planner.atmosphere.time)
+    : null;
+  const readoutTitle = readoutName?.label ?? readout?.title;
+  const readoutIcon = readoutName?.icon ?? readout?.icon;
+  const flippedIcon = readoutElement
+    ? elementLabel(readoutElement, planner.atmosphere.time).icon
+    : flipped?.icon;
 
   return (
     <div className="flex flex-col gap-4">
@@ -501,8 +564,7 @@ export function BoardMode() {
             const turned = flipped?.index === index;
             return (
               <div
-                // biome-ignore lint/suspicious/noArrayIndexKey: squares are fixed
-                key={index}
+                key={`${col}:${row}`}
                 className="relative"
                 style={{
                   gridColumn: col + 1,
@@ -550,7 +612,7 @@ export function BoardMode() {
                       transform: "rotateY(180deg)",
                     }}
                   >
-                    {!closed && flipped?.icon}
+                    {!closed && flippedIcon}
                   </div>
                 </motion.div>
               </div>
@@ -587,10 +649,10 @@ export function BoardMode() {
                       readout.tone === "empty" && "text-muted-foreground",
                     )}
                   >
-                    {readout.icon && (
-                      <span className="text-xl">{readout.icon}</span>
+                    {readoutIcon && (
+                      <span className="text-xl">{readoutIcon}</span>
                     )}
-                    {readout.title}
+                    {readoutTitle}
                   </span>
                   {readout.detail && (
                     <span className="font-mono text-xs text-muted-foreground">
@@ -727,7 +789,11 @@ export function BoardMode() {
 /** Element picker with a countdown ring for free-draw squares. */
 function FreeDrawPicker({ until }: Readonly<{ until: number }>) {
   const planner = usePlanner();
+  const picker = useRef<HTMLDivElement>(null);
   const [left, setLeft] = useState(FREE_DRAW_MS);
+  useEffect(() => {
+    picker.current?.querySelector("button")?.focus();
+  }, []);
   useEffect(() => {
     const timer = setInterval(
       () => setLeft(Math.max(0, until - Date.now())),
@@ -743,6 +809,7 @@ function FreeDrawPicker({ until }: Readonly<{ until: number }>) {
 
   return (
     <motion.div
+      ref={picker}
       className="flex w-full flex-col items-center gap-2"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -776,7 +843,12 @@ function FreeDrawPicker({ until }: Readonly<{ until: number }>) {
             key={e.id}
             type="button"
             title={e.label}
-            onClick={() => planner.setTool({ kind: "place", elementId: e.id })}
+            aria-label={e.label}
+            aria-pressed={active === e.id}
+            onClick={() => {
+              planner.setTool({ kind: "place", elementId: e.id });
+              planner.stage.current?.focus();
+            }}
             className={cn(
               "rounded-md border px-1 text-base",
               active === e.id

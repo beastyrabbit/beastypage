@@ -33,6 +33,7 @@ import { loadTileSet } from "@/lib/scene-planner/tile-sheets";
 import { cn } from "@/lib/utils";
 
 import { DURATION, EASE, seconds } from "./motion";
+import { PlannerStatus } from "./PlannerStatus";
 import { type StageTool, usePlanner } from "./usePlanner";
 
 /** Perspective distance of the diorama and each zone's depth in px. */
@@ -148,6 +149,7 @@ export function Stage() {
     selected,
     setSelected,
     misplaced,
+    announce,
   } = planner;
   const { cols, rows } = settings;
   const diorama = view === "diorama";
@@ -255,6 +257,7 @@ export function Stage() {
 
   useEffect(() => {
     planner.stage.current = {
+      focus: () => hitRef.current?.focus(),
       cellRect: (rect) => {
         const hit = hitRef.current;
         if (!hit) return null;
@@ -278,8 +281,13 @@ export function Stage() {
   const rotateX = useSpring(0, spring);
   const rotateY = useSpring(0, spring);
   useEffect(() => {
-    rotateX.set(restingTilt(diorama, reduced));
-    rotateY.set(diorama && reduced ? -8 : 0);
+    if (reduced) {
+      rotateX.jump(restingTilt(diorama, reduced));
+      rotateY.jump(diorama ? -8 : 0);
+    } else {
+      rotateX.set(restingTilt(diorama, reduced));
+      rotateY.set(0);
+    }
   }, [diorama, reduced, rotateX, rotateY]);
 
   const onTilt = (event: React.PointerEvent) => {
@@ -295,7 +303,8 @@ export function Stage() {
   // Pointer tools
   // ---------------------------------------------------------------------
 
-  const [hover, setHover] = useState<number | null>(null);
+  const [pointerHover, setPointerHover] = useState<number | null>(null);
+  const [cursor, setCursor] = useState(0);
   const [draft, setDraft] = useState<{ start: number; cells: number[] } | null>(
     null,
   );
@@ -304,6 +313,23 @@ export function Stage() {
   const keyDraft = useRef(false);
   /** Shows the keyboard cursor; a mouse click focuses the grid too. */
   const [keyboard, setKeyboard] = useState(false);
+  const hover = keyboard ? cursor : pointerHover;
+  const [placementMessage, setPlacementMessage] = useState<string | null>(null);
+  const draftGrid = useRef({ cols, rows });
+  useEffect(() => {
+    if (draftGrid.current.cols === cols && draftGrid.current.rows === rows)
+      return;
+    draftGrid.current = { cols, rows };
+    setDraft(null);
+    keyDraft.current = false;
+    setCursor((cell) => Math.min(cell, cols * rows - 1));
+    if (draft) announce("Placement cancelled: grid size changed.");
+  }, [cols, rows, draft, announce]);
+  useEffect(() => {
+    if (!placementMessage) return;
+    const timer = setTimeout(() => setPlacementMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [placementMessage]);
   const ignoredCells = useMemo(
     () => ignored.flatMap((on, cell) => (on ? [cell] : [])),
     [ignored],
@@ -318,6 +344,18 @@ export function Stage() {
       if (rides(p.elementId)) for (const cell of p.cells) map.set(cell, p.key);
     return map;
   }, [placements]);
+
+  const keyboardStatus = cellStatus(
+    cursor,
+    cols,
+    starts,
+    ignored[cursor],
+    elementOn(cursor, placements, occupied),
+    atmosphere.time,
+  );
+  useEffect(() => {
+    if (keyboard) announce(keyboardStatus);
+  }, [keyboard, keyboardStatus, announce]);
 
   const cellAt = useCallback(
     (event: React.PointerEvent) => {
@@ -404,7 +442,13 @@ export function Stage() {
               w: Math.max(...colsOf) - Math.min(...colsOf) + 1,
               h: Math.max(...rowsOf) - Math.min(...rowsOf) + 1,
             };
-      planner.placeManual(placeElement.id, draft.cells, rect);
+      const placed = planner.placeManual(placeElement.id, draft.cells, rect);
+      const name = elementLabel(placeElement, atmosphere.time).label;
+      const message = placed
+        ? `${name} placed.`
+        : `${name} could not be placed: cells are occupied or a required host is missing.`;
+      setPlacementMessage(placed ? null : message);
+      announce(message);
     }
     setDraft(null);
   };
@@ -425,7 +469,8 @@ export function Stage() {
     onTilt(event);
     if (diorama) return;
     const cell = cellAt(event);
-    setHover(cell);
+    setKeyboard(false);
+    setPointerHover(cell);
     if (cell !== null && event.currentTarget.hasPointerCapture(event.pointerId))
       extend(cell);
   };
@@ -444,6 +489,7 @@ export function Stage() {
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Escape") {
       setDraft(null);
+      if (draft) announce("Placement cancelled.");
       return;
     }
     const arrow = event.key in ARROWS;
@@ -451,14 +497,14 @@ export function Stage() {
     event.preventDefault();
     setKeyboard(true);
     // The grid may have shrunk since the cursor last moved.
-    const at = hover !== null && hover < cols * rows ? hover : 0;
+    const at = cursor < cols * rows ? cursor : 0;
     if (!arrow) {
       activate(at);
       return;
     }
     const next = arrowTarget(event.key, at, cols, rows);
     if (next === null) return;
-    setHover(next);
+    setCursor(next);
     if (draft) extend(next);
   };
 
@@ -533,7 +579,7 @@ export function Stage() {
           className="relative w-full select-none"
           style={{ aspectRatio: ratio, perspective: PERSPECTIVE }}
           onPointerLeave={() => {
-            setHover(null);
+            setPointerHover(null);
             if (diorama && !reduced) {
               rotateX.set(6);
               rotateY.set(0);
@@ -827,12 +873,13 @@ export function Stage() {
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={() => finish(draft)}
-            onPointerCancel={() => setDraft(null)}
+            onPointerCancel={() => {
+              setDraft(null);
+              if (draft) announce("Placement cancelled.");
+            }}
             onKeyDown={onKeyDown}
             onFocus={(event) => {
-              setHover((cell) =>
-                cell !== null && cell < cols * rows ? cell : 0,
-              );
+              setCursor((cell) => (cell < cols * rows ? cell : 0));
               if (event.currentTarget.matches(":focus-visible"))
                 setKeyboard(true);
             }}
@@ -841,7 +888,10 @@ export function Stage() {
               // keyboard draft from before would be stale. Safari blurs the
               // grid when a mouse drag starts, so pointer drafts stay.
               setKeyboard(false);
-              if (keyDraft.current) setDraft(null);
+              if (keyDraft.current && draft) {
+                setDraft(null);
+                announce("Placement cancelled.");
+              }
             }}
           />
         </div>
@@ -890,6 +940,10 @@ export function Stage() {
           </span>
         )}
       </div>
+      {placementMessage && (
+        <p className="px-1 text-xs text-rose-200">{placementMessage}</p>
+      )}
+      <PlannerStatus />
     </div>
   );
 }

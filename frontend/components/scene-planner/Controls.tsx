@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import RefreshIcon from "@/components/ui/refresh-icon";
 import {
@@ -33,22 +33,39 @@ const SAMPLE_SUBJECT = `data:image/svg+xml;utf8,${encodeURIComponent(
 function Field({
   label,
   value,
+  controlId,
   children,
 }: Readonly<{
   label: string;
   value?: string;
+  controlId?: string;
   children: React.ReactNode;
 }>) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between text-xs">
+  const heading = (
+    <div className="flex items-baseline justify-between text-xs">
+      {controlId ? (
+        <label htmlFor={controlId} className="font-semibold text-foreground/90">
+          {label}
+        </label>
+      ) : (
         <span className="font-semibold text-foreground/90">{label}</span>
-        {value && (
-          <span className="font-mono text-muted-foreground">{value}</span>
-        )}
-      </div>
+      )}
+      {value && (
+        <span className="font-mono text-muted-foreground">{value}</span>
+      )}
+    </div>
+  );
+  // A labelled control names itself; a set of chips is named as a group.
+  return controlId ? (
+    <div className="flex flex-col gap-1.5">
+      {heading}
       {children}
     </div>
+  ) : (
+    <fieldset aria-label={label} className="flex min-w-0 flex-col gap-1.5">
+      {heading}
+      {children}
+    </fieldset>
   );
 }
 
@@ -58,7 +75,7 @@ function Chip({
   children,
   title,
 }: Readonly<{
-  on: boolean;
+  on?: boolean;
   onClick: () => void;
   children: React.ReactNode;
   title?: string;
@@ -67,6 +84,7 @@ function Chip({
     <button
       type="button"
       title={title}
+      aria-pressed={on}
       onClick={onClick}
       className={cn(
         "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
@@ -98,11 +116,25 @@ export function Controls() {
     rolling,
   } = planner;
   const fileRef = useRef<HTMLInputElement>(null);
+  const id = useId();
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   /** Only the latest pick may land; an older image can finish decoding later. */
   const loading = useRef(0);
+  useEffect(
+    () => () => {
+      loading.current++;
+    },
+    [],
+  );
+  const failOverlay = (request: number, message: string) => {
+    if (request !== loading.current) return;
+    setLoadError(message);
+    planner.announce(message);
+  };
   const clearOverlay = () => {
     loading.current++;
+    setLoadError(null);
     // Let the same file be picked again after removing it.
     if (fileRef.current) fileRef.current.value = "";
     setOverlay(null);
@@ -113,9 +145,16 @@ export function Controls() {
     name: string,
     request = ++loading.current,
   ) => {
+    setLoadError(null);
     const image = new Image();
+    image.onerror = () =>
+      failOverlay(request, `Could not decode ${name}. Choose another image.`);
     image.onload = () => {
       if (request !== loading.current) return;
+      if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+        failOverlay(request, `Could not decode ${name}. Choose another image.`);
+        return;
+      }
       setOverlay({
         src,
         name,
@@ -133,11 +172,24 @@ export function Controls() {
     if (!file) return;
     // The pick counts from now, not from when reading finishes.
     const request = ++loading.current;
+    setLoadError(null);
     const reader = new FileReader();
+    reader.onerror = () =>
+      failOverlay(
+        request,
+        `Could not read ${file.name}. Try choosing it again.`,
+      );
+    reader.onabort = () =>
+      failOverlay(request, `Reading ${file.name} was cancelled.`);
     reader.onload = () => {
       if (request !== loading.current) return;
       if (typeof reader.result === "string")
         loadOverlay(reader.result, file.name, request);
+      else
+        failOverlay(
+          request,
+          `Could not read ${file.name}. Try choosing it again.`,
+        );
     };
     reader.readAsDataURL(file);
   };
@@ -161,8 +213,13 @@ export function Controls() {
     <div className="grid gap-6 sm:grid-cols-2">
       <section className="flex flex-col gap-4">
         <h3 className="section-eyebrow">Grid</h3>
-        <Field label="Columns" value={String(settings.cols)}>
+        <Field
+          label="Columns"
+          controlId={`${id}-cols`}
+          value={String(settings.cols)}
+        >
           <input
+            id={`${id}-cols`}
             type="range"
             min={5}
             max={20}
@@ -174,8 +231,13 @@ export function Controls() {
             className="accent-[oklch(0.77_0.12_300)]"
           />
         </Field>
-        <Field label="Rows" value={String(settings.rows)}>
+        <Field
+          label="Rows"
+          controlId={`${id}-rows`}
+          value={String(settings.rows)}
+        >
           <input
+            id={`${id}-rows`}
             type="range"
             min={5}
             max={20}
@@ -200,9 +262,11 @@ export function Controls() {
         </div>
         <Field
           label="Horizon"
+          controlId={`${id}-horizon`}
           value={`${Math.round(settings.skyShare * 100)}% sky`}
         >
           <input
+            id={`${id}-horizon`}
             type="range"
             min={0.15}
             max={0.5}
@@ -249,9 +313,10 @@ export function Controls() {
             ))}
           </div>
         </Field>
-        <Field label="Seed">
+        <Field label="Seed" controlId={`${id}-seed`}>
           <div className="flex gap-1.5">
             <input
+              id={`${id}-seed`}
               value={settings.seed}
               onChange={(e) =>
                 setSettings((s) => ({ ...s, seed: e.target.value || "seed" }))
@@ -290,8 +355,9 @@ export function Controls() {
             <RefreshIcon size={12} /> Roll
           </button>
         </div>
-        <Field label="Time of day">
+        <Field label="Time of day" controlId={`${id}-time`}>
           <select
+            id={`${id}-time`}
             className={selectClass}
             value={atmosphere.time}
             onChange={(e) =>
@@ -308,8 +374,9 @@ export function Controls() {
             ))}
           </select>
         </Field>
-        <Field label="Season">
+        <Field label="Season" controlId={`${id}-season`}>
           <select
+            id={`${id}-season`}
             className={selectClass}
             value={atmosphere.season}
             onChange={(e) =>
@@ -324,8 +391,9 @@ export function Controls() {
             ))}
           </select>
         </Field>
-        <Field label="Weather">
+        <Field label="Weather" controlId={`${id}-weather`}>
           <select
+            id={`${id}-weather`}
             className={selectClass}
             value={atmosphere.weather}
             onChange={(e) =>
@@ -347,25 +415,21 @@ export function Controls() {
         <input
           ref={fileRef}
           type="file"
+          aria-label="Foreground image"
           accept="image/*"
           className="hidden"
           onChange={(e) => onFile(e.target.files?.[0])}
         />
+        {loadError && <p className="text-xs text-rose-200">{loadError}</p>}
         <div className="flex flex-wrap gap-1.5">
-          <Chip on={false} onClick={() => fileRef.current?.click()}>
-            Upload PNG
-          </Chip>
+          <Chip onClick={() => fileRef.current?.click()}>Upload PNG</Chip>
           <Chip
             on={overlay?.name === "Sample subject"}
             onClick={() => loadOverlay(SAMPLE_SUBJECT, "Sample subject")}
           >
             Sample subject
           </Chip>
-          {overlay && (
-            <Chip on={false} onClick={clearOverlay}>
-              Remove
-            </Chip>
-          )}
+          {overlay && <Chip onClick={clearOverlay}>Remove</Chip>}
         </div>
         {overlay ? (
           <>
@@ -379,7 +443,6 @@ export function Controls() {
                 {overlay.visible ? "Shown" : "Hidden"}
               </Chip>
               <Chip
-                on={false}
                 onClick={matchImage}
                 title="Fit the grid to the image's shape"
               >
@@ -388,9 +451,11 @@ export function Controls() {
             </div>
             <Field
               label="Opacity"
+              controlId={`${id}-opacity`}
               value={`${Math.round(overlay.opacity * 100)}%`}
             >
               <input
+                id={`${id}-opacity`}
                 type="range"
                 min={0.1}
                 max={1}
@@ -405,9 +470,11 @@ export function Controls() {
             {planner.coverage ? (
               <Field
                 label="Ignore cells covered by"
+                controlId={`${id}-threshold`}
                 value={`${Math.round(overlay.threshold * 100)}%`}
               >
                 <input
+                  id={`${id}-threshold`}
                   type="range"
                   min={0.1}
                   max={1}
@@ -447,7 +514,7 @@ export function Controls() {
             Paint ignored cells
           </Chip>
           {planner.painted.size > 0 && (
-            <Chip on={false} onClick={() => planner.setPainted(new Map())}>
+            <Chip onClick={() => planner.setPainted(new Map())}>
               Reset painting
             </Chip>
           )}

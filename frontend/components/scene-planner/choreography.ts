@@ -1,6 +1,6 @@
 import { columnName, type RollChain } from "@/lib/scene-planner/generate";
 
-import { DURATION } from "./motion";
+import { DURATION, type Sequence } from "./motion";
 import type { Planner } from "./usePlanner";
 
 /** Arrow for a path's overall direction. */
@@ -27,8 +27,17 @@ function shuffled<T>(list: readonly T[]) {
  * trail. Ends by placing the element (and anything it feeds), and returns
  * false when the board changed meanwhile so that it no longer fits.
  */
-export async function revealOnStage(planner: Planner, chain: RollChain) {
+export async function revealOnStage(
+  planner: Planner,
+  chain: RollChain,
+  onPlaced?: () => void,
+  sequence?: Sequence,
+) {
   const { director, setCue, settings } = planner;
+  const wait = (ms: number) => {
+    const pending = director.wait(ms);
+    return sequence ? sequence.wait(pending) : pending;
+  };
   const { cols } = settings;
   const steps = [chain, ...(chain.fed ? [chain.fed] : [])];
 
@@ -42,7 +51,7 @@ export async function revealOnStage(planner: Planner, chain: RollChain) {
     };
     if (step === chain) {
       setCue({ zones });
-      await director.wait(DURATION.snap * 2);
+      await wait(DURATION.snap * 2);
       const hops = shuffled(step.candidates).slice(0, 5);
       for (const anchor of hops) {
         if (director.skipped) break;
@@ -55,18 +64,21 @@ export async function revealOnStage(planner: Planner, chain: RollChain) {
             h: target.h,
           },
         });
-        await director.wait(DURATION.scan / 4);
+        await wait(DURATION.scan / 4);
       }
     }
     setCue({ zones, box: { ...target, locked: true } });
-    await director.wait(DURATION.snap * 2);
+    await wait(DURATION.snap * 2);
     if (step.path) {
       setCue({ trail: step.placement.cells });
-      await director.wait(DURATION.step);
+      await wait(DURATION.step);
     }
   }
   setCue(null);
   const placed = planner.addChain(chain);
-  if (placed) await director.wait(DURATION.place);
+  if (placed) {
+    onPlaced?.();
+    await wait(DURATION.place);
+  }
   return placed;
 }

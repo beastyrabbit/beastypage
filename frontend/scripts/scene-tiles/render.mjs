@@ -28,7 +28,11 @@ const option = (name, fallback) => {
   const i = args.indexOf(name);
   if (i < 0) return fallback;
   const [value] = args.splice(i, 2).slice(1);
-  return Number(value);
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number <= 0) {
+    throw new Error(`${name} requires a positive finite integer.`);
+  }
+  return number;
 };
 const jobs = option("--jobs", 6);
 const threads = option("--threads", 3);
@@ -65,6 +69,8 @@ function run(sheet) {
       [
         "-b",
         "--factory-startup",
+        "--python-exit-code",
+        "1",
         "-P",
         join(here, "run.py"),
         "--",

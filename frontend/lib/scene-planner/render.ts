@@ -25,6 +25,7 @@ import {
   N,
   S,
   type TileGroup,
+  type TileSelection,
   tileMask,
   W,
 } from "./tiles";
@@ -1096,7 +1097,7 @@ function paintPlainLand(
 /** Land from the ground tile sheet; false when it has not loaded. */
 function paintGround(ctx: CanvasRenderingContext2D, frame: SceneFrame) {
   const set = currentTileSet();
-  if (!set?.index.sheets.ground) return false;
+  if (!set?.index.sheets.ground || !set.images.has("ground")) return false;
   const { cols, rows, starts, atmosphere, tick } = frame;
   const near = gradeFor(palette(atmosphere), atmosphere, true);
   // Lighter haze than far elements get: the land itself is already muted.
@@ -1366,7 +1367,29 @@ function drawTile({ ctx, set, sheet, key, px, py, tick, grade }: TileDraw) {
 
 /** Whether every cell of a group has a tile, so it can skip its painter. */
 function canTile(set: TileSet, g: TileGroup) {
-  return Boolean(TILE_SPECS[g.elementId] && set.index.sheets[g.elementId]);
+  return Boolean(
+    TILE_SPECS[g.elementId] &&
+      set.index.sheets[g.elementId] &&
+      set.images.has(g.elementId),
+  );
+}
+
+/** The same resolved tile identity is used by the renderer and the atlas. */
+export function selectTile(
+  g: TileGroup,
+  cell: number,
+  cols: number,
+  rows: number,
+  time: TimeOfDay = "midday",
+): TileSelection {
+  const spec = TILE_SPECS[g.elementId];
+  const shape = spec ? tileShape(spec, g.shape) : g.shape;
+  const mask = shape === "single" ? 0 : tileMask(g, cell, cols, rows);
+  const variant = tileVariant(g.elementId, time);
+  const pickBy = spec?.altByRow ? Math.floor(cell / cols) * 97 : cell;
+  const salt = seedOf(g.elementId);
+  const alt = Math.floor(hash(salt + pickBy * 31) * (spec?.alts ?? 1));
+  return { key: tileKey(shape, mask, variant, alt), shape, mask, variant, alt };
 }
 
 function paintTiles(
@@ -1376,21 +1399,19 @@ function paintTiles(
   frame: SceneFrame,
   p: Palette,
 ) {
-  const spec = TILE_SPECS[g.elementId];
-  const shape = tileShape(spec, g.shape);
-  const variant = tileVariant(g.elementId, frame.atmosphere.time);
   const grade = gradeFor(
     p,
     frame.atmosphere,
     SEASONAL.has(MATERIALS[g.elementId]),
   );
-  const alts = spec.alts ?? 1;
-  const salt = seedOf(g.elementId);
   for (const cell of g.cells) {
-    const mask =
-      shape === "single" ? 0 : tileMask(g, cell, frame.cols, frame.rows);
-    const pickBy = spec.altByRow ? Math.floor(cell / frame.cols) * 97 : cell;
-    const alt = Math.floor(hash(salt + pickBy * 31) * alts);
+    const { key, shape, mask, alt } = selectTile(
+      g,
+      cell,
+      frame.cols,
+      frame.rows,
+      frame.atmosphere.time,
+    );
     const draw = {
       ctx,
       set,
@@ -1400,7 +1421,7 @@ function paintTiles(
       tick: frame.tick,
       grade,
     };
-    if (!drawTile({ ...draw, key: tileKey(shape, mask, variant, alt) }))
+    if (!drawTile({ ...draw, key }))
       drawTile({ ...draw, key: tileKey(shape, mask, "base", alt) });
   }
 }
@@ -1503,6 +1524,7 @@ function paintFrom(
   rider: TileGroup | undefined,
   settled: Set<TileGroup>,
 ) {
+  // Bare land throws no edge: the receiving tile's own rounded rim meets it.
   if (source && spills(source, spot.target, settled))
     drawSide(spot, source, from, side);
   // Riders throw combos too, such as a boat's wake on the water around it.
@@ -1754,41 +1776,76 @@ function paintGroup(
   settled: boolean,
   tiles: TileSet | null,
 ) {
-  const { cols, rows, starts, atmosphere, tick } = frame;
+  const { starts, atmosphere } = frame;
   const bottom = g.rect.row + g.rect.h - 1;
   const haze = bottom < starts.mid ? 0.25 : 0;
   const p = palette(atmosphere, haze);
   const tiled = tiles !== null && canTile(tiles, g);
-  const overlays = tiles !== null && Boolean(tiles.index.sheets.edges);
+  const overlays = tiles?.images.has("edges") ?? false;
   if (settled) paintSeams(ctx, g, frame, p, overlays);
   ctx.save();
   ctx.clip(groupClip(g, frame, owners));
   if (tiled) {
     paintTiles(ctx, tiles, g, frame, p);
   } else {
-    const painter = PAINTERS[g.elementId] ?? swatch;
-    const seed = seedOf(g.id);
-    painter({
-      ctx,
-      g,
-      x: g.rect.col * CELL,
-      y: g.rect.row * CELL,
-      w: g.rect.w * CELL,
-      h: g.rect.h * CELL,
-      cols,
-      rows,
-      tick,
-      p,
-      atm: atmosphere,
-      seed,
-      rnd: (i) => hash(seed + i * 7919),
-    });
+    paintProcedural(ctx, g, frame, p);
   }
   ctx.restore();
 }
 
+function paintProcedural(
+  ctx: CanvasRenderingContext2D,
+  g: TileGroup,
+  frame: SceneFrame,
+  p: Palette,
+) {
+  const painter = PAINTERS[g.elementId] ?? swatch;
+  // The generic swatch already visits each occupied cell itself.
+  const point =
+    painter !== swatch && ELEMENTS_BY_ID.get(g.elementId)?.shape === "point";
+  const rects = point
+    ? g.cells.map((cell) => ({
+        col: cell % frame.cols,
+        row: Math.floor(cell / frame.cols),
+        w: 1,
+        h: 1,
+      }))
+    : [g.rect];
+  for (const rect of rects) {
+    const seed = seedOf(
+      point ? `${g.elementId}:${rect.col}:${rect.row}` : g.id,
+    );
+    painter({
+      ctx,
+      g,
+      x: rect.col * CELL,
+      y: rect.row * CELL,
+      w: rect.w * CELL,
+      h: rect.h * CELL,
+      cols: frame.cols,
+      rows: frame.rows,
+      tick: frame.tick,
+      p,
+      atm: frame.atmosphere,
+      seed,
+      rnd: (i) => hash(seed + i * 7919),
+    });
+  }
+}
+
+export interface Foreground {
+  image: CanvasImageSource;
+  visible: boolean;
+  opacity: number;
+}
+
 /** The scene at a larger size with a light grid, for export. */
-export function exportCanvas(frame: SceneFrame, scale: number, grid: boolean) {
+export function exportCanvas(
+  frame: SceneFrame,
+  scale: number,
+  grid: boolean,
+  overlay?: Foreground | null,
+) {
   const base = document.createElement("canvas");
   base.width = frame.cols * CELL;
   base.height = frame.rows * CELL;
@@ -1819,6 +1876,13 @@ export function exportCanvas(frame: SceneFrame, scale: number, grid: boolean) {
       ctx.lineTo(out.width, r * size + 0.5);
       ctx.stroke();
     }
+  }
+  if (overlay?.visible) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = overlay.opacity;
+    ctx.drawImage(overlay.image, 0, 0, out.width, out.height);
+    ctx.restore();
   }
   return out;
 }

@@ -98,6 +98,7 @@ export function PlanList() {
       },
       scale,
       true,
+      planner.overlay,
     );
     canvas.toBlob((blob) => {
       if (!blob) return;

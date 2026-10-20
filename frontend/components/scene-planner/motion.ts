@@ -56,6 +56,33 @@ export function seconds(ms: number) {
   return ms / 1000;
 }
 
+export class SequenceCancelled extends Error {}
+
+/** Settles awaited animations even when Motion stops them on unmount. */
+export class Sequence {
+  private cancelled = false;
+  private readonly pending = new Set<() => void>();
+
+  wait<T>(promise: PromiseLike<T>): Promise<T> {
+    if (this.cancelled) return Promise.reject(new SequenceCancelled());
+    return new Promise<T>((resolve, reject) => {
+      const cancel = () => reject(new SequenceCancelled());
+      this.pending.add(cancel);
+      Promise.resolve(promise)
+        .then(resolve, reject)
+        .finally(() => {
+          this.pending.delete(cancel);
+        });
+    });
+  }
+
+  cancel() {
+    this.cancelled = true;
+    for (const cancel of this.pending) cancel();
+    this.pending.clear();
+  }
+}
+
 /**
  * Paces a roll. `wait` sleeps for a step scaled by the tempo; `skip` ends
  * every pending and later wait of the current roll at once.

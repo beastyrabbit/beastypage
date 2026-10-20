@@ -70,11 +70,6 @@ def _water(pixels, u, phase):
         pixels[u, v] = "waterDark" if v == depth - 1 else "water"
 
 
-def _built(pixels, u, depth):
-    for v in range(min(depth, 3)):
-        pixels[u, v] = "builtLight" if v == 0 else "built"
-
-
 def _fringe(tile, pixels, u, depth, phase):
     if tile.source == "foliage":
         _foliage(pixels, u, depth)
@@ -86,8 +81,6 @@ def _fringe(tile, pixels, u, depth, phase):
         _sand(pixels, u, depth)
     elif tile.source == "water":
         _water(pixels, u, phase)
-    elif tile.source == "built":
-        _built(pixels, u, depth)
 
 
 def _glints(tile, pixels):

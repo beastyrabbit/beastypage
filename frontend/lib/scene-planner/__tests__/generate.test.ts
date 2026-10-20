@@ -8,6 +8,7 @@ import {
   generatePlan,
   gridFor,
   outOfZone,
+  PlanBuilder,
   type PlanOptions,
   withHosts,
   zoneOfRow,
@@ -89,6 +90,75 @@ describe("generatePlan", () => {
       }
     }
     expect(riders).toBeGreaterThan(0);
+  });
+
+  it("retries an exhausted rider after a compatible host is added", () => {
+    const builder = new PlanBuilder(
+      options({ cols: 20, rows: 20, themes: ["water"] }),
+    );
+    // The last weighted candidate is lily pads, which fail without a host.
+    const first = builder.roll(() => 0.999);
+    expect(first?.element.id).toBe("reeds");
+    expect(
+      builder.keep({ key: "new-pond", elementId: "pond", cells: [0] }),
+    ).toBe(true);
+    const next = builder.roll(() => 0.999);
+    expect(next?.element.id).toBe("lily-pads");
+    expect(next?.placement.cells).toEqual([0]);
+    // The one host cell is now ridden, so failure must still terminate.
+    while (builder.roll(() => 0.999)) {
+      /* exhaust the remaining types */
+    }
+    expect(builder.roll(() => 0.999)).toBeNull();
+  });
+
+  it("places lily pads when the riders-0 hosts arrive after a failed attempt", () => {
+    const opts = options({
+      cols: 20,
+      rows: 20,
+      seed: "riders-0",
+      themes: ["water", "wildlife"],
+      density: 0.7,
+    });
+    const plan = generatePlan(opts);
+    const pads = plan.placements.filter((p) => p.elementId === "lily-pads");
+    expect(pads).toHaveLength(2);
+    expect(withHosts(plan.placements)).toEqual(plan.placements);
+    expect(generatePlan(opts)).toEqual(plan);
+  });
+
+  it("keeps widened river sections connected on both sides of an obstacle", () => {
+    const { placements } = generatePlan(
+      options({
+        cols: 20,
+        rows: 20,
+        seed: "edge-215",
+        themes: ["water"],
+        density: 0.7,
+        locked: [
+          { key: "obstacle", elementId: "rocks", cells: [381], locked: true },
+        ],
+      }),
+    );
+    const river = placements.find((p) => p.elementId === "river");
+    expect(river).toBeDefined();
+    const cells = river?.cells ?? [];
+    expect(cells).not.toContain(381);
+    expect(cells).not.toContain(382);
+    expect(river?.ends).not.toContain(382);
+    const reached = new Set([cells[0]]);
+    const queue = [cells[0]];
+    for (const cell of queue) {
+      for (const next of cells) {
+        const dx = Math.abs((cell % 20) - (next % 20));
+        const dy = Math.abs(Math.floor(cell / 20) - Math.floor(next / 20));
+        if (dx + dy !== 1 || reached.has(next)) continue;
+        reached.add(next);
+        queue.push(next);
+      }
+    }
+    expect(reached.size).toBe(cells.length);
+    expect(river?.ends?.every((cell) => cells.includes(cell))).toBe(true);
   });
 
   it("keeps riders only where an allowed host remains", () => {

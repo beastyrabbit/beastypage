@@ -10,7 +10,7 @@ import {
   SHAPES,
   THEMES,
 } from "@/lib/scene-planner/catalog";
-import { sampleTile, TICK_MS } from "@/lib/scene-planner/render";
+import { sampleTile, selectTile, TICK_MS } from "@/lib/scene-planner/render";
 import {
   atlasEntries,
   E,
@@ -74,8 +74,11 @@ export function AtlasMode() {
     [placements, cols, rows],
   );
   const allEntries = useMemo(
-    () => atlasEntries(groups, cols, rows),
-    [groups, cols, rows],
+    () =>
+      atlasEntries(groups, cols, rows, (group, cell, gridCols, gridRows) =>
+        selectTile(group, cell, gridCols, gridRows, atmosphere.time),
+      ),
+    [groups, cols, rows, atmosphere.time],
   );
   // Each atlas tile is a live sample of the board, so only the first few draw.
   const entries = allEntries.slice(0, MAX_TILES);
@@ -127,6 +130,7 @@ export function AtlasMode() {
               <button
                 key={kind}
                 type="button"
+                aria-pressed={tool.kind === kind}
                 onClick={() => setTool({ kind })}
                 className={cn(
                   "rounded-full border px-3 py-1 text-xs font-semibold",
@@ -159,6 +163,7 @@ export function AtlasMode() {
                   <motion.button
                     key={e.id}
                     type="button"
+                    aria-pressed={active === e.id}
                     title={`${name.label} · ${SHAPES[e.shape]} · ${e.zones.join(", ")}`}
                     onClick={() =>
                       setTool(
