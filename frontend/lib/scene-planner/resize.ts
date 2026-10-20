@@ -98,29 +98,14 @@ function freeCells(taken: Set<number>, grid: Grid) {
   ).filter((cell) => !taken.has(cell));
 }
 
-/**
- * The one cell for a block nothing sampled: the one under its corner if
- * free. A shrink may drop such a block, but never a locked one, which takes
- * the nearest free cell instead.
- */
-function unsampledCell(p: Placement, taken: Set<number>, from: Grid, to: Grid) {
-  const corner = cornerCell(p.cells[0], from, to);
-  if (!taken.has(corner)) return corner;
-  const free = p.locked ? freeCells(taken, to) : [];
-  return free.length > 0
-    ? nearestCell(free, scaled(p.cells[0], from, to), to.cols)
-    : undefined;
-}
-
 /** Blocks take their samples, apart from cells already taken. */
-function remapBlocks(
-  placements: Placement[],
+function sampleBlocks(
+  blocks: Placement[],
   from: Grid,
   to: Grid,
   taken: Set<number>,
-  result: Map<string, Placement>,
 ) {
-  const sampled = sampleCentres(placements, from, to);
+  const sampled = sampleCentres(blocks, from, to);
   const cells = new Map(
     [...sampled].map(([key, list]) => [
       key,
@@ -128,16 +113,40 @@ function remapBlocks(
     ]),
   );
   for (const cell of [...cells.values()].flat()) taken.add(cell);
-  for (const p of placements) {
-    let next = cells.get(p.key) ?? [];
-    if (next.length === 0) {
-      const cell = unsampledCell(p, taken, from, to);
-      if (cell === undefined) continue;
-      taken.add(cell);
-      next = [cell];
-    }
-    result.set(p.key, movedPlacement(p, next, from, to));
+  return cells;
+}
+
+/**
+ * The first cell for an element the samples missed. A block takes the cell
+ * under its corner if free; a shrink may drop it otherwise, unless it is
+ * locked. Everything else takes the free cell nearest its old place, and a
+ * locked element may take it from a block that keeps other cells.
+ */
+function firstCell(
+  p: Placement,
+  block: boolean,
+  blocks: Map<string, number[]>,
+  taken: Set<number>,
+  from: Grid,
+  to: Grid,
+) {
+  if (block) {
+    const corner = cornerCell(p.cells[0], from, to);
+    if (!taken.has(corner)) return corner;
+    if (!p.locked) return undefined;
   }
+  const shared = p.locked
+    ? [...blocks.values()].filter((list) => list.length > 1).flat()
+    : [];
+  const options = [...freeCells(taken, to), ...shared];
+  if (options.length === 0) return undefined;
+  const cell = nearestCell(options, scaled(p.cells[0], from, to), to.cols);
+  for (const [key, list] of blocks)
+    blocks.set(
+      key,
+      list.filter((c) => c !== cell),
+    );
+  return cell;
 }
 
 function neighbours(cell: number, grid: Grid) {
@@ -206,12 +215,12 @@ function connectStep(
 
 function remapPath(
   p: Placement,
-  free: number[],
+  start: number,
   taken: Set<number>,
   from: Grid,
   to: Grid,
 ) {
-  let current = nearestCell(free, scaled(p.cells[0], from, to), to.cols);
+  let current = start;
   const cells = new Set([current]);
   for (const step of pathWalk(p.cells, from)) {
     const { x, y } = scaled(step, from, to);
@@ -228,26 +237,46 @@ const lockedFirst = (placements: Placement[]) => [
   placements.filter((p) => !p.locked),
 ];
 
+const shapeOf = (p: Placement) => ELEMENTS_BY_ID.get(p.elementId)?.shape;
+const isBlock = (p: Placement) => !["point", "path"].includes(shapeOf(p) ?? "");
+
+/**
+ * Every element the samples missed claims its first cell before any path
+ * routes, so each locked element keeps at least one cell.
+ */
+function remapGroup(
+  group: Placement[],
+  from: Grid,
+  to: Grid,
+  taken: Set<number>,
+  result: Map<string, Placement>,
+) {
+  const blocks = sampleBlocks(group.filter(isBlock), from, to, taken);
+  const first = new Map<string, number>();
+  for (const p of group) {
+    if (blocks.get(p.key)?.length) continue;
+    const cell = firstCell(p, isBlock(p), blocks, taken, from, to);
+    if (cell === undefined) continue;
+    taken.add(cell);
+    first.set(p.key, cell);
+  }
+  for (const p of group) {
+    const start = first.get(p.key);
+    let cells = blocks.get(p.key) ?? [];
+    if (start !== undefined)
+      cells =
+        shapeOf(p) === "path" ? remapPath(p, start, taken, from, to) : [start];
+    if (cells.length === 0) continue;
+    for (const cell of cells) taken.add(cell);
+    result.set(p.key, movedPlacement(p, cells, from, to));
+  }
+}
+
 function remapGrounded(placements: Placement[], from: Grid, to: Grid) {
-  const shapeOf = (p: Placement) => ELEMENTS_BY_ID.get(p.elementId)?.shape;
-  const isBlock = (p: Placement) =>
-    !["point", "path"].includes(shapeOf(p) ?? "");
   const taken = new Set<number>();
   const result = new Map<string, Placement>();
-  for (const group of lockedFirst(placements)) {
-    remapBlocks(group.filter(isBlock), from, to, taken, result);
-    for (const p of group) {
-      if (isBlock(p)) continue;
-      const free = freeCells(taken, to);
-      if (free.length === 0) break;
-      const cells =
-        shapeOf(p) === "path"
-          ? remapPath(p, free, taken, from, to)
-          : [nearestCell(free, scaled(p.cells[0], from, to), to.cols)];
-      for (const cell of cells) taken.add(cell);
-      result.set(p.key, movedPlacement(p, cells, from, to));
-    }
-  }
+  for (const group of lockedFirst(placements))
+    remapGroup(group, from, to, taken, result);
   return result;
 }
 

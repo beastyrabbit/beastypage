@@ -329,6 +329,37 @@ describe("remapPlacements", () => {
     expect(movedMeadow.cells).not.toContain(20);
   });
 
+  it("trims a locked block that every sample hits for other locked elements", () => {
+    // Locked this time: the meadow covers rows 1–19 and would take every
+    // cell of a 5×5 grid, beside a locked fox at T20 and locked rocks at A20.
+    const meadow = {
+      key: "meadow",
+      elementId: "meadow",
+      cells: Array.from({ length: 380 }, (_, cell) => cell),
+      rect: { col: 0, row: 0, w: 20, h: 19 },
+      locked: true,
+    };
+    const fox = { key: "fox", elementId: "fox", cells: [399], locked: true };
+    const stones = {
+      key: "rocks",
+      elementId: "rocks",
+      cells: [380],
+      rect: { col: 0, row: 19, w: 1, h: 1 },
+      locked: true,
+    };
+    const next = remapPlacements(
+      [meadow, fox, stones],
+      { cols: 20, rows: 20 },
+      { cols: 5, rows: 5 },
+    );
+    expect(next.map((p) => p.key)).toEqual(["meadow", "fox", "rocks"]);
+    const [movedMeadow, movedFox, movedRocks] = next;
+    expect(movedFox.cells).toEqual([24]);
+    expect(movedRocks.cells).toEqual([20]);
+    expect(movedMeadow.cells).toHaveLength(23);
+    expect(new Set(next.flatMap((p) => p.cells)).size).toBe(25);
+  });
+
   it("seats locked riders before unlocked ones on a shrunken host", () => {
     // A two-cell pond under an unlocked duck and a locked one; the pond
     // keeps one cell on 5×5, which the locked duck gets.
