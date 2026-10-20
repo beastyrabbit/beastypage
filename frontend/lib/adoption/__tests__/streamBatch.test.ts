@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { catDataToLegacyPersistence } from "@/lib/cat-system/document";
+import {
+  catDataToLegacyPersistence,
+  legacyParamsToCatDocument,
+} from "@/lib/cat-system/document";
 import {
   EAR_ACCESSORY_PROBE_ID,
   EAR_ACCESSORY_PROBE_PRIMARY_VALUE,
@@ -202,6 +205,33 @@ describe("buildPartialBatchParams", () => {
     expect(params.peltName).toBe("Tabby");
     expect(params.eyeColour).toBe("BLUE"); // not yet revealed
     expect(params.shading).toBe(false); // not yet revealed
+  });
+
+  it("never renders two identical tortie layers mid-reveal", () => {
+    // Layer 1's revealed mask plus the stand-in pattern and colour equal
+    // layer 0, which strict cat documents reject as a duplicate.
+    const base = makeCat();
+    const cat = {
+      ...base,
+      catData: {
+        ...base.catData,
+        tortieSlots: [
+          { mask: "MASK", pattern: "SingleColour", colour: "WHITE" },
+          { mask: "MASK", pattern: "Tabby", colour: "BLACK" },
+        ],
+        counts: { ...base.catData.counts, tortie: 2 },
+      },
+    };
+    const through = stages.findIndex((s) => s.id === "tortie-1-mask");
+    const params = buildPartialBatchParams(
+      cat,
+      stages,
+      through,
+    ) as unknown as Record<string, unknown>;
+    expect(params.tortie).toEqual([
+      { mask: "MASK", pattern: "SingleColour", colour: "WHITE" },
+    ]);
+    expect(() => legacyParamsToCatDocument(params)).not.toThrow();
   });
 
   it("reveals peltName and a derived coat pattern together", () => {

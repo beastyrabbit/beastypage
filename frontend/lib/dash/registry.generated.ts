@@ -107,6 +107,14 @@ export const TOOL_REGISTRY: ToolWidgetMeta[] = [
     "category": "artist"
   },
   {
+    "id": "scene-planner",
+    "title": "Scene Planner",
+    "description": "Roll an illustration background on a grid with dice, gacha reels or hand-placed pixel tiles.",
+    "icon": "🎲",
+    "href": "/scene-planner",
+    "category": "artist"
+  },
+  {
     "id": "single-cat-calm",
     "title": "Single Cat (Less Spin)",
     "description": "Calm typewriter-style reveal where traits appear one by one.",

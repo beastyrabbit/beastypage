@@ -1,0 +1,570 @@
+"use client";
+
+import { AnimatePresence, motion, useAnimate } from "motion/react";
+import {
+  createRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import {
+  ELEMENTS_BY_ID,
+  elementLabel,
+  SCENE_ELEMENTS,
+  THEMES,
+} from "@/lib/scene-planner/catalog";
+import { columnName, type RollChain } from "@/lib/scene-planner/generate";
+import { cn } from "@/lib/utils";
+
+import { DRIFT_ARROW } from "./choreography";
+import { DURATION, EASE, Sequence, SequenceCancelled, seconds } from "./motion";
+import { usePlanner } from "./usePlanner";
+
+const ITEM_H = 52;
+const WINDOW_H = ITEM_H * 1.7;
+const FILLERS = 14;
+
+interface ReelHandle {
+  spin: (result: string, pool: string[], ms: number) => Promise<void>;
+  /** Jumps a running spin to its result. */
+  finish: () => void;
+}
+
+const nextFrame = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+/** Any reel face; the filler only has to look random while it spins. */
+const filler = (pool: string[]) =>
+  pool[Math.floor(Math.random() * pool.length)]; // NOSONAR: visual filler, not security
+
+function Reel({
+  label,
+  idle,
+  rare,
+  still,
+  result,
+  ref,
+}: Readonly<{
+  label: string;
+  idle?: boolean;
+  rare?: boolean;
+  /** Reduced motion: the rare border stays put instead of spinning. */
+  still?: boolean;
+  result?: string;
+  ref: React.Ref<ReelHandle>;
+}>) {
+  const [items, setItems] = useState([{ key: "idle", label: "?" }]);
+  const [locked, setLocked] = useState(false);
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const offset = (WINDOW_H - ITEM_H) / 2;
+  const current = useRef("?");
+  /** Each spin builds a fresh strip; its faces are keyed by spin and slot. */
+  const spins = useRef(0);
+  const sequence = useRef(new Sequence());
+  useEffect(() => {
+    sequence.current = new Sequence();
+    return () => sequence.current.cancel();
+  }, []);
+
+  /** The running reel animation, and whether Skip asked to jump to the end. */
+  const playing = useRef<ReturnType<typeof animate> | null>(null);
+  const hurry = useRef(false);
+  const slide = async (y: number, ms: number, ease: readonly number[]) => {
+    const controls = animate(
+      scope.current,
+      { y },
+      {
+        duration: hurry.current ? 0 : seconds(ms),
+        ease: ease as [number, number, number, number],
+      },
+    );
+    playing.current = controls;
+    await sequence.current.wait(controls.then(() => {}));
+    playing.current = null;
+  };
+
+  useImperativeHandle(ref, () => ({
+    async spin(result, pool, ms) {
+      const strip = [current.current];
+      for (let i = 0; i < FILLERS; i++) strip.push(filler(pool));
+      strip.push(result, filler(pool));
+      const spin = ++spins.current;
+      hurry.current = ms <= 0;
+      setLocked(false);
+      setItems(
+        strip.map((label, slot) => ({
+          key: slot === strip.length - 2 ? `${spin}:result` : `${spin}:${slot}`,
+          label,
+        })),
+      );
+      await sequence.current.wait(nextFrame());
+      await sequence.current.wait(nextFrame());
+      const target = offset - (strip.length - 2) * ITEM_H;
+      animate(scope.current, { y: offset }, { duration: 0 });
+      // Run past the result by a third of a row, then spring back.
+      await slide(target - ITEM_H * 0.35, ms, EASE.reel);
+      await slide(target, DURATION.tick * 2, EASE.spring);
+      current.current = result;
+      setLocked(true);
+    },
+    finish() {
+      hurry.current = true;
+      playing.current?.complete();
+    },
+  }));
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </span>
+      <div
+        className={cn(
+          "relative w-full overflow-hidden rounded-xl border bg-black/50 transition-[border-color,box-shadow,opacity]",
+          locked
+            ? "border-primary/70 shadow-[0_0_16px_oklch(0.77_0.12_300/0.45)]"
+            : "border-white/10",
+          idle && "opacity-40",
+        )}
+        style={{
+          height: WINDOW_H,
+          transitionDuration: `${DURATION.tick}ms`,
+          maskImage:
+            "linear-gradient(to bottom, transparent, black 25%, black 75%, transparent)",
+        }}
+      >
+        {rare && locked && (
+          <motion.div
+            className="pointer-events-none absolute inset-0 rounded-xl"
+            style={{
+              background:
+                "conic-gradient(from 0deg, #f472b6, #facc15, #4ade80, #60a5fa, #a78bfa, #f472b6)",
+              mask: "linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0)",
+              padding: 2,
+            }}
+            animate={still ? undefined : { rotate: 360 }}
+            transition={{
+              duration: seconds(DURATION.scene * 4),
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "linear",
+            }}
+          />
+        )}
+        <div
+          ref={scope}
+          className="absolute inset-x-0 top-0"
+          style={{ transform: `translateY(${offset}px)` }}
+        >
+          {items.map((item) => (
+            <div
+              key={item.key}
+              className="flex items-center justify-center truncate px-1 text-center text-xl font-bold"
+              style={{ height: ITEM_H }}
+            >
+              {item.key.endsWith(":result") && result ? result : item.label}
+            </div>
+          ))}
+        </div>
+        <motion.div
+          className="pointer-events-none absolute inset-x-0 border-y border-white/20"
+          style={{ top: (WINDOW_H - ITEM_H) / 2, height: ITEM_H }}
+          animate={locked ? { x: [0, 2, 0] } : { x: 0 }}
+          transition={{ duration: seconds(DURATION.tick * 2), ease: EASE.out }}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface Card {
+  id: number;
+  elementId: string;
+  icon: string;
+  label: string;
+  where: string;
+  rare: boolean;
+  bonus?: string;
+}
+
+interface Flight {
+  id: number;
+  icon: string;
+  from: DOMRect;
+  to: DOMRect;
+}
+
+export function GachaMode() {
+  const planner = usePlanner();
+  const { director, settings, rolling, setRolling, reduced } = planner;
+  // One stable list of reel handles, so effects can depend on it.
+  const reels = useMemo(
+    () => Array.from({ length: 5 }, () => createRef<ReelHandle>()),
+    [],
+  );
+  const [pathReel, setPathReel] = useState(true);
+  const [rare, setRare] = useState(false);
+  const [elementId, setElementId] = useState<string | null>(null);
+  const [card, setCard] = useState<Card | null>(null);
+  const [flight, setFlight] = useState<Flight | null>(null);
+  const [history, setHistory] = useState<Card[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const multi = useRef(false);
+  const serial = useRef(0);
+  const sequence = useRef(new Sequence());
+  const messageFor = (text: string) => {
+    setMessage(text);
+    planner.announce(text);
+  };
+
+  async function fly(icon: string, chain: RollChain) {
+    const from = cardRef.current?.getBoundingClientRect();
+    const rect = chain.placement.rect ?? {
+      col: chain.placement.cells[0] % settings.cols,
+      row: Math.floor(chain.placement.cells[0] / settings.cols),
+      w: 1,
+      h: 1,
+    };
+    const to = planner.stage.current?.cellRect(rect);
+    const ms = director.scale(DURATION.fly);
+    if (!from || !to || ms <= 0) return;
+    setFlight({ id: serial.current++, icon, from, to });
+    await sequence.current.wait(director.wait(DURATION.fly));
+    setFlight(null);
+  }
+
+  async function pull() {
+    const { builder, rng } = planner.nextTurn();
+    const chain = builder.roll(rng);
+    if (!chain) {
+      setCard(null);
+      messageFor("The machine is empty: nothing has room left.");
+      return false;
+    }
+    // The time can change while "Pull until full" runs.
+    const name = elementLabel(
+      chain.element,
+      planner.latest.current.atmosphere.time,
+    );
+    const theme = THEMES.find((t) => t.id === chain.theme);
+    const first = chain.placement.rect
+      ? chain.placement.rect.row * settings.cols + chain.placement.rect.col
+      : chain.placement.cells[0];
+    const col = first % settings.cols;
+    const row = Math.floor(first / settings.cols);
+    const isRare = chain.element.weight <= 1;
+    setPathReel(Boolean(chain.path));
+    setElementId(chain.element.id);
+    setRare(isRare);
+    setCard(null);
+
+    const themePool = THEMES.filter((t) => settings.themes.includes(t.id)).map(
+      (t) => t.icon,
+    );
+    const variantPool = SCENE_ELEMENTS.filter(
+      (e) => e.theme === chain.theme,
+    ).map((e) => elementLabel(e, planner.latest.current.atmosphere.time).icon);
+    const colPool = Array.from({ length: settings.cols }, (_, c) =>
+      columnName(c),
+    );
+    const rowPool = Array.from({ length: settings.rows }, (_, r) =>
+      String(r + 1),
+    );
+    const lengthPool = ["2↓", "3↘", "4↙", "5↓", "6↘", "7↙"];
+    const lengthResult = chain.path
+      ? `${chain.path.length}${DRIFT_ARROW[chain.path.drift]}`
+      : "—";
+
+    const spins = [
+      [theme?.icon ?? "?", themePool],
+      [name.icon, variantPool],
+      [columnName(col), colPool],
+      [String(row + 1), rowPool],
+      [lengthResult, chain.path ? lengthPool : ["—"]],
+    ] as const;
+    await sequence.current.wait(
+      Promise.all(
+        spins.map(([result, pool], i) =>
+          reels[i].current?.spin(
+            result,
+            [...pool],
+            director.scale(DURATION.reel + i * DURATION.stagger),
+          ),
+        ),
+      ),
+    );
+
+    const where = chain.path
+      ? `${columnName(col)}${row + 1} · ${chain.path.length} cells ${DRIFT_ARROW[chain.path.drift]}`
+      : `${columnName(col)}${row + 1}`;
+    const next: Card = {
+      id: serial.current++,
+      elementId: chain.element.id,
+      icon: name.icon,
+      label: name.label,
+      where,
+      rare: isRare,
+      bonus: chain.fed
+        ? `+ ${elementLabel(chain.fed.element, planner.latest.current.atmosphere.time).label}`
+        : undefined,
+    };
+    setCard(next);
+    await sequence.current.wait(director.wait(DURATION.place));
+    planner.setCue({ zones: chain.element.zones });
+    await fly(
+      elementLabel(chain.element, planner.latest.current.atmosphere.time).icon,
+      chain,
+    );
+    planner.setCue(null);
+    const committedName = elementLabel(
+      chain.element,
+      planner.latest.current.atmosphere.time,
+    );
+    const placed = planner.addChain(chain);
+    if (!placed) {
+      // The board changed during the pull; the card goes, nothing landed.
+      setCard(null);
+      messageFor(
+        `${committedName.label} no longer fits there: nothing was placed.`,
+      );
+      return true;
+    }
+    // The stream it feeds can be crowded out on its own; the bonus goes too.
+    const landed = placed.fed ? next : { ...next, bonus: undefined };
+    if (landed !== next) setCard(landed);
+    setHistory((current) =>
+      [{ ...landed, ...committedName }, ...current].slice(0, 12),
+    );
+    const bonus = landed.bonus ? ` ${landed.bonus}` : "";
+    planner.announce(`${committedName.label} at ${where}${bonus}`);
+    await sequence.current.wait(director.wait(DURATION.place));
+    return true;
+  }
+
+  // Leaving the page ends a running sequence: no further pulls, and the
+  // current one finishes at once instead of waiting out its reels.
+  useEffect(
+    () => () => {
+      multi.current = false;
+      sequence.current.cancel();
+      director.skip();
+      for (const reel of reels) reel.current?.finish();
+    },
+    [director, reels],
+  );
+
+  async function run(untilFull: boolean) {
+    if (rolling) return;
+    // "Pull until full" on a full scene would overfill it by one.
+    if (untilFull && planner.boardStatus().full) {
+      setCard(null);
+      messageFor("The scene is already full.");
+      return;
+    }
+    director.reset();
+    sequence.current = new Sequence();
+    setRolling(true);
+    setMessage(null);
+    multi.current = untilFull;
+    try {
+      for (let i = 0; i < 60; i++) {
+        if (!(await pull())) break;
+        if (!multi.current) break;
+        if (planner.boardStatus().full) break;
+      }
+    } catch (error) {
+      if (!(error instanceof SequenceCancelled)) throw error;
+    } finally {
+      planner.setCue(null);
+      setRolling(false);
+      multi.current = false;
+      director.reset();
+    }
+  }
+
+  const cardElement = card && ELEMENTS_BY_ID.get(card.elementId);
+  const cardName = cardElement
+    ? elementLabel(cardElement, planner.atmosphere.time)
+    : card;
+  const reelElement = elementId && ELEMENTS_BY_ID.get(elementId);
+  const reelIcon = reelElement
+    ? elementLabel(reelElement, planner.atmosphere.time).icon
+    : undefined;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2 rounded-2xl border border-white/10 bg-gradient-to-b from-violet-500/10 to-transparent p-3">
+        <Reel ref={reels[0]} label="Category" />
+        <Reel
+          ref={reels[1]}
+          label="Variant"
+          rare={rare}
+          still={reduced}
+          result={reelIcon}
+        />
+        <Reel ref={reels[2]} label="Column" />
+        <Reel ref={reels[3]} label="Row" />
+        <Reel ref={reels[4]} label="Length" idle={!pathReel} />
+      </div>
+
+      <div className="relative flex min-h-[92px] items-center justify-center">
+        <AnimatePresence mode="popLayout">
+          {card ? (
+            <motion.div
+              key={card.id}
+              ref={cardRef}
+              className={cn(
+                "relative flex items-center gap-3 rounded-2xl border px-4 py-3",
+                card.rare
+                  ? "border-amber-200/60 bg-gradient-to-br from-amber-300/20 via-pink-400/15 to-violet-500/20"
+                  : "border-white/15 bg-white/[0.06]",
+              )}
+              initial={{ opacity: 0, scale: 0.6, y: 12 }}
+              animate={{ opacity: flight ? 0.35 : 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{
+                duration: reduced ? 0 : seconds(DURATION.place),
+                ease: EASE.spring,
+              }}
+            >
+              <span className="text-3xl">{cardName?.icon}</span>
+              <span className="flex flex-col">
+                <span className="flex items-center gap-1.5 font-bold">
+                  {cardName?.label}
+                  {card.rare && (
+                    <SparklesIcon size={16} className="text-amber-200" />
+                  )}
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {card.where}
+                </span>
+                {card.bonus && (
+                  <span className="text-xs text-sky-200">{card.bonus}</span>
+                )}
+              </span>
+            </motion.div>
+          ) : (
+            <motion.span
+              key="empty"
+              className="text-sm text-muted-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {message ??
+                "Pull to roll category, variant, column, row and length at once."}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button
+          type="button"
+          disabled={rolling}
+          onClick={() => run(false)}
+          className="rounded-full bg-gradient-to-r from-pink-400 to-violet-500 px-5 py-2 text-sm font-bold text-white shadow-lg shadow-pink-500/25 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+        >
+          Pull ×1
+        </button>
+        <button
+          type="button"
+          disabled={rolling}
+          onClick={() => run(true)}
+          className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-50"
+        >
+          Pull until full
+        </button>
+        {rolling && (
+          <button
+            type="button"
+            onClick={() => {
+              director.skip();
+              // Reels already spinning run on their own clock.
+              for (const reel of reels) reel.current?.finish();
+            }}
+            className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+          >
+            Skip
+          </button>
+        )}
+        {rolling && multi.current && (
+          <button
+            type="button"
+            onClick={() => {
+              multi.current = false;
+            }}
+            className="rounded-full border border-rose-300/30 px-4 py-2 text-sm font-semibold text-rose-200 hover:bg-rose-300/10"
+          >
+            Stop
+          </button>
+        )}
+      </div>
+
+      {history.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-1.5">
+          <AnimatePresence initial={false}>
+            {history.map((item) => (
+              <motion.span
+                key={item.id}
+                layout
+                title={`${item.label} · ${item.where}`}
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-lg border text-base",
+                  item.rare
+                    ? "border-amber-200/60 bg-amber-300/10"
+                    : "border-white/10 bg-white/5",
+                )}
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{
+                  duration: reduced ? 0 : seconds(DURATION.snap),
+                  ease: EASE.spring,
+                }}
+              >
+                {item.icon}
+              </motion.span>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Card flight from the tray into its cells; portalled because the
+          glass card's backdrop filter would trap a fixed element. */}
+      {flight &&
+        createPortal(
+          <motion.div
+            key={flight.id}
+            className="pointer-events-none fixed z-50 flex items-center justify-center rounded-xl border-2 border-amber-200 bg-violet-500/40 text-3xl shadow-[0_0_30px_rgba(253,230,138,0.6)]"
+            initial={{
+              left: flight.from.left,
+              top: flight.from.top,
+              width: flight.from.width,
+              height: flight.from.height,
+              rotate: -4,
+            }}
+            animate={{
+              left: flight.to.left,
+              top: flight.to.top,
+              width: flight.to.width,
+              height: flight.to.height,
+              rotate: 0,
+              opacity: [1, 1, 0.2],
+            }}
+            transition={{
+              duration: seconds(director.scale(DURATION.fly)),
+              ease: EASE.inout,
+            }}
+          >
+            {cardName?.icon ?? flight.icon}
+          </motion.div>,
+          document.body,
+        )}
+    </div>
+  );
+}

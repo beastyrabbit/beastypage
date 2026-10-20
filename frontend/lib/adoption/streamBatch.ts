@@ -19,6 +19,7 @@ import type {
 import { readCatDocument } from "@/lib/cat-system/document";
 import { catSystem } from "@/lib/cat-system/registry";
 import { getSystemRevealTraits } from "@/lib/cat-system/runtime";
+import { deduplicateTortieLayers } from "@/lib/cat-system/tortieLayers";
 import { applyCoatChoice, getCoatChoiceValue } from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME, formatPoseName } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
@@ -925,7 +926,9 @@ function revealedTortieLayers(
       colour: revealed.colour ? slot.colour : placeholders.colour,
     });
   }
-  return tortie;
+  // Stand-ins can make a half-revealed layer repeat another one exactly.
+  // Drawing it twice looks the same as once, and cat documents reject repeats.
+  return deduplicateTortieLayers(tortie);
 }
 
 /** The flat (legacy) render params for the reveal so far. */

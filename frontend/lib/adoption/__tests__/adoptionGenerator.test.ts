@@ -139,6 +139,24 @@ describe("AdoptionGenerator coat reveal", () => {
     expect(stages.filter((stage) => stage.traitId === "scars")).toHaveLength(1);
   });
 
+  it("renders a reveal frame where two tortie layers briefly match", () => {
+    // While a layer's parts spin, a frame can repeat another layer exactly;
+    // strict cat documents reject that, which used to abort the generation.
+    const generator = makeGenerator();
+    const state = generator.buildInitialState(
+      { dead: false, darkForest: false },
+      0,
+      0,
+      0,
+    );
+    const layer = { mask: "ONE", pattern: "SingleColour", colour: "WHITE" };
+    state.tortieLayers = [layer, { ...layer }];
+    state.isTortie = true;
+
+    const params = generator.buildRenderParams(state);
+    expect(params.traits.tortie).toHaveLength(1);
+  });
+
   it("reveals a derived coat pattern atomically at the pelt stage", () => {
     const generator = makeGenerator();
     const finalParams = {
