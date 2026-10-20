@@ -39,6 +39,13 @@ const TOOLS: ToolCard[] = [
     href: "/pixelator",
   },
   {
+    title: "Scene Planner",
+    icon: "🎲",
+    description:
+      "Roll an illustration background on a grid with dice, gacha reels or hand-placed pixel tiles.",
+    href: "/scene-planner",
+  },
+  {
     title: "Cat Color Palettes",
     icon: "🐱",
     description:
