@@ -55,43 +55,13 @@ def _roof(tile, compact, glass):
         l1, r1 = bounds(z1)
         _prism([(l0, z0), (r0, z0), (r1, z1), (l1, z1)], color, front)
 
-    # The roof hides the lower chimney bricks as its outline rises.
-    if tile.alt == 0:
-        chimney = 4 if not tile.e and tile.w else 10
-        _box(chimney, low + 1, chimney + 2, 15, "builtDark", -0.20)
-        _box(chimney - 1, 15, chimney + 3, 16, "trunk", -0.22)
-        _box(chimney, 13, chimney + 1, 15, "rockLight", -0.23)
-
-    band(low, ridge, "trunk", -0.38)
-    for z in range(low + 1, ridge, 3):
-        top = min(z + 2, ridge)
-        band(z, top, "roof", -0.40)
-        # Staggered shingle joints repeat independently of the alternative.
-        l, r = bounds(top)
-        for x in range(-16 + (2 if (z - low) % 2 else 0), 33, 4):
-            if l + 1 <= x and x + 1 <= r - 1:
-                _box(x, z, x + 1, top, "trunk", -0.41)
-        band(top - 1, top, "red", -0.42)
-
+    _chimney(tile, low)
+    _shingles(low, ridge, bounds, band)
     _box(left, low - 1, right, low, "trunk", -0.44)
     l, r = bounds(ridge - 1)
     _box(l, ridge - 1, r, ridge, "red", -0.43)
 
-    if tile.alt == 1:
-        centre = 10 if not tile.w and tile.e else 6 if tile.w and not tile.e else 8
-        bottom, width = (10, 2) if compact else (4, 3)
-        top = bottom + (2 if compact else 5)
-        _box(centre - width, bottom, centre + width, top, "wood", -0.46)
-        _pane(centre - width + 1, bottom + 1, centre + width - 1,
-              top, glass, -0.48)
-        if not compact:
-            _box(centre, bottom + 1, centre + 1, top, "trunk", -0.49)
-        _prism([(centre - width - 1, top), (centre + width + 1, top),
-                (centre, top + 3)], "trunk", -0.50)
-        _prism([(centre - width, top + 1), (centre + width, top + 1),
-                (centre, top + 3)], "roof", -0.51)
-        _box(centre - width - 1, bottom - 1, centre + width + 1,
-             bottom, "woodLight", -0.50)
+    _dormer(tile, compact, glass)
 
 
 def _window(glass):
@@ -125,24 +95,7 @@ def build(tile):
 
     bottom = -16 if tile.s else 1
     top = 8 if compact else 32
-    _box(left, bottom, right, top, "sand", -0.25)
-    if not tile.w:
-        _box(left, bottom, left + 1, top, "wood", -0.28)
-    if not tile.e:
-        _box(right - 1, bottom, right, top, "trunk", -0.28)
-    if tile.shape == "mass":
-        # Timber framing distinguishes a rambling cottage from a plaster one.
-        _box(left, 7 if compact else 14, right, 8 if compact else 16,
-             "wood", -0.28)
-        _box(2, bottom, 3, top, "wood", -0.28)
-        _box(13, bottom, 14, top, "wood", -0.28)
-
-    if not tile.s:
-        _box(left, 1, right, 3 if not compact else 2, "rock", -0.29)
-        for x in range(-16, 33, 4):
-            if left <= x < right:
-                _box(x, 1, min(x + 3, right), 2, "rockLight", -0.30)
-
+    _walls(tile, compact, left, right, bottom, top)
     if compact:
         # The little cottage fills fourteen pixels across and high.
         _box(3, 3, 8, 7, "trunk", -0.30)
@@ -156,3 +109,72 @@ def build(tile):
         _door()
     else:
         _window(glass)
+
+
+def _dormer(tile, compact, glass):
+    if tile.alt == 1:
+        if not tile.w and tile.e:
+            centre = 10
+        elif tile.w and not tile.e:
+            centre = 6
+        else:
+            centre = 8
+        bottom, width = (10, 2) if compact else (4, 3)
+        top = bottom + (2 if compact else 5)
+        _box(centre - width, bottom, centre + width, top, "wood", -0.46)
+        _pane(centre - width + 1, bottom + 1, centre + width - 1,
+              top, glass, -0.48)
+        if not compact:
+            _box(centre, bottom + 1, centre + 1, top, "trunk", -0.49)
+        _prism([(centre - width - 1, top), (centre + width + 1, top),
+                (centre, top + 3)], "trunk", -0.50)
+        _prism([(centre - width, top + 1), (centre + width, top + 1),
+                (centre, top + 3)], "roof", -0.51)
+        _box(centre - width - 1, bottom - 1, centre + width + 1,
+             bottom, "woodLight", -0.50)
+
+
+def _shingles(low, ridge, bounds, band):
+    band(low, ridge, "trunk", -0.38)
+    for z in range(low + 1, ridge, 3):
+        top = min(z + 2, ridge)
+        band(z, top, "roof", -0.40)
+        # Staggered shingle joints repeat independently of the alternative.
+        l, r = bounds(top)
+        for x in range(-16 + (2 if (z - low) % 2 else 0), 33, 4):
+            if l + 1 <= x and x + 1 <= r - 1:
+                _box(x, z, x + 1, top, "trunk", -0.41)
+        band(top - 1, top, "red", -0.42)
+
+
+def _walls(tile, compact, left, right, bottom, top):
+    _box(left, bottom, right, top, "sand", -0.25)
+    if not tile.w:
+        _box(left, bottom, left + 1, top, "wood", -0.28)
+    if not tile.e:
+        _box(right - 1, bottom, right, top, "trunk", -0.28)
+    if tile.shape == "mass":
+        # Timber framing distinguishes a rambling cottage from a plaster one.
+        _box(left, 7 if compact else 14, right, 8 if compact else 16,
+             "wood", -0.28)
+        _box(2, bottom, 3, top, "wood", -0.28)
+        _box(13, bottom, 14, top, "wood", -0.28)
+
+    if not tile.s:
+        _foundation(left, right, compact)
+
+
+def _foundation(left, right, compact):
+    _box(left, 1, right, 3 if not compact else 2, "rock", -0.29)
+    for x in range(-16, 33, 4):
+        if left <= x < right:
+            _box(x, 1, min(x + 3, right), 2, "rockLight", -0.30)
+
+
+def _chimney(tile, low):
+    # The roof hides the lower chimney bricks as its outline rises.
+    if tile.alt == 0:
+        chimney = 4 if not tile.e and tile.w else 10
+        _box(chimney, low + 1, chimney + 2, 15, "builtDark", -0.20)
+        _box(chimney - 1, 15, chimney + 3, 16, "trunk", -0.22)
+        _box(chimney, 13, chimney + 1, 15, "rockLight", -0.23)

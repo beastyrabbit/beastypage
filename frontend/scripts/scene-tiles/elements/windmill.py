@@ -3,26 +3,11 @@
 import math
 
 import tilekit as kit
+from fieldkit import lit_box as _box, lit_poly as _poly
 
 PALETTE = kit.ramp("paint", "rockLight", "trunk", "roof") + [
     kit.BASE["glow"], "#b9b8a2", kit.BASE["woodLight"], kit.BASE["sand"],
 ]
-P = 1 / 16
-
-
-def _poly(points, color, front=-0.3):
-    material = kit.mat(color) if isinstance(color, str) else color
-    if "glow" in material:
-        material.cycles.emission_sampling = "NONE"
-    obj = kit.prism([(x * P, z * P) for x, z in points],
-                    material, front, front + 0.01)
-    obj.visible_shadow = False
-    obj.visible_diffuse = False
-    obj.visible_glossy = False
-
-
-def _box(x0, z0, x1, z1, color, front=-0.3):
-    _poly([(x0, z0), (x1, z0), (x1, z1), (x0, z1)], color, front)
 
 
 def _rotor(tile):
@@ -45,8 +30,7 @@ def _rotor(tile):
     _box(7, 8, 8, 9, "#b9b8a2", -0.59)
 
 
-def build(tile):
-    compact = not tile.n and not tile.s
+def _shaft(tile):
     # A twelve-pixel masonry shaft joins the column cells. Only the closed
     # base flares and the closed top tapers, so arbitrary column heights join.
     if tile.s and tile.n:
@@ -68,6 +52,10 @@ def build(tile):
     for x, z in ((3, 3), (10, 4), (4, 11), (10, 14), (3, 15)):
         if tile.n or z < 10:
             _box(x, z, x + 2, z + 0.7, "#b9b8a2", -0.33)
+
+
+def _windows(tile):
+    compact = not tile.n and not tile.s
     glass = kit.glow("glow", 1.5) if tile.variant == "night" else kit.mat("trunk")
     if tile.n or tile.s:
         for x, z in ((6, 8), (9, 13)) if tile.n and tile.s else ((7, 8),):
@@ -76,6 +64,11 @@ def build(tile):
     elif compact:
         _box(4, 6, 5.5, 8, glass, -0.37)
         _box(10.5, 6, 12, 8, glass, -0.37)
+
+
+def build(tile):
+    _shaft(tile)
+    _windows(tile)
     if not tile.s:
         _box(1, 0, 15, 1, "rockLight", -0.34)
         _poly([(6, 1), (10, 1), (10, 5), (9, 6), (7, 6), (6, 5)], "trunk", -0.36)

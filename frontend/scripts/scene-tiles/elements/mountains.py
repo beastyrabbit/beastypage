@@ -3,6 +3,7 @@
 import math
 
 import tilekit as kit
+import woodkit as wood
 
 PALETTE = [kit.BASE[c] for c in ("rockDark", "rock", "rockLight", "snow", "white")]
 PALETTE += ["#354f46", "#59735c", "#b1b7c2"]
@@ -20,6 +21,22 @@ def _height(x, alt):
         if xa <= x <= xb:
             return za + (zb - za) * (x - xa) / (xb - xa)
     return .34
+
+
+def _gullies(x, z, alt, color):
+    # Short, kinked snow remnants sit in gullies, rather than forming a
+    # repeating white diagonal. All are inset from the shared borders.
+    gullies = (
+        ((.25, .75), (.33, .56), (.24, .40)),
+        ((.69, .73), (.57, .60), (.62, .40)),
+        ((.38, .78), (.25, .62), (.31, .49)),
+    )
+    for (xa, za), (xb, zb) in zip(gullies[alt], gullies[alt][1:]):
+        if zb < z < za:
+            gx = xa + (xb - xa) * (za - z) / (za - zb)
+            if abs(x - gx) < .038:
+                color = 3 if z > .54 else 7
+    return color
 
 
 def _flank(x, z, alt):
@@ -48,18 +65,7 @@ def _flank(x, z, alt):
         if ax * qz - az * qx >= 0 and qx * bz - qz * bx >= 0:
             color = shade
             break
-    # Short, kinked snow remnants sit in gullies, rather than forming a
-    # repeating white diagonal. All are inset from the shared borders.
-    gullies = (
-        ((.25, .75), (.33, .56), (.24, .40)),
-        ((.69, .73), (.57, .60), (.62, .40)),
-        ((.38, .78), (.25, .62), (.31, .49)),
-    )
-    for (xa, za), (xb, zb) in zip(gullies[alt], gullies[alt][1:]):
-        if zb < z < za:
-            gx = xa + (xb - xa) * (za - z) / (za - zb)
-            if abs(x - gx) < .038:
-                color = 3 if z > .54 else 7
+    color = _gullies(x, z, alt, color)
     # A few two-pixel scree chips break up the larger faces.
     scree = (((.64, .24), (.78, .34)),
              ((.29, .25), (.41, .39)),
@@ -70,40 +76,48 @@ def _flank(x, z, alt):
     return color
 
 
-def build(tile):
-    verts, faces = [[] for _ in PALETTE], [[] for _ in PALETTE]
+def _top(tile, x, alt):
+    top = 1.1 if tile.n else _height(x, alt)
+    if not tile.n:
+        if not tile.w:
+            top = min(top, .0625 + x * 2.2)
+        if not tile.e:
+            top = min(top, .0625 + (1 - x) * 2.2)
+    return top
+
+
+def _foothills(tile, x, z, c):
+    if tile.s:
+        return c
+    # A serrated forested foothill band, with lit left edges.
+    if z < .13:
+        c = 5
+    for tx, h in ((.08, .22), (.28, .18), (.48, .25), (.73, .20), (.92, .24)):
+        width = .10 * (h - z) / max(.01, h - .07)
+        if .07 < z < h and abs(x - tx) < width:
+            c = 6 if x < tx else 5
+    return c
+
+
+def _paint(tile, x, z, alt, peak_x, peak_z):
+    if (not tile.w and x < .03125) or (not tile.e and x > .96875):
+        return None
+    top = _top(tile, x, alt)
+    if z > top or (not tile.s and z < .03125):
+        return None
+    c = _flank(x, z, alt)
+    if not tile.n and z > peak_z - .22 - .15 * abs(x - peak_x):
+        c = 4 if x <= peak_x else 3
+    c = _foothills(tile, x, z, c)
+    return c
+
+
+def _pixel(tile, x, z):
     alt = tile.alt % 3
     peak_x, peak_z = PEAKS[alt]
-    for j in range(32):
-        z = (j + .5) / 32
-        for i in range(32):
-            x = (i + .5) / 32
-            if (not tile.w and x < .03125) or (not tile.e and x > .96875):
-                continue
-            top = 1.1 if tile.n else _height(x, alt)
-            if not tile.n:
-                if not tile.w:
-                    top = min(top, .0625 + x * 2.2)
-                if not tile.e:
-                    top = min(top, .0625 + (1 - x) * 2.2)
-            if z > top or (not tile.s and z < .03125):
-                continue
-            c = _flank(x, z, alt)
-            if not tile.n:
-                if z > peak_z - .22 - .15 * abs(x - peak_x):
-                    c = 4 if x <= peak_x else 3
-            if not tile.s:
-                # A serrated forested foothill band, with lit left edges.
-                if z < .13:
-                    c = 5
-                for tx, h in ((.08, .22), (.28, .18), (.48, .25), (.73, .20), (.92, .24)):
-                    width = .10 * (h - z) / max(.01, h - .07)
-                    if .07 < z < h and abs(x - tx) < width:
-                        c = 6 if x < tx else 5
-            n = len(verts[c])
-            verts[c] += [(i / 32, 0, j / 32), ((i + 1) / 32, 0, j / 32),
-                         ((i + 1) / 32, 0, (j + 1) / 32), (i / 32, 0, (j + 1) / 32)]
-            faces[c].append((n, n + 1, n + 2, n + 3))
-    for color, v, f in zip(PALETTE, verts, faces):
-        if f:
-            kit.mesh(v, f, kit.mat(color), name="alpine-flank")
+    return _paint(tile, x, z, alt, peak_x, peak_z)
+
+
+def build(tile):
+    p = wood.sample(tile, _pixel, resolution=32, normalized=True)
+    wood.draw_indices(p, PALETTE, 'alpine-flank', resolution=32)

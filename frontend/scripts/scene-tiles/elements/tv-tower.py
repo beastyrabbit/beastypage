@@ -1,21 +1,12 @@
 """Slender concrete broadcast tower with a saucer pod and aircraft beacon."""
 
 import tilekit as kit
+import townkit
 
 PALETTE = kit.ramp("rockDark", "rockLight", "waterDark", "waterLight", "red") + [kit.BASE["glow"]]
-P = 1 / 16
-
-
-def _face(points, color, y=-.3):
-    material = kit.mat(color) if isinstance(color, str) else color
-    if "glow" in material:
-        material.cycles.emission_sampling = "NONE"
-    obj = kit.prism([(x * P, z * P) for x, z in points], material, y, y + .01)
-    obj.visible_shadow = obj.visible_diffuse = obj.visible_glossy = False
-
-
-def _box(a, b, c, d, color, y=-.3):
-    _face([(a, b), (c, b), (c, d), (a, d)], color, y)
+_shapes = townkit.Shapes(painted=False)
+_face = _shapes.face
+_box = _shapes.polygon_box
 
 
 def build(tile):

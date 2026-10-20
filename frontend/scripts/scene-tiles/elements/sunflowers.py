@@ -3,46 +3,10 @@
 import math
 
 import tilekit as kit
+from fieldkit import Picture, neighbours
 
 PALETTE = kit.ramp("foliageDark", "foliage", "foliageLight", "#f4c632", "#603c25") + ["#ffe684"]
 _MATERIALS = {}
-
-
-def _ink(color):
-    """Flat illustration colour; regular atlas pixels still receive scene tint."""
-    if color not in _MATERIALS:
-        material = kit.mat(color).copy()
-        nodes = material.node_tree.nodes
-        nodes.clear()
-        ink = nodes.new("ShaderNodeEmission")
-        ink.inputs["Color"].default_value = kit.linear(kit.BASE.get(color, color))
-        ink.inputs["Strength"].default_value = 1
-        output = nodes.new("ShaderNodeOutputMaterial")
-        material.node_tree.links.new(ink.outputs[0], output.inputs["Surface"])
-        # No tilekit glow metadata: daylight art must darken normally at night.
-        _MATERIALS[color] = material
-    return _MATERIALS[color]
-
-
-class _Picture:
-    def __init__(self):
-        self.parts = {}
-
-    def poly(self, points, color, depth):
-        verts, faces = self.parts.setdefault(color, ([], []))
-        start = len(verts)
-        verts.extend((x / 16, depth, z / 16) for x, z in points)
-        faces.append(tuple(range(start, len(verts))))
-
-    def rect(self, x, z, w, h, color, depth):
-        self.poly([(x, z), (x + w, z), (x + w, z + h), (x, z + h)], color, depth)
-
-    def finish(self):
-        for color, (verts, faces) in self.parts.items():
-            obj = kit.mesh(verts, faces, _ink(color), name="sunflowers")
-            obj.visible_shadow = False
-            obj.visible_diffuse = False
-            obj.visible_glossy = False
 
 
 def _flower(p, tile, x, base, height, radius, index, back=False):
@@ -84,28 +48,25 @@ def _flower(p, tile, x, base, height, radius, index, back=False):
            kit.shade("#603c25", 1.22), depth - .09)
 
 
-def build(tile):
-    p = _Picture()
-    p.rect(-1, -1, 18, 10.5 if not tile.n else 18, "foliageDark", .9)
-    for dz in (-1, 0, 1):
-        for dx in (-1, 0, 1):
-            if not tile.has(dx, dz):
-                continue
-            # Different heights, spacings and turns break the old rosette grid.
-            distant = ((1, 8.8, 4.4, 2, 2), (5.5, 7.9, 5.3, 2.3, 1),
-                       (10.2, 8.5, 3.6, 1.8, 3), (14.1, 7.4, 6, 2.1, 0))
-            if tile.shape == "single":
-                distant = ((3.3, 6.8, 5.6, 2.4, 2), (11.5, 7, 5.3, 2.3, 1))
-            for x, base, h, r, index in distant:
-                _flower(p, tile, x + dx * 16, base + dz * 16, h, r, index, True)
-            near = ((3.4, -1.4, 8.7, 3.4, 0), (11.2, -.8, 10.2, 2.9, 2))
-            if tile.shape == "mass":
-                near = ((2.5, -1.4, 8.4, 3.2, 1), (9.2, -1, 9.4, 3.5, 0),
-                        (14.6, -.7, 6, 2.8, 2))
-            if tile.shape == "single":
-                near = ((4.7, -.7, 6.1, 3.6, 0), (12.1, -.8, 9, 3.1, 1))
-            for x, base, h, r, index in near:
-                _flower(p, tile, x + dx * 16, base + dz * 16, h, r, index)
+def _cell(p, tile, dx, dz):
+    # Different heights, spacings and turns break the old rosette grid.
+    distant = ((1, 8.8, 4.4, 2, 2), (5.5, 7.9, 5.3, 2.3, 1),
+               (10.2, 8.5, 3.6, 1.8, 3), (14.1, 7.4, 6, 2.1, 0))
+    if tile.shape == "single":
+        distant = ((3.3, 6.8, 5.6, 2.4, 2), (11.5, 7, 5.3, 2.3, 1))
+    for x, base, h, r, index in distant:
+        _flower(p, tile, x + dx * 16, base + dz * 16, h, r, index, True)
+    near = ((3.4, -1.4, 8.7, 3.4, 0), (11.2, -.8, 10.2, 2.9, 2))
+    if tile.shape == "mass":
+        near = ((2.5, -1.4, 8.4, 3.2, 1), (9.2, -1, 9.4, 3.5, 0),
+                (14.6, -.7, 6, 2.8, 2))
+    if tile.shape == "single":
+        near = ((4.7, -.7, 6.1, 3.6, 0), (12.1, -.8, 9, 3.1, 1))
+    for x, base, h, r, index in near:
+        _flower(p, tile, x + dx * 16, base + dz * 16, h, r, index)
+
+
+def _cover(p, tile):
     # Low broad leaves close the ground without soil lines between cells.
     for dx in (-1, 0, 1):
         if dx and not tile.has(dx, 0):
@@ -115,4 +76,12 @@ def build(tile):
             p.poly([(x - 2, 0), (x - 2.5, 1.6), (x - 1, 2.4),
                     (x, 1.5), (x + 1.1, 3), (x + 2.3, 2.3), (x + 1, 0)],
                    "foliage" if i % 2 else "foliageLight", -.9)
+
+
+def build(tile):
+    p = Picture("sunflowers", _MATERIALS)
+    p.rect(-1, -1, 18, 10.5 if not tile.n else 18, "foliageDark", .9)
+    for dx, dz in neighbours(tile):
+        _cell(p, tile, dx, dz)
+    _cover(p, tile)
     p.finish()

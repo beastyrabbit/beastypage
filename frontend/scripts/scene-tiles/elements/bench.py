@@ -6,6 +6,8 @@ PALETTE = kit.ramp("wood", "woodLight", "trunk", "builtDark", "rockDark")
 
 
 def build(tile):
+    if tile.element != "bench":
+        raise ValueError("Bench builder requires a bench tile")
     iron = kit.mat("rockDark", metal=0.3)
     wood = kit.mat("wood")
     light = kit.mat("woodLight")

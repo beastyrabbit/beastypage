@@ -3,24 +3,9 @@
 import math
 
 import tilekit as kit
+from fieldkit import lit_box as _box, lit_poly as _poly
 
 PALETTE = kit.ramp("#b83f39", "#78352f", "rockDark", "paint", "glow")
-P = 1 / 16
-
-
-def _poly(points, color, front=-0.3):
-    material = kit.mat(color) if isinstance(color, str) else color
-    if "glow" in material:
-        material.cycles.emission_sampling = "NONE"
-    obj = kit.prism([(x * P, z * P) for x, z in points],
-                    material, front, front + 0.01)
-    obj.visible_shadow = False
-    obj.visible_diffuse = False
-    obj.visible_glossy = False
-
-
-def _box(x0, z0, x1, z1, color, front=-0.3):
-    _poly([(x0, z0), (x1, z0), (x1, z1), (x0, z1)], color, front)
 
 
 def _line(a, b, color, front=-0.4):
@@ -39,27 +24,32 @@ def _doors(bottom, top):
     _line((4, top - 1), (12, bottom), "paint", -0.42)
 
 
-def _roof(tile, compact, glass):
-    low = 8 if compact else 0
-    shoulder = low + (15 - low) * 0.58
+def _roof_bounds(tile, z, low, shoulder, upper_inset):
     left, right = (-16 if tile.w else 1), (32 if tile.e else 15)
-    upper_inset = 6 if not tile.w and not tile.e else 7
+    if z <= shoulder:
+        inset = (z - low) / (shoulder - low) * 2
+    else:
+        inset = 2 + (z - shoulder) / (15 - shoulder) * (upper_inset - 2)
+    return left if tile.w else left + inset, right if tile.e else right - inset
 
-    def bounds(z):
-        if z <= shoulder:
-            inset = (z - low) / (shoulder - low) * 2
-        else:
-            inset = 2 + (z - shoulder) / (15 - shoulder) * (upper_inset - 2)
-        return left if tile.w else left + inset, right if tile.e else right - inset
 
+def _roof_panels(tile, low, shoulder, upper_inset):
     for z in range(low, 15):
-        l0, r0 = bounds(z)
-        l1, r1 = bounds(z + 1)
+        l0, r0 = _roof_bounds(tile, z, low, shoulder, upper_inset)
+        l1, r1 = _roof_bounds(tile, z + 1, low, shoulder, upper_inset)
         _poly([(l0, z), (r0, z), (r1, z + 1), (l1, z + 1)], "rockDark", -0.32)
         inset_l, inset_r = (0 if tile.w else 1), (0 if tile.e else 1)
         if r1 - inset_r > l1 + inset_l:
             _poly([(l0 + inset_l, z), (r0 - inset_r, z),
                    (r1 - inset_r, z + 1), (l1 + inset_l, z + 1)], "#b83f39", -0.34)
+
+
+def _roof(tile, compact, glass):
+    low = 8 if compact else 0
+    shoulder = low + (15 - low) * 0.58
+    left, right = (-16 if tile.w else 1), (32 if tile.e else 15)
+    upper_inset = 6 if not tile.w and not tile.e else 7
+    _roof_panels(tile, low, shoulder, upper_inset)
     for closed, x, direction in ((not tile.w, left, 1), (not tile.e, right, -1)):
         if closed:
             _line((x, low), (x + direction * 2, shoulder), "paint", -0.38)
@@ -76,13 +66,7 @@ def _roof(tile, compact, glass):
         _line((5, bottom), (11, top - 2), "paint", -0.44)
 
 
-def build(tile):
-    glass = kit.glow("glow", 1.5) if tile.variant == "night" else kit.mat("rockDark")
-    compact = not tile.n and not tile.s
-    if not tile.n and not compact:
-        _roof(tile, False, glass)
-        return
-    left, right = (-16 if tile.w else 1), (32 if tile.e else 15)
+def _walls(tile, compact, left, right):
     bottom, top = (-16 if tile.s else 1), (8 if compact else 32)
     _box(left, bottom, right, top, "#b83f39", -0.25)
     for x in range(-16, 33, 3):
@@ -92,6 +76,9 @@ def build(tile):
         _box(left, bottom, left + 1, top, "paint", -0.31)
     if not tile.e:
         _box(right - 1, bottom, right, top, "paint", -0.31)
+
+
+def _openings(tile, compact, left, right, glass):
     if not tile.s:
         _box(left, 1, right, 2, "rockDark", -0.33)
         _doors(2, 8 if compact else 13)
@@ -102,5 +89,16 @@ def build(tile):
         _box(5, 7, 11, 8, "paint", -0.38)
         if tile.shape == "mass":
             _box(left, 14, right, 16, "paint", -0.32)
+
+
+def build(tile):
+    glass = kit.glow("glow", 1.5) if tile.variant == "night" else kit.mat("rockDark")
+    compact = not tile.n and not tile.s
+    if not tile.n and not compact:
+        _roof(tile, False, glass)
+        return
+    left, right = (-16 if tile.w else 1), (32 if tile.e else 15)
+    _walls(tile, compact, left, right)
+    _openings(tile, compact, left, right, glass)
     if compact:
         _roof(tile, True, glass)

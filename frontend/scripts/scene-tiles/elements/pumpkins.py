@@ -3,6 +3,7 @@
 import math
 
 import tilekit as kit
+from fieldkit import rim
 
 PALETTE = kit.ramp("#543c2c", "foliage", "#ed8529", "#b95620", "#ffb74f")
 
@@ -39,12 +40,4 @@ def build(tile):
                   kit.mat("foliageLight" if i % 2 else "foliage"), -.14, -.1, bulge=.025)
     for x, z, radius in layouts.get(tile.shape, layouts["mass"]):
         _pumpkin(x, z, radius)
-    rim = kit.mat(kit.shade("#543c2c", .72))
-    left, right = (-1 if tile.w else 0), (2 if tile.e else 1)
-    bottom, top = (-1 if tile.s else 0), (2 if tile.n else 1)
-    for closed, bounds in (
-        (not tile.w, (0, bottom, .0625, top)), (not tile.e, (.9375, bottom, 1, top)),
-        (not tile.s, (left, 0, right, .0625)), (not tile.n, (left, .9375, right, 1)),
-    ):
-        if closed:
-            kit.box(*bounds, rim, -.6, -.55)
+    rim(tile, kit.mat(kit.shade("#543c2c", .72)), -.6, -.55)

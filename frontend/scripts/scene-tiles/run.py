@@ -89,8 +89,7 @@ def render(path: str, factor: int, palette):
     return kit.downsample(kit.read_png(path), factor, palette)
 
 
-def glow_pass(path: str, factor: int):
-    """Renders only self-lit surfaces; everything else blocks them."""
+def _holdout_materials():
     swapped = []
     colours = set()
     for obj in bpy.context.scene.objects:
@@ -104,16 +103,25 @@ def glow_pass(path: str, factor: int):
             else:
                 swapped.append((slot, slot.material))
                 slot.material = holdout()
+    return swapped, colours
+
+
+def _restore_materials(swapped):
+    for slot, material in swapped:
+        slot.material = material
+
+
+def glow_pass(path: str, factor: int):
+    """Renders only self-lit surfaces; everything else blocks them."""
+    swapped, colours = _holdout_materials()
     if not colours:
-        for slot, material in swapped:
-            slot.material = material
+        _restore_materials(swapped)
         return None
     palette = [c for value in colours for c in (value, kit.shade(value, 0.8), kit.shade(value, 1.15))]
     try:
         return render(path, factor, palette)
     finally:
-        for slot, material in swapped:
-            slot.material = material
+        _restore_materials(swapped)
 
 
 def uses_glow() -> bool:
@@ -124,44 +132,53 @@ def uses_glow() -> bool:
     return False
 
 
-def render_sheet(sheet: str, jobs: list[dict], args, manifest: dict) -> int:
-    builder = load_builder(sheet)
-    palette = getattr(builder, "PALETTE", None) or kit.GLOBAL_PALETTE
-    factor = args.supersample
-    kit.setup_scene(CELL * factor, args.threads)
+def _render_frame(sheet, builder, job, frame, tmp, factor, palette):
+    tile = kit.Tile(job, frame)
+    kit.clear()
+    try:
+        builder.build(tile)
+    except Exception:
+        print(f"[{sheet}] build failed for {job['key']} frame {frame}")
+        traceback.print_exc()
+        return None
+    pixels = render(os.path.join(tmp, "frame.png"), factor, palette)
+    glow = glow_pass(os.path.join(tmp, "glow.png"), factor) if uses_glow() else None
+    return pixels, glow
 
+
+def _repeat_frame(tiles, glows, row, job, frame, pixels, glow):
+    # Short loops repeat to fill the sheet's columns.
+    columns = tiles.shape[2] // CELL
+    for col in range(frame, columns, job["frames"]):
+        x = col * CELL
+        tiles[row, :, x : x + CELL] = pixels
+        if glow is not None:
+            glows[row, :, x : x + CELL] = glow
+
+
+def _render_tiles(sheet, builder, jobs, tmp, factor, palette, started):
     columns = max(job["frames"] for job in jobs)
     tiles = np.zeros((len(jobs), CELL, columns * CELL, 4), dtype=np.float32)
     glows = np.zeros_like(tiles)
     any_glow = False
     errors = 0
-    tmp = tempfile.mkdtemp(prefix=f"tiles-{sheet}-")
-    started = time.time()
-
     for row, job in enumerate(jobs):
         for frame in range(job["frames"]):
-            tile = kit.Tile(job, frame)
-            kit.clear()
-            try:
-                builder.build(tile)
-            except Exception:
+            result = _render_frame(sheet, builder, job, frame, tmp, factor, palette)
+            if result is None:
                 errors += 1
-                print(f"[{sheet}] build failed for {job['key']} frame {frame}")
-                traceback.print_exc()
                 continue
-            path = os.path.join(tmp, "frame.png")
-            pixels = render(path, factor, palette)
-            glow = glow_pass(os.path.join(tmp, "glow.png"), factor) if uses_glow() else None
-            # Short loops repeat to fill the sheet's columns.
-            for col in range(frame, columns, job["frames"]):
-                x = col * CELL
-                tiles[row, :, x : x + CELL] = pixels
-                if glow is not None:
-                    glows[row, :, x : x + CELL] = glow
-                    any_glow = True
+            pixels, glow = result
+            _repeat_frame(tiles, glows, row, job, frame, pixels, glow)
+            if glow is not None:
+                any_glow = True
         if (row + 1) % 25 == 0:
             print(f"[{sheet}] {row + 1}/{len(jobs)} tiles, {time.time() - started:.0f}s")
+    return tiles, glows, any_glow, errors
 
+
+def _write_sheet(sheet, jobs, tiles, glows, args):
+    columns = tiles.shape[2] // CELL
     out = os.path.join(args.out, "sheets")
     os.makedirs(out, exist_ok=True)
     sheet_pixels = tiles.reshape(len(jobs) * CELL, columns * CELL, 4)
@@ -172,7 +189,7 @@ def render_sheet(sheet: str, jobs: list[dict], args, manifest: dict) -> int:
         "columns": columns,
         "tiles": {job["key"]: [row, job["frames"]] for row, job in enumerate(jobs)},
     }
-    if any_glow:
+    if glows is not None:
         kit.write_png(
             os.path.join(out, f"{sheet}.glow.png"),
             glows.reshape(len(jobs) * CELL, columns * CELL, 4),
@@ -181,7 +198,19 @@ def render_sheet(sheet: str, jobs: list[dict], args, manifest: dict) -> int:
     with open(os.path.join(out, f"{sheet}.json"), "w") as fh:
         json.dump(entry, fh)
 
-    write_preview(sheet, jobs, tiles, glows if any_glow else None, args, manifest)
+
+def render_sheet(sheet: str, jobs: list[dict], args, manifest: dict) -> int:
+    builder = load_builder(sheet)
+    palette = getattr(builder, "PALETTE", None) or kit.GLOBAL_PALETTE
+    factor = args.supersample
+    kit.setup_scene(CELL * factor, args.threads)
+    tmp = tempfile.mkdtemp(prefix=f"tiles-{sheet}-")
+    started = time.time()
+    tiles, glows, any_glow, errors = _render_tiles(sheet, builder, jobs, tmp, factor, palette, started)
+    if not any_glow:
+        glows = None
+    _write_sheet(sheet, jobs, tiles, glows, args)
+    write_preview(sheet, jobs, tiles, glows, args, manifest)
     print(
         f"[{sheet}] done: {len(jobs)} tiles in {time.time() - started:.0f}s, "
         f"{errors} errors"
@@ -240,75 +269,91 @@ def over(canvas, x, y, tile):
     region[...] = tile * a + region * (1 - a)
 
 
-def write_preview(sheet, jobs, tiles, glows, args, manifest):
-    index = {job["key"]: row for row, job in enumerate(jobs)}
-    frames = tiles.shape[2] // CELL
+def _ground_previews(index, frames, frame_of):
+    # Each zone as a 6 x 3 field with alternatives scattered as in the app.
     panels = []
+    for zone in ("far", "mid", "front"):
+        panel = np.zeros((3 * CELL, 6 * CELL * frames, 4), dtype=np.float32)
+        for f in range(frames):
+            for y in range(3):
+                for x in range(6):
+                    alt = (x * 7 + y * 13) % 4
+                    over(panel, x + 6 * f, y, frame_of(index[f"{zone}:{alt}"], f))
+        panels.append(panel)
+    return panels
 
-    def frame_of(row, f):
-        tile = tiles[row, :, f * CELL : (f + 1) * CELL].copy()
-        if glows is not None:
-            g = glows[row, :, f * CELL : (f + 1) * CELL]
-            tile = g * g[..., 3:4] + tile * (1 - g[..., 3:4])
-        return tile
 
-    if sheet == "ground":
-        # Each zone as a 6 x 3 field with alternatives scattered as in the app.
-        for zone in ("far", "mid", "front"):
-            panel = np.zeros((3 * CELL, 6 * CELL * frames, 4), dtype=np.float32)
-            for f in range(frames):
-                for y in range(3):
-                    for x in range(6):
-                        alt = (x * 7 + y * 13) % 4
-                        over(panel, x + 6 * f, y, frame_of(index[f"{zone}:{alt}"], f))
-            panels.append(panel)
-    elif sheet in ("edges", "combos"):
-        for job in jobs:
-            row = index[job["key"]]
-            p = job["params"]
-            side = p["side"]
-            src = MATERIAL_COLOURS.get(p.get("from", ""), "#b08a5a")
-            onto = MATERIAL_COLOURS.get(p.get("onto", ""), "meadow")
-            if sheet == "combos":
-                combo = next(c for c in manifest["combos"] if c["id"] == p["combo"])
-                src = manifest["elements"].get(combo["from"][0], {}).get("color", "#888888")
-                first = combo["onto"][0]
-                onto = (
-                    "meadow" if first == "empty-ground"
-                    else "#8fc1ea" if first == "empty-sky"
-                    else manifest["elements"].get(first, {}).get("color", "#888888")
-                )
-            dx, dy = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}[side]
-            panel = np.zeros((3 * CELL, 3 * CELL * frames, 4), dtype=np.float32)
-            for f in range(frames):
-                for y in range(3):
-                    for x in range(3):
-                        fill(panel, x + 3 * f, y, onto)
-                fill(panel, 1 + dx + 3 * f, 1 + dy, src)
-                over(panel, 1 + 3 * f, 1, frame_of(row, f))
-            panels.append(panel)
-    else:
-        spec = manifest["elements"][sheet]
-        backdrop = "#8fc1ea" if "sky" in (spec.get("zones") or []) else "meadow"
-        alts = spec.get("alts") or 1
-        for shape in spec["shapes"]:
-            for variant in ["base", *(spec.get("variants") or [])]:
-                for sample in SAMPLES[shape]:
-                    cells = set(sample)
-                    w = max(x for x, _ in cells) + 3
-                    h = max(y for _, y in cells) + 3
-                    panel = np.zeros((h * CELL, w * CELL * frames, 4), dtype=np.float32)
-                    for f in range(frames):
-                        for y in range(h):
-                            for x in range(w):
-                                fill(panel, x + w * f, y, backdrop)
-                        for x, y in cells:
-                            alt = (y * 7 if spec.get("altByRow") else x * 7 + y * 13) % alts
-                            key = f"{shape}:{mask_of(cells, x, y)}:{variant}:{alt}"
-                            if key in index:
-                                over(panel, x + 1 + w * f, y + 1, frame_of(index[key], f))
-                    panels.append(panel)
+def _combo_backdrop(first, manifest):
+    if first == "empty-ground":
+        return "meadow"
+    if first == "empty-sky":
+        return "#8fc1ea"
+    return manifest["elements"].get(first, {}).get("color", "#888888")
 
+
+def _overlay_colours(sheet, params, manifest):
+    src = MATERIAL_COLOURS.get(params.get("from", ""), "#b08a5a")
+    onto = MATERIAL_COLOURS.get(params.get("onto", ""), "meadow")
+    if sheet == "combos":
+        combo = next(c for c in manifest["combos"] if c["id"] == params["combo"])
+        src = manifest["elements"].get(combo["from"][0], {}).get("color", "#888888")
+        onto = _combo_backdrop(combo["onto"][0], manifest)
+    return src, onto
+
+
+def _fill_backdrop(panel, frame, width, height, colour):
+    for y in range(height):
+        for x in range(width):
+            fill(panel, x + width * frame, y, colour)
+
+
+def _overlay_preview(row, side, src, onto, frames, frame_of):
+    dx, dy = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}[side]
+    panel = np.zeros((3 * CELL, 3 * CELL * frames, 4), dtype=np.float32)
+    for f in range(frames):
+        _fill_backdrop(panel, f, 3, 3, onto)
+        fill(panel, 1 + dx + 3 * f, 1 + dy, src)
+        over(panel, 1 + 3 * f, 1, frame_of(row, f))
+    return panel
+
+
+def _overlay_previews(sheet, jobs, index, frames, frame_of, manifest):
+    panels = []
+    for job in jobs:
+        row = index[job["key"]]
+        params = job["params"]
+        src, onto = _overlay_colours(sheet, params, manifest)
+        panels.append(_overlay_preview(row, params["side"], src, onto, frames, frame_of))
+    return panels
+
+
+def _element_preview(spec, shape, variant, sample, index, frames, frame_of):
+    backdrop = "#8fc1ea" if "sky" in (spec.get("zones") or []) else "meadow"
+    alts = spec.get("alts") or 1
+    cells = set(sample)
+    w = max(x for x, _ in cells) + 3
+    h = max(y for _, y in cells) + 3
+    panel = np.zeros((h * CELL, w * CELL * frames, 4), dtype=np.float32)
+    for f in range(frames):
+        _fill_backdrop(panel, f, w, h, backdrop)
+        for x, y in cells:
+            alt = (y * 7 if spec.get("altByRow") else x * 7 + y * 13) % alts
+            key = f"{shape}:{mask_of(cells, x, y)}:{variant}:{alt}"
+            if key in index:
+                over(panel, x + 1 + w * f, y + 1, frame_of(index[key], f))
+    return panel
+
+
+def _element_previews(spec, index, frames, frame_of):
+    panels = []
+    for shape in spec["shapes"]:
+        for variant in ["base", *(spec.get("variants") or [])]:
+            for sample in SAMPLES[shape]:
+                panels.append(_element_preview(spec, shape, variant, sample, index, frames, frame_of))
+    return panels
+
+
+def _join_previews(panels):
     width = max(p.shape[1] for p in panels)
     gap = CELL // 2
     height = sum(p.shape[0] + gap for p in panels)
@@ -319,7 +364,27 @@ def write_preview(sheet, jobs, tiles, glows, args, manifest):
     for p in panels:
         sheet_img[y : y + p.shape[0], : p.shape[1]] = p
         y += p.shape[0] + gap
-    big = sheet_img.repeat(4, axis=0).repeat(4, axis=1)
+    return sheet_img.repeat(4, axis=0).repeat(4, axis=1)
+
+
+def write_preview(sheet, jobs, tiles, glows, args, manifest):
+    index = {job["key"]: row for row, job in enumerate(jobs)}
+    frames = tiles.shape[2] // CELL
+
+    def frame_of(row, f):
+        tile = tiles[row, :, f * CELL : (f + 1) * CELL].copy()
+        if glows is not None:
+            g = glows[row, :, f * CELL : (f + 1) * CELL]
+            tile = g * g[..., 3:4] + tile * (1 - g[..., 3:4])
+        return tile
+
+    if sheet == "ground":
+        panels = _ground_previews(index, frames, frame_of)
+    elif sheet in ("edges", "combos"):
+        panels = _overlay_previews(sheet, jobs, index, frames, frame_of, manifest)
+    else:
+        panels = _element_previews(manifest["elements"][sheet], index, frames, frame_of)
+    big = _join_previews(panels)
     out = os.path.join(args.out, "preview")
     os.makedirs(out, exist_ok=True)
     kit.write_png(os.path.join(out, f"{sheet}.png"), big)

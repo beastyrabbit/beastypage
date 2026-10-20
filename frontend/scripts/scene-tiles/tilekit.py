@@ -73,6 +73,7 @@ N, E, S, W = 1, 2, 4, 8
 SIDE_BITS = {"N": N, "E": E, "S": S, "W": W}
 
 RIG = "tilekit-rig"
+BASE_COLOR = "Base Color"
 
 
 def rgb(hex_value: str) -> tuple[float, float, float]:
@@ -210,7 +211,7 @@ def setup_scene(size: int, threads: int = 4):
     scene.view_settings.exposure = 0
     scene.view_settings.gamma = 1
 
-    for obj in list(bpy.data.objects):
+    for obj in bpy.data.objects:
         bpy.data.objects.remove(obj, do_unlink=True)
 
     world = scene.world or bpy.data.worlds.new("World")
@@ -240,13 +241,13 @@ def setup_scene(size: int, threads: int = 4):
 
 def clear():
     """Removes everything a builder made, keeping camera and lights."""
-    for obj in list(bpy.data.objects):
+    for obj in bpy.data.objects:
         if not obj.name.startswith(RIG):
             bpy.data.objects.remove(obj, do_unlink=True)
-    for mesh in list(bpy.data.meshes):
+    for mesh in bpy.data.meshes:
         if mesh.users == 0:
             bpy.data.meshes.remove(mesh)
-    for curve in list(bpy.data.curves):
+    for curve in bpy.data.curves:
         if curve.users == 0:
             bpy.data.curves.remove(curve)
 
@@ -272,7 +273,7 @@ def mat(color: str, rough: float = 0.85, metal: float = 0.0) -> bpy.types.Materi
         return _materials[name]
     material = bpy.data.materials.new(name)
     node = _principled(material)
-    node.inputs["Base Color"].default_value = linear(value)
+    node.inputs[BASE_COLOR].default_value = linear(value)
     node.inputs["Roughness"].default_value = rough
     node.inputs["Metallic"].default_value = metal
     _materials[name] = material
@@ -288,7 +289,7 @@ def glow(color: str = "glow", strength: float = 6.0) -> bpy.types.Material:
         return _materials[name]
     material = bpy.data.materials.new(name)
     node = _principled(material)
-    node.inputs["Base Color"].default_value = linear(value)
+    node.inputs[BASE_COLOR].default_value = linear(value)
     node.inputs["Emission Color"].default_value = linear(value)
     node.inputs["Emission Strength"].default_value = strength
     material["glow"] = value
@@ -304,7 +305,7 @@ def transparent(color: str, alpha: float) -> bpy.types.Material:
         return _materials[name]
     material = bpy.data.materials.new(name)
     node = _principled(material)
-    node.inputs["Base Color"].default_value = linear(value)
+    node.inputs[BASE_COLOR].default_value = linear(value)
     node.inputs["Alpha"].default_value = alpha
     _materials[name] = material
     return material

@@ -1,6 +1,7 @@
 """Side-on dairy cow and chestnut cow, grazing and flicking their tails."""
 
 import tilekit as kit
+from animalkit import draw_pixels, stamp_pixels as _stamp
 
 PALETTE = kit.ramp("white", "#a56b42", "#d58f99", "grass") + ["#282b32"]
 COLOURS = {
@@ -10,29 +11,7 @@ COLOURS = {
 }
 
 
-def _stamp(pixels, rows, x, y):
-    for dy, row in enumerate(rows):
-        for dx, colour in enumerate(row):
-            if colour != ".":
-                pixels[x + dx, y + dy] = colour
-
-
-def _draw(pixels):
-    # Coplanar, pixel-aligned quads keep the 1 px outline at supersampling.
-    for key, colour in COLOURS.items():
-        verts, faces = [], []
-        for (x, y), value in pixels.items():
-            if value != key:
-                continue
-            i = len(verts)
-            verts.extend([(x / 16, 0, (15 - y) / 16),
-                          ((x + 1) / 16, 0, (15 - y) / 16),
-                          ((x + 1) / 16, 0, (16 - y) / 16),
-                          (x / 16, 0, (16 - y) / 16)])
-            faces.append((i, i + 1, i + 2, i + 3))
-        if faces:
-            kit.mesh(verts, faces, kit.mat(colour), name="cow-" + key)
-
+LEG_ROW = ".K.K.K.K."
 
 def build(tile):
     frame = int(tile.t * 4) % 4
@@ -45,9 +24,9 @@ def build(tile):
         "KWWWWKWWK",
         "KSSWKKSSK",
         ".KSSSSSK.",
-        ".K.K.K.K.",
-        ".K.K.K.K.",
-        ".K.K.K.K.",
+        LEG_ROW,
+        LEG_ROW,
+        LEG_ROW,
     ]
     if tile.alt:
         body = [row.translate(str.maketrans({"W": "L", "S": "B"}))
@@ -68,4 +47,4 @@ def build(tile):
     _stamp(pixels, head, 11, 6 + (frame in (2, 3)))
     if tile.alt:
         pixels = {(15 - x, y): colour for (x, y), colour in pixels.items()}
-    _draw(pixels)
+    draw_pixels(pixels, COLOURS, "cow-")

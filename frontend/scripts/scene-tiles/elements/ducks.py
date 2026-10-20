@@ -3,6 +3,7 @@
 import math
 
 import tilekit as kit
+import waterkit
 
 PALETTE = kit.ramp("#27794a", "#9c7148", "#d6c7a2", "#e9ad43") + [
     "#243c36", kit.BASE["white"], kit.BASE["waterLight"],
@@ -15,19 +16,7 @@ COLORS = {
 
 
 def _stamp(rows, x, z, y=0):
-    """Pixel-sized faces, batched by colour; dots leave the host water visible."""
-    for symbol in set("".join(rows)) - {"."}:
-        verts, faces = [], []
-        for row, line in enumerate(rows):
-            for col, value in enumerate(line):
-                if value != symbol:
-                    continue
-                a, b = (x + col) / 16, (z + len(rows) - row - 1) / 16
-                n = len(verts)
-                verts.extend([(a, y, b), (a + 1 / 16, y, b),
-                              (a + 1 / 16, y, b + 1 / 16), (a, y, b + 1 / 16)])
-                faces.append((n, n + 1, n + 2, n + 3))
-        kit.mesh(verts, faces, kit.mat(COLORS[symbol]), name="duck-pixels")
+    waterkit.stamp(rows, x, z, COLORS, "duck-pixels", y)
 
 
 def _ripple(x, z, width, phase):

@@ -2,7 +2,7 @@
 
 import math
 
-import tilekit as kit
+import woodkit as wood
 
 PALETTE = [
     "#4f9a46", "#648b4c", "#759b54", "#83a65b", "#a3c575",
@@ -35,21 +35,29 @@ def _contour(x, z, alt):
     return 8 if slope < -.35 else 2
 
 
+def _tree_detail(x, z):
+    tx, tz = .31, .58
+    if abs(x - tx) < .027 and tz - .12 < z < tz:
+        return 5
+    crown = ((x - tx) / .10) ** 2 + ((z - tz) / .10) ** 2
+    if crown < 1:
+        return 5 if crown > .60 or x > tx + .035 else 3
+
+
+def _pasture_detail(tile, x, z):
+    if tile.n and not tile.s:
+        return _tree_detail(x, z)
+    elif tile.n and .24 < x < .51:
+        contour = .30 + .12 * math.sin(math.pi * (x - .24) / .55)
+        if abs(z - contour) < .034:
+            return 5 if z < contour else 1
+
+
 def _detail(tile, x, z):
     # One small landmark per tile, at different heights. No edge-crossing
     # strips or repeated rows of grass dashes. All lie inside the collar.
     if tile.alt == 0:
-        if tile.n and not tile.s:
-            tx, tz = .31, .58
-            if abs(x - tx) < .027 and tz - .12 < z < tz:
-                return 5
-            crown = ((x - tx) / .10) ** 2 + ((z - tz) / .10) ** 2
-            if crown < 1:
-                return 5 if crown > .60 or x > tx + .035 else 3
-        elif tile.n and .24 < x < .51:
-            contour = .30 + .12 * math.sin(math.pi * (x - .24) / .55)
-            if abs(z - contour) < .034:
-                return 5 if z < contour else 1
+        return _pasture_detail(tile, x, z)
     elif tile.n and not tile.s:
         # A single oblique field parcel, with a softly contrasting edge.
         px, pz = x - .64, z - .51
@@ -58,37 +66,39 @@ def _detail(tile, x, z):
     return None
 
 
+def _ridge_shade(tile, x, z, top, c):
+    slope = _crest(tile, min(1, x + .02)) - _crest(tile, max(0, x - .02))
+    depth = top - z
+    if depth < .070:
+        c = 4 if slope > -.025 else 8
+    elif depth < .20:
+        c = 3 if slope > -.025 else 1
+    elif depth < .33 and slope < -.025:
+        c = 8
+    return c
+
+
+def _ridge(tile, x, z, top, c):
+    if not tile.n:
+        if z > top:
+            c = 0  # Ground tiles remain opaque above their ridge.
+        else:
+            c = _ridge_shade(tile, x, z, top, c)
+    return c
+
+
+def _paint(tile, x, z):
+    top = _crest(tile, x)
+    c = _contour(x, z, tile.alt)
+    c = _ridge(tile, x, z, top, c)
+    detail = _detail(tile, x, z)
+    if detail is not None and (tile.n or z < top - .32):
+        c = detail
+    if not tile.s and z < .055:
+        c = 2
+    return c
+
+
 def build(tile):
-    verts, faces = [[] for _ in PALETTE], [[] for _ in PALETTE]
-    for j in range(32):
-        z = (j + .5) / 32
-        for i in range(32):
-            x = (i + .5) / 32
-            top = _crest(tile, x)
-            c = _contour(x, z, tile.alt)
-            if not tile.n:
-                if z > top:
-                    c = 0  # Ground tiles remain opaque above their ridge.
-                else:
-                    slope = _crest(tile, min(1, x + .02)) - _crest(tile, max(0, x - .02))
-                    depth = top - z
-                    if depth < .070:
-                        c = 4 if slope > -.025 else 8
-                    elif depth < .20:
-                        c = 3 if slope > -.025 else 1
-                    elif depth < .33 and slope < -.025:
-                        c = 8
-            detail = _detail(tile, x, z)
-            if detail is not None and (tile.n or z < top - .32):
-                c = detail
-            if not tile.s and z < .055:
-                c = 2
-            n = len(verts[c])
-            verts[c] += [(i / 32, 0, j / 32), ((i + 1) / 32, 0, j / 32),
-                         ((i + 1) / 32, 0, (j + 1) / 32), (i / 32, 0, (j + 1) / 32)]
-            faces[c].append((n, n + 1, n + 2, n + 3))
-    for color, v, f in zip(PALETTE, verts, faces):
-        if f:
-            # These flat picture-plane faces receive less light than rounded
-            # geometry; compensate before the renderer snaps to our palette.
-            kit.mesh(v, f, kit.mat(kit.shade(color, 1.05)), name="rolling-hill")
+    p = wood.sample(tile, _paint, resolution=32, normalized=True)
+    wood.draw_indices(p, PALETTE, 'rolling-hill', resolution=32, light=1.05)

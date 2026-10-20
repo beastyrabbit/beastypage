@@ -1,34 +1,12 @@
 """Long-legged bay and grey horses, with a dark mane and a swishing tail."""
 
 import tilekit as kit
+from animalkit import draw_pixels, stamp_pixels as _stamp
 
 PALETTE = kit.ramp("#a36a43", "white", "rock", "grass") + ["#292830"]
 COLOURS = {"K": "#292830", "B": PALETTE[1], "L": PALETTE[2],
            "D": PALETTE[0], "W": PALETTE[4], "S": PALETTE[3],
            "R": PALETTE[7], "g": PALETTE[9]}
-
-
-def _stamp(pixels, rows, x, y):
-    for dy, row in enumerate(rows):
-        for dx, colour in enumerate(row):
-            if colour != ".":
-                pixels[x + dx, y + dy] = colour
-
-
-def _draw(pixels):
-    for key, colour in COLOURS.items():
-        verts, faces = [], []
-        for (x, y), value in pixels.items():
-            if value != key:
-                continue
-            i = len(verts)
-            verts.extend([(x / 16, 0, (15 - y) / 16),
-                          ((x + 1) / 16, 0, (15 - y) / 16),
-                          ((x + 1) / 16, 0, (16 - y) / 16),
-                          (x / 16, 0, (16 - y) / 16)])
-            faces.append((i, i + 1, i + 2, i + 3))
-        if faces:
-            kit.mesh(verts, faces, kit.mat(colour), name="horse-" + key)
 
 
 def build(tile):
@@ -71,4 +49,4 @@ def build(tile):
     _stamp(pixels, tails[frame], 1, 6)
     if tile.alt:
         pixels = {(15 - x, y): colour for (x, y), colour in pixels.items()}
-    _draw(pixels)
+    draw_pixels(pixels, COLOURS, "horse-")

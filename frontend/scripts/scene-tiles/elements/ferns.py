@@ -3,16 +3,12 @@
 import math
 
 import tilekit as kit
+import woodkit as wood
 
 PALETTE = kit.ramp("foliageDark", "foliage", "grassLight")
 
 
-def _line(p, a, b, color):
-    steps = max(1, math.ceil(math.dist(a, b) * 3))
-    for i in range(steps + 1):
-        t = i / steps
-        p[round(a[0] + (b[0] - a[0]) * t),
-          round(a[1] + (b[1] - a[1]) * t)] = color
+_line = wood.line
 
 
 def build(tile):
@@ -41,14 +37,4 @@ def build(tile):
         for step in range(18):
             _line(p, point(step / 18), point((step + 1) / 18), 7 if k % 2 else 4)
     p[7, 2], p[8, 2], p[9, 2] = 0, 4, 0
-    verts, faces = [[] for _ in PALETTE], [[] for _ in PALETTE]
-    for (x, z), c in p.items():
-        if not 0 <= x < 16 or not 0 <= z < 16:
-            continue
-        n = len(verts[c])
-        verts[c] += [(x / 16, 0, z / 16), ((x + 1) / 16, 0, z / 16),
-                     ((x + 1) / 16, 0, (z + 1) / 16), (x / 16, 0, (z + 1) / 16)]
-        faces[c].append((n, n + 1, n + 2, n + 3))
-    for c, v, f in zip(PALETTE, verts, faces):
-        if f:
-            kit.mesh(v, f, kit.mat(c), name="fern-fronds")
+    wood.draw_indices(p, PALETTE, 'fern-fronds', clip=True)

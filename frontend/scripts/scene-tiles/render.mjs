@@ -8,12 +8,22 @@
 //   BLENDER=/Applications/Blender.app/Contents/MacOS/Blender node ...
 
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
+if (args.includes("--help")) {
+  console.log(
+    "Usage: node scripts/scene-tiles/render.mjs [--jobs 6] [--threads 3] [sheet ...]\n" +
+      "Renders sheets, then packs them into public/scene-planner/tiles/.\n" +
+      "BLENDER must be an absolute path; defaults to /usr/bin/blender on Linux\n" +
+      "or /Applications/Blender.app/Contents/MacOS/Blender on macOS when installed.",
+  );
+  process.exit(0);
+}
+
 const option = (name, fallback) => {
   const i = args.indexOf(name);
   if (i < 0) return fallback;
@@ -22,7 +32,17 @@ const option = (name, fallback) => {
 };
 const jobs = option("--jobs", 6);
 const threads = option("--threads", 3);
-const blender = process.env.BLENDER ?? "blender";
+const macBlender = "/Applications/Blender.app/Contents/MacOS/Blender";
+const defaultBlender =
+  process.platform === "darwin" && existsSync(macBlender)
+    ? macBlender
+    : "/usr/bin/blender";
+const blender = process.env.BLENDER ?? defaultBlender;
+if (!isAbsolute(blender)) {
+  throw new Error(
+    "BLENDER must be an absolute path to the Blender executable.",
+  );
+}
 
 const manifest = JSON.parse(
   readFileSync(join(here, "out", "manifest.json"), "utf8"),
@@ -84,10 +104,19 @@ console.log(
     (failed.length ? `; failed: ${failed.join(", ")}` : ""),
 );
 
-await new Promise((resolve) => {
-  const pack = spawn("pnpm", ["exec", "tsx", join(here, "pack.ts")], {
-    stdio: "inherit",
-  });
+// A failed sheet has blank frames; packing it would overwrite the published
+// tiles, so keep the last good set instead.
+if (failed.length) {
+  console.log("Not packing: fix the failed sheets and render again.");
+  process.exit(1);
+}
+
+const packed = await new Promise((resolve) => {
+  const pack = spawn(
+    process.execPath,
+    ["--import", import.meta.resolve("tsx"), join(here, "pack.ts")],
+    { stdio: "inherit" },
+  );
   pack.on("close", resolve);
 });
-process.exit(failed.length ? 1 : 0);
+process.exit(packed ?? 1);

@@ -3,21 +3,9 @@
 import math
 
 import tilekit as kit
+from fieldkit import box as _box, poly as _poly
 
 PALETTE = kit.ramp("#d8a33d", "#8c602d", "sand", "trunk")
-P = 1 / 16
-
-
-def _poly(points, color, front):
-    obj = kit.prism([(x * P, z * P) for x, z in points],
-                    kit.mat(color), front, front + 0.01)
-    obj.visible_shadow = False
-    obj.visible_diffuse = False
-    obj.visible_glossy = False
-
-
-def _box(x0, z0, x1, z1, color, front=-0.3):
-    _poly([(x0, z0), (x1, z0), (x1, z1), (x0, z1)], color, front)
 
 
 def _line(a, b, width, color, front):

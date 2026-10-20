@@ -3,21 +3,9 @@
 import math
 
 import tilekit as kit
+from fieldkit import box as _box, poly as _poly
 
 PALETTE = kit.ramp("rock", "rockLight", "rockDark", "wood", "sandDark")
-P = 1 / 16
-
-
-def _poly(points, color, front=-0.3):
-    obj = kit.prism([(x * P, z * P) for x, z in points],
-                    kit.mat(color), front, front + 0.01)
-    obj.visible_shadow = False
-    obj.visible_diffuse = False
-    obj.visible_glossy = False
-
-
-def _box(x0, z0, x1, z1, color, front=-0.3):
-    _poly([(x0, z0), (x1, z0), (x1, z1), (x0, z1)], color, front)
 
 
 def _ellipse(x, z, rx, rz, color, front):
@@ -26,6 +14,8 @@ def _ellipse(x, z, rx, rz, color, front):
 
 
 def build(tile):
+    if tile.element != "well":
+        raise ValueError(f"Well builder received {tile.element!r}")
     _ellipse(8, 1.5, 6, 1.5, "rockDark", -0.15)
     _box(2, 2, 14, 6, "rockDark", -0.2)
     _box(3, 2, 13, 6, "rock", -0.25)

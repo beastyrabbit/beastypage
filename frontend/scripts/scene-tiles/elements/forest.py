@@ -7,8 +7,20 @@ independent of shadows from an alternative's different interior crown.
 import math
 
 import tilekit as kit
+import woodkit as wood
 
 PALETTE = [kit.BASE[c] for c in ("foliageDark", "foliage", "foliageLight", "trunk", "wood", "grass")]
+
+
+def _pine_skirt(x, h, cx, phase, width, bottom, tip, spread, color):
+    if bottom <= h <= tip:
+        center = cx + .028 * math.sin(phase) * h
+        radius = width * .5 * spread * (tip - h) / (tip - bottom)
+        if abs(x - center) <= radius:
+            color = 1 if x < center else 0
+            if x < center - .04 and h > bottom + .10:
+                color = 2
+    return color
 
 
 def _pine(x, z, cx, base, height, width, phase, trunk=True):
@@ -19,13 +31,7 @@ def _pine(x, z, cx, base, height, width, phase, trunk=True):
         return 4 if x < cx else 3
     color = None
     for bottom, tip, spread in ((.18, .69, 1), (.37, .85, .79), (.58, 1, .54)):
-        if bottom <= h <= tip:
-            center = cx + .028 * math.sin(phase) * h
-            radius = width * .5 * spread * (tip - h) / (tip - bottom)
-            if abs(x - center) <= radius:
-                color = 1 if x < center else 0
-                if x < center - .04 and h > bottom + .10:
-                    color = 2
+        color = _pine_skirt(x, h, cx, phase, width, bottom, tip, spread, color)
     return color
 
 
@@ -36,6 +42,20 @@ def _row(tile, x, z):
     for k, cx in enumerate((.25, .75)):
         h = (.79, .86)[(k + tile.alt) % 2]
         c = _pine(x, z, cx, .10, h, .43, 2 * math.pi * tile.t + k)
+        if c is not None:
+            color = c
+    return color
+
+
+def _column_trees(tile, x, z, dz, color):
+    for k, (cx, base, h, width) in enumerate(((.62, .40, .91, .72), (.40, .045, .90, .76))):
+        if k == 0 and dz == 0 and not tile.n:
+            base, h = .09, .86
+        if k == 1:
+            h -= .025 * tile.alt
+        # Trunks appear only along the bottom of the complete column.
+        c = _pine(x, z - dz, cx, base, h, width,
+                  2 * math.pi * tile.t + k, trunk=not tile.s and dz == 0)
         if c is not None:
             color = c
     return color
@@ -55,16 +75,7 @@ def _column(tile, x, z):
     for dz in (-1, 0, 1):
         if not tile.has(0, dz):
             continue
-        for k, (cx, base, h, width) in enumerate(((.62, .40, .91, .72), (.40, .045, .90, .76))):
-            if k == 0 and dz == 0 and not tile.n:
-                base, h = .09, .86
-            if k == 1:
-                h -= .025 * tile.alt
-            # Trunks appear only along the bottom of the complete column.
-            c = _pine(x, z - dz, cx, base, h, width,
-                      2 * math.pi * tile.t + k, trunk=not tile.s and dz == 0)
-            if c is not None:
-                color = c
+        color = _column_trees(tile, x, z, dz, color)
     return color
 
 
@@ -73,17 +84,22 @@ def _single(tile, x, z):
                  .76 + .04 * tile.alt, 2 * math.pi * tile.t)
 
 
+def _shoulder(tile, x, z):
+    # The entire corner cell is a rounded shoulder, rather than a tiny
+    # bevel on a rectangular hedge. Individual crowns set the skyline.
+    for closed, dx in ((not tile.w, x), (not tile.e, 16 - x)):
+        if closed and dx < 12 and z > 2.5:
+            if ((dx - 12) / 12) ** 2 + ((z - 2.5) / 13) ** 2 > 1:
+                return False
+    return True
+
+
 def _woodland_edge(tile, x, z):
     side = 1 + .45 * math.sin(math.tau * z / 16)
     if (not tile.w and x < side) or (not tile.e and x > 16 - side):
         return False
     if not tile.n:
-        # The entire corner cell is a rounded shoulder, rather than a tiny
-        # bevel on a rectangular hedge. Individual crowns set the skyline.
-        for closed, dx in ((not tile.w, x), (not tile.e, 16 - x)):
-            if closed and dx < 12 and z > 2.5:
-                if ((dx - 12) / 12) ** 2 + ((z - 2.5) / 13) ** 2 > 1:
-                    return False
+        return _shoulder(tile, x, z)
     return True
 
 
@@ -103,10 +119,7 @@ def _crown(x, z, cx, cz, rx, rz, species, phase):
     return color
 
 
-def _woodland_floor(tile, x, z):
-    color = None
-    if tile.s:
-        return color
+def _stems(tile, x, z, color):
     # Staggered, forked stems leave ground visible below a low understorey.
     for k, cx in enumerate((3.2 + tile.alt, 10.6 - .8 * tile.alt)):
         bend = .40 * math.sin(z * .48 + k + tile.alt)
@@ -115,6 +128,14 @@ def _woodland_floor(tile, x, z):
             color = 4 if x < cx + bend - .12 else 3
         if 4 < z < 8 and abs(x - cx - (z - 4) * (.5 if k else -.6)) < .48:
             color = 3
+    return color
+
+
+def _woodland_floor(tile, x, z):
+    color = None
+    if tile.s:
+        return color
+    color = _stems(tile, x, z, color)
     if not _woodland_edge(tile, x, z):
         return color
     # Small shadowed shrubs interrupt the underside without hiding the stems.
@@ -126,50 +147,26 @@ def _woodland_floor(tile, x, z):
     return color
 
 
-def _canopy(tile, x, z):
-    x, z = x * 16, z * 16
-    color = _woodland_floor(tile, x, z)
-    if not _woodland_edge(tile, x, z):
-        return color
-    floor = 8.2 + .7 * math.sin(math.tau * x / 16) + .45 * math.sin(math.tau * x / 8)
-    if not tile.s and z < floor:
-        return color
+def _rear_pines(tile, x, z, seed, color):
+    # Rear firs rise above the broadleaf canopy. Corner firs move inward
+    # and shorten so their tips survive the rounded outer shoulder.
+    pines = [(4.5, 15.5, 5.5), (11.5, 13.8, 4.2)]
+    if not tile.w:
+        pines = [(10.3, 14.7, 5.2)]
+    if not tile.e:
+        pines = [(5.7, 14.7, 5.2)]
+    if not tile.w and not tile.e:
+        pines = [(8, 13.6, 5)]
+    for k, (cx, tip, width) in enumerate(pines):
+        cx += .3 * math.sin(seed + k) + .3 * math.sin(math.tau * tile.t + k)
+        c = _pine(x / 16, z / 16, cx / 16, (tip - 8) / 16,
+                  .5, width / 16, math.tau * tile.t + k, trunk=False)
+        if c is not None:
+            color = 1 if c == 2 else 0
+    return color
 
-    seed = tile.mask * 13 + tile.alt * 41
-    # The dark interior is continuous; crowns, not a rectangle, finish the N
-    # edge. Only the interior varies, so open joins agree between both alts.
-    cap = 10.5 + .6 * math.sin(math.tau * x / 16)
-    color = 0 if tile.n or z < cap else None
-    if not tile.n:
-        # Rear firs rise above the broadleaf canopy. Corner firs move inward
-        # and shorten so their tips survive the rounded outer shoulder.
-        pines = [(4.5, 15.5, 5.5), (11.5, 13.8, 4.2)]
-        if not tile.w:
-            pines = [(10.3, 14.7, 5.2)]
-        if not tile.e:
-            pines = [(5.7, 14.7, 5.2)]
-        if not tile.w and not tile.e:
-            pines = [(8, 13.6, 5)]
-        for k, (cx, tip, width) in enumerate(pines):
-            cx += .3 * math.sin(seed + k) + .3 * math.sin(math.tau * tile.t + k)
-            c = _pine(x / 16, z / 16, cx / 16, (tip - 8) / 16,
-                      .5, width / 16, math.tau * tile.t + k, trunk=False)
-            if c is not None:
-                color = 1 if c == 2 else 0
 
-    # Shared lobes straddle open borders. Their centres, shapes and shades
-    # never depend on the mask or alternative on the other side of the join.
-    crowns = []
-    for cz, connected in ((0, tile.s), (16, tile.n)):
-        if connected:
-            for cx in (0, 16):
-                crowns.append((cx, cz, 4.7, 4.4, 1, 2.7))
-    crowns += [(0, 7.7, 4.7, 4.0, 0, .3), (16, 7.7, 4.7, 4.0, 0, .3)]
-    if tile.s:
-        crowns.append((8.3, 0, 5.0, 4.5, 1, 1.2))
-    if tile.n:
-        crowns.append((8.3, 16, 5.0, 4.5, 1, 1.2))
-
+def _interior_crowns(tile, seed, crowns):
     for k, (cx, cz, rx, rz) in enumerate(((5, 10, 3.5, 4.0),
                                          (10.6, 9, 4.3, 3.4),
                                          (4.9, 4.5, 3.6, 2.8),
@@ -187,6 +184,44 @@ def _canopy(tile, x, z):
             cz = min(cz, 12.1 - rz)
         crowns.append((cx, cz, rx, rz, (k + tile.alt + tile.mask) % 3, phase))
 
+
+def _crowns(tile, seed):
+    # Shared lobes straddle open borders. Their centres, shapes and shades
+    # never depend on the mask or alternative on the other side of the join.
+    crowns = []
+    for cz, connected in ((0, tile.s), (16, tile.n)):
+        if connected:
+            for cx in (0, 16):
+                crowns.append((cx, cz, 4.7, 4.4, 1, 2.7))
+    crowns += [(0, 7.7, 4.7, 4.0, 0, .3), (16, 7.7, 4.7, 4.0, 0, .3)]
+    if tile.s:
+        crowns.append((8.3, 0, 5.0, 4.5, 1, 1.2))
+    if tile.n:
+        crowns.append((8.3, 16, 5.0, 4.5, 1, 1.2))
+
+    _interior_crowns(tile, seed, crowns)
+    return crowns
+
+
+def _canopy(tile, x, z):
+    x, z = x * 16, z * 16
+    color = _woodland_floor(tile, x, z)
+    if not _woodland_edge(tile, x, z):
+        return color
+    floor = 8.2 + .7 * math.sin(math.tau * x / 16) + .45 * math.sin(math.tau * x / 8)
+    if not tile.s and z < floor:
+        return color
+
+    seed = tile.mask * 13 + tile.alt * 41
+    # The dark interior is continuous; crowns, not a rectangle, finish the N
+    # edge. Only the interior varies, so open joins agree between both alts.
+    cap = 10.5 + .6 * math.sin(math.tau * x / 16)
+    color = 0 if tile.n or z < cap else None
+    if not tile.n:
+        color = _rear_pines(tile, x, z, seed, color)
+
+    crowns = _crowns(tile, seed)
+
     for crown in crowns:
         c = _crown(x, z, *crown)
         if c is not None:
@@ -198,17 +233,5 @@ def _canopy(tile, x, z):
 
 def build(tile):
     painter = {"row": _row, "column": _column, "single": _single}.get(tile.shape, _canopy)
-    verts, faces = [[] for _ in PALETTE], [[] for _ in PALETTE]
-    for j in range(32):
-        z = (j + .5) / 32
-        for i in range(32):
-            x = (i + .5) / 32
-            c = painter(tile, x, z)
-            if c is None:
-                continue
-            n = len(verts[c])
-            verts[c] += [(i / 32, 0, j / 32), ((i + 1) / 32, 0, j / 32), ((i + 1) / 32, 0, (j + 1) / 32), (i / 32, 0, (j + 1) / 32)]
-            faces[c].append((n, n + 1, n + 2, n + 3))
-    for color, v, f in zip(PALETTE, verts, faces):
-        if f:
-            kit.mesh(v, f, kit.mat(color), name="woodland-" + tile.shape)
+    p = wood.sample(tile, painter, resolution=32, normalized=True)
+    wood.draw_indices(p, PALETTE, "woodland-" + tile.shape, resolution=32)

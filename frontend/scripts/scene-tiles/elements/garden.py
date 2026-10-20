@@ -1,6 +1,7 @@
 """Cabbages, carrot tops and lettuce in small beds with wooden outer edges."""
 
 import tilekit as kit
+from fieldkit import field_bounds, rim
 
 PALETTE = kit.ramp("#63492f", "foliage", "#96bb61", "wood", "#e89a43")
 
@@ -34,8 +35,7 @@ def _lettuce(x, z):
             kit.mat("foliage"), -.3, -.27)
 
 
-def build(tile):
-    kit.box(-.4, -.4, 1.4, 1.4, kit.mat("#63492f"), .12, .18)
+def _plant(tile):
     # The single is a mixed kitchen bed; larger shapes have planted rows.
     if tile.shape == "single":
         _cabbage(.26, .70, .17)
@@ -55,15 +55,14 @@ def build(tile):
             _cabbage(x, .79, .115 if tile.shape == "mass" else .13)
             _carrot(x, .44)
             _lettuce(x, .15)
+
+
+def build(tile):
+    kit.box(-.4, -.4, 1.4, 1.4, kit.mat("#63492f"), .12, .18)
+    _plant(tile)
     # Only the outside perimeter has a timber frame.
-    left, right = (-1 if tile.w else 0), (2 if tile.e else 1)
-    bottom, top = (-1 if tile.s else 0), (2 if tile.n else 1)
-    for closed, bounds in (
-        (not tile.w, (0, bottom, .0625, top)), (not tile.e, (.9375, bottom, 1, top)),
-        (not tile.s, (left, 0, right, .0625)), (not tile.n, (left, .9375, right, 1)),
-    ):
-        if closed:
-            kit.box(*bounds, kit.mat("wood"), -.4, -.34)
+    left, right, bottom, top = field_bounds(tile)
+    rim(tile, kit.mat("wood"), -.4, -.34)
     if not tile.n:
         kit.box(left, .9375, right, .97, kit.mat("woodLight"), -.43, -.4)
     if not tile.w:

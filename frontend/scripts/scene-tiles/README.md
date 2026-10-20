@@ -44,4 +44,12 @@ pnpm exec tsx scripts/scene-tiles/manifest.ts
 node scripts/scene-tiles/render.mjs --jobs 6 --threads 3   # renders, then packs
 ```
 
-On a Mac, point `BLENDER` at `/Applications/Blender.app/Contents/MacOS/Blender`.
+The script uses `/usr/bin/blender` on Linux. On macOS, it uses
+`/Applications/Blender.app/Contents/MacOS/Blender` when that file exists.
+Set `BLENDER` to an absolute executable path to override the default:
+
+```sh
+BLENDER=/opt/blender/blender node scripts/scene-tiles/render.mjs --jobs 6 --threads 3
+```
+
+`node scripts/scene-tiles/render.mjs --help` prints usage without rendering or packing.

@@ -3,6 +3,7 @@
 import math
 
 import tilekit as kit
+from fieldkit import Picture, neighbours
 
 PALETTE = (kit.ramp("grass", "grassLight", "red", "#a58bd6")
            + [kit.BASE["white"], "#f6d354", "#ae873b", "#739ad9"])
@@ -25,43 +26,6 @@ _TUFTS = (
     ((4, 5), (11, 3), (8, 8)),
     ((5, 6), (12, 2)),
 )
-
-
-def _ink(color):
-    """Flat illustration colour; regular atlas pixels still receive scene tint."""
-    if color not in _MATERIALS:
-        material = kit.mat(color).copy()
-        nodes = material.node_tree.nodes
-        nodes.clear()
-        ink = nodes.new("ShaderNodeEmission")
-        ink.inputs["Color"].default_value = kit.linear(kit.BASE.get(color, color))
-        ink.inputs["Strength"].default_value = 1
-        output = nodes.new("ShaderNodeOutputMaterial")
-        material.node_tree.links.new(ink.outputs[0], output.inputs["Surface"])
-        # No tilekit glow metadata: daylight art must darken normally at night.
-        _MATERIALS[color] = material
-    return _MATERIALS[color]
-
-
-class _Picture:
-    def __init__(self):
-        self.parts = {}
-
-    def poly(self, points, color, depth):
-        verts, faces = self.parts.setdefault(color, ([], []))
-        start = len(verts)
-        verts.extend((x / 16, depth, z / 16) for x, z in points)
-        faces.append(tuple(range(start, len(verts))))
-
-    def rect(self, x, z, w, h, color, depth):
-        self.poly([(x, z), (x + w, z), (x + w, z + h), (x, z + h)], color, depth)
-
-    def finish(self):
-        for color, (verts, faces) in self.parts.items():
-            obj = kit.mesh(verts, faces, _ink(color), name="meadow")
-            obj.visible_shadow = False
-            obj.visible_diffuse = False
-            obj.visible_glossy = False
 
 
 def _grass(p, tile, x, z, index):
@@ -115,28 +79,33 @@ def _seed(p, tile, x, top):
     p.rect(head - 1.5, top, 1, 1, "#f6d354", -.28)
 
 
-def build(tile):
-    p = _Picture()
-    alt = tile.alt % len(_FLOWERS)
-    p.rect(-1, -1, 18, 13.4 if not tile.n else 18, "grass", .9)
-    for dz in (-1, 0, 1):
-        for dx in (-1, 0, 1):
-            if not tile.has(dx, dz):
-                continue
-            for i, (x, z) in enumerate(((1, -.8), (7.4, .6), (13.8, -.3),
-                                      (3.8, 5.1), (10.3, 4.2),
-                                      (.5, 10), (6.6, 9), (13, 10.4))):
-                _grass(p, tile, x + dx * 16, z + dz * 16, i)
-            if tile.n:
-                # Interior cover is low and dense, with no repeated skyline.
-                for i, (x, z) in enumerate(_TUFTS[alt]):
-                    _grass(p, tile, x + dx * 16, z + dz * 16, i + 1)
+def _flowers(p, tile, alt):
     # Flowers never cross an open side, so neighbouring alternatives can mix.
     for i, (x, top, height, kind) in enumerate(_FLOWERS[alt]):
         if not tile.n and i == (1 if alt == 0 else len(_FLOWERS[alt]) - 1):
             top = 14.5
             height = 5
         _flower(p, tile, x, top, height, kind)
+
+
+def _cell(p, tile, dx, dz, alt):
+    for i, (x, z) in enumerate(((1, -.8), (7.4, .6), (13.8, -.3),
+                              (3.8, 5.1), (10.3, 4.2),
+                              (.5, 10), (6.6, 9), (13, 10.4))):
+        _grass(p, tile, x + dx * 16, z + dz * 16, i)
+    if tile.n:
+        # Interior cover is low and dense, with no repeated skyline.
+        for i, (x, z) in enumerate(_TUFTS[alt]):
+            _grass(p, tile, x + dx * 16, z + dz * 16, i + 1)
+
+
+def build(tile):
+    p = Picture("meadow", _MATERIALS)
+    alt = tile.alt % len(_FLOWERS)
+    p.rect(-1, -1, 18, 13.4 if not tile.n else 18, "grass", .9)
+    for dx, dz in neighbours(tile):
+        _cell(p, tile, dx, dz, alt)
+    _flowers(p, tile, alt)
     if not tile.n:
         # Different tall blades and seed stalks break up the closed north edge.
         x = (5, 9, 4, 7)[alt]

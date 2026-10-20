@@ -3,20 +3,12 @@
 import math
 
 import tilekit as kit
+import waterkit
 
 PALETTE = kit.ramp(
     "water", "waterDark", "waterLight", "foam", "cloudShade", "wood",
     "woodLight", "trunk", "glow", "sand", "sandDark",
 )
-
-
-def _point(side, u, v):
-    return {
-        "N": (u / 16, 1 - v / 16),
-        "E": (1 - v / 16, 1 - u / 16),
-        "S": (1 - u / 16, v / 16),
-        "W": (v / 16, u / 16),
-    }[side]
 
 
 class _Canvas:
@@ -51,14 +43,7 @@ class _Canvas:
             self.dot(u0 + (u1 - u0) * t, v0 + (v1 - v0) * t, colour)
 
     def draw(self, side):
-        groups = {}
-        for (u, v), colour in self.pixels.items():
-            verts, faces = groups.setdefault(colour, ([], []))
-            offset = len(verts)
-            for a, b in ((u, v), (u + 1, v), (u + 1, v + 1), (u, v + 1)):
-                x, z = _point(side, a, b)
-                verts.append((x, -0.1, z))
-            faces.append(tuple(offset + i for i in (3, 2, 1, 0)))
+        groups = waterkit.edge_batches(side, self.pixels)
         for colour, (verts, faces) in groups.items():
             if colour.startswith("lit-"):
                 material = kit.glow({
@@ -114,12 +99,16 @@ def _surf(c, tile, cliff=False):
         if (u + tile.frame) % 4 != 0:
             c.dot(u, front + 3, "waterLight")
     if cliff:
-        for i in range(6):
-            u = 1 + i * 2
-            v = 5 + (i + tile.frame) % 4
-            c.dot(u, v, "foam")
-            if i % 2:
-                c.dot(u + 1, v - 1, "mist")
+        _cliff_spray(c, tile.frame)
+
+
+def _cliff_spray(c, frame):
+    for i in range(6):
+        u = 1 + i * 2
+        v = 5 + (i + frame) % 4
+        c.dot(u, v, "foam")
+        if i % 2:
+            c.dot(u + 1, v - 1, "mist")
 
 
 def _current(c, tile, confluence=False):
@@ -128,16 +117,20 @@ def _current(c, tile, confluence=False):
         bend = math.sin(v / 5 + 2 * math.pi * tile.t)
         centre = 8 + (v / 4 if confluence else bend)
         width = 1.5 + v * (0.14 if confluence else 0.28)
-        for u in range(16):
-            distance = abs(u + 0.5 - centre)
-            if distance < width and (v < 4 or (u + v) % 4 != 0):
-                c.dot(u, v, "waterLight" if distance > width - 1 else "water")
+        _current_row(c, v, centre, width)
     for i in range(3):
         v = (i * 4 + tile.frame) % 11
         x = 7 + (v // 4 if confluence else (i % 2) * 2)
         c.line(x, v, x + 1, v + 2, "foam" if i == 0 else "waterLight")
     if confluence:
         c.line(12, 7 + tile.frame % 2, 10, 12, "waterLight")
+
+
+def _current_row(c, v, centre, width):
+    for u in range(16):
+        distance = abs(u + 0.5 - centre)
+        if distance < width and (v < 4 or (u + v) % 4 != 0):
+            c.dot(u, v, "waterLight" if distance > width - 1 else "water")
 
 
 def _posts(c, frame):
@@ -164,39 +157,43 @@ def _wake(c, frame):
     c.rect(7, 3 + frame, 2, 1, "waterLight")
 
 
+def _beam_colour(tile, u, v):
+    sweep = math.sin(2 * math.pi * (tile.t + 1 / 16))
+    centre = 7.5 + sweep * (0.5 + v * 0.32)
+    width = 0.9 + v * 0.27
+    distance = abs(u + 0.5 - centre) / width
+    if distance > 1 or v == 15:
+        return None
+    # The warm narrow core is luminous; the fan thins into air.
+    if distance < 0.3 and v < 7:
+        return "lit-core"
+    if distance < 0.65 and (u + v) % 3 != 0:
+        return "lit-mid"
+    if (u + v) % 2 == 0:
+        return "lit-edge"
+    return None
+
+
+def _pool_colour(pulse, u, v):
+    distance = ((u + 0.5 - 8) / (6.5 + pulse)) ** 2 + ((v + 0.5 - 5) / 4) ** 2
+    if distance > 1:
+        return None
+    if distance < 0.18:
+        return "lit-core"
+    if distance < 0.58 and (u + v) % 4 != 0:
+        return "lit-mid"
+    if (u + v) % 2 == 0:
+        return "lit-edge"
+    return None
+
+
 def _light(c, tile, beam=False):
     pulse = (0, 0.7, 0.35, -0.5)[tile.frame % 4]
     for u in range(16):
         for v in range(16):
-            if beam:
-                sweep = math.sin(2 * math.pi * (tile.t + 1 / 16))
-                centre = 7.5 + sweep * (0.5 + v * 0.32)
-                width = 0.9 + v * 0.27
-                distance = abs(u + 0.5 - centre) / width
-                if distance > 1 or v == 15:
-                    continue
-                # The warm narrow core is luminous; the fan thins into air.
-                if distance < 0.3 and v < 7:
-                    colour = "lit-core"
-                elif distance < 0.65 and (u + v) % 3 != 0:
-                    colour = "lit-mid"
-                elif (u + v) % 2 == 0:
-                    colour = "lit-edge"
-                else:
-                    continue
-            else:
-                d = ((u + 0.5 - 8) / (6.5 + pulse)) ** 2 + ((v + 0.5 - 5) / 4) ** 2
-                if d > 1:
-                    continue
-                if d < 0.18:
-                    colour = "lit-core"
-                elif d < 0.58 and (u + v) % 4 != 0:
-                    colour = "lit-mid"
-                elif (u + v) % 2 == 0:
-                    colour = "lit-edge"
-                else:
-                    continue
-            c.dot(u, v, colour)
+            colour = _beam_colour(tile, u, v) if beam else _pool_colour(pulse, u, v)
+            if colour is not None:
+                c.dot(u, v, colour)
 
 
 def build(tile):

@@ -3,18 +3,19 @@
 import math
 
 import tilekit as kit
+import woodkit as wood
 
 PALETTE = kit.ramp("rockDark", "rock", "rockLight", "#393c38")
 
 
-def _line(pixels, a, b, color, width=1):
-    steps = max(1, math.ceil(math.dist(a, b) * 3))
-    for i in range(steps + 1):
-        t = i / steps
-        x = round(a[0] + (b[0] - a[0]) * t)
-        z = round(a[1] + (b[1] - a[1]) * t)
-        for dx in range(width):
-            pixels[x + dx, z] = color
+_line = wood.line
+
+
+def _trunk(p, north, south):
+    for z in range(-1 if south else 1, 17 if north else 14):
+        cx = round(7 + .8 * math.sin(math.tau * z / 16))
+        for dx, color in ((-1, 0), (0, 7), (1, 4), (2, 0)):
+            p[cx + dx, z] = color
 
 
 def build(tile):
@@ -22,10 +23,7 @@ def build(tile):
     column = tile.shape == "column"
     north, south = column and tile.n, column and tile.s
     # This periodic bend has the same width and position at both open ends.
-    for z in range(-1 if south else 1, 17 if north else 14):
-        cx = round(7 + .8 * math.sin(math.tau * z / 16))
-        for dx, color in ((-1, 0), (0, 7), (1, 4), (2, 0)):
-            p[cx + dx, z] = color
+    _trunk(p, north, south)
     branches = [((7, 5), (4, 8), (3, 11)),
                 ((8, 8), (11, 10), (13, 13)),
                 ((7, 11), (5, 13), (5, 15))]
@@ -47,14 +45,4 @@ def build(tile):
             p[8, z] = 9
             p[7, z] = 4
         p[8, 6] = 0
-    verts, faces = [[] for _ in PALETTE], [[] for _ in PALETTE]
-    for (x, z), c in p.items():
-        if not 0 <= x < 16 or not 0 <= z < 16:
-            continue
-        n = len(verts[c])
-        verts[c] += [(x / 16, 0, z / 16), ((x + 1) / 16, 0, z / 16),
-                     ((x + 1) / 16, 0, (z + 1) / 16), (x / 16, 0, (z + 1) / 16)]
-        faces[c].append((n, n + 1, n + 2, n + 3))
-    for c, v, f in zip(PALETTE, verts, faces):
-        if f:
-            kit.mesh(v, f, kit.mat(c), name="silver-snag")
+    wood.draw_indices(p, PALETTE, 'silver-snag', clip=True)

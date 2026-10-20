@@ -114,7 +114,7 @@ def _fields(surface, alt):
 def _patches(seed):
     rng = random.Random(seed)
     return [(rng.uniform(0, 16), rng.uniform(0, 16),
-             rng.uniform(1.1, 2.1), rng.choice((-1, 1))) for _ in range(28)]
+             rng.uniform(1.1, 2.1), rng.choice((-1, 1))) for _ in range(28)]  # NOSONAR: seeded art noise, not security
 
 
 def _patch_value(patches, x, z):
@@ -124,6 +124,14 @@ def _patch_value(patches, x, z):
         dz = (z - pz + 8) % 16 - 8
         value += sign * math.exp(-(dx * dx + dz * dz) / (radius * radius))
     return value
+
+
+def _patch_color(patch):
+    if patch > 0.24:
+        return SOFT
+    if patch < -0.3:
+        return SHADE
+    return MEADOW
 
 
 def _base(surface, zone, alt):
@@ -138,8 +146,7 @@ def _base(surface, zone, alt):
             edge_z = 0 if z == 15 else z
             patch = (1 - weight) * _patch_value(shared, edge_x, edge_z)
             patch += weight * _patch_value(interior, x, z)
-            color = SOFT if patch > 0.24 else SHADE if patch < -0.3 else MEADOW
-            surface.rect(x, z, 1, 1, color)
+            surface.rect(x, z, 1, 1, _patch_color(patch))
 
 
 def _blade(surface, x, z, height, color, phase, t):
@@ -159,15 +166,15 @@ def _grass(surface, tile):
         height = rng.uniform(2.5, 3.4) if large and i < 3 else rng.uniform(1, 1.9)
         x = rng.uniform(1.1, 13.7)
         z = rng.uniform(1.1, 14.8 - height)
-        color = rng.choice((GRASS, LIGHT, SOFT) if large else (SHADE, SOFT))
-        _blade(surface, x, z, height, color, rng.random(), tile.t)
+        color = rng.choice((GRASS, LIGHT, SOFT) if large else (SHADE, SOFT))  # NOSONAR: seeded art noise, not security
+        _blade(surface, x, z, height, color, rng.random(), tile.t)  # NOSONAR: seeded art noise, not security
 
     if large and tile.alt in (1, 3):
         x, z = rng.uniform(2, 11), rng.uniform(2, 11)
         surface.rect(x, z, 2, 1, LEAF)
         surface.rect(x + 0.5, z + 0.75, 1, 1, SOFT)
     for _ in range((0, 1, 0, 2)[tile.alt]):
-        x, z = rng.randrange(1, 15), rng.randrange(1, 15)
+        x, z = rng.randrange(1, 15), rng.randrange(1, 15)  # NOSONAR: seeded art noise, not security
         surface.rect(x, z, 1, 1, FLOWER)
 
 

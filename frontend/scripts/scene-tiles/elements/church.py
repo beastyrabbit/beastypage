@@ -3,40 +3,16 @@
 import math
 
 import tilekit as kit
+import townkit
 
 STONE = "#b4b2a1"
 SLATE = "#7e8ba1"
 PALETTE = kit.ramp("rockDark", STONE, "woodLight", "glow") + [
     SLATE, kit.BASE["paint"], kit.BASE["red"], kit.BASE["grassLight"],
 ]
-P = 1 / 16
-_PAINT = {}
-
-
-def _paint(color):
-    if color not in _PAINT:
-        material = kit.mat(color).copy()
-        material.node_tree.nodes.clear()
-        node = material.node_tree.nodes.new("ShaderNodeEmission")
-        node.inputs["Color"].default_value = kit.linear(kit.BASE.get(color, color))
-        node.inputs["Strength"].default_value = 1
-        out = material.node_tree.nodes.new("ShaderNodeOutputMaterial")
-        material.node_tree.links.new(node.outputs[0], out.inputs["Surface"])
-        material.cycles.emission_sampling = "NONE"
-        _PAINT[color] = material
-    return _PAINT[color]
-
-
-def _face(points, color, y=-.3):
-    material = _paint(color) if isinstance(color, str) else color
-    if "glow" in material:
-        material.cycles.emission_sampling = "NONE"
-    obj = kit.prism([(x * P, z * P) for x, z in points], material, y, y + .01)
-    obj.visible_shadow = obj.visible_diffuse = obj.visible_glossy = False
-
-
-def _box(a, b, c, d, color, y=-.3):
-    _face([(a, b), (c, b), (c, d), (a, d)], color, y)
+_shapes = townkit.Shapes(painted=True)
+_face = _shapes.face
+_box = _shapes.polygon_box
 
 
 def _arch(x, z, w, h, color, y):
@@ -99,21 +75,7 @@ def build(tile):
     _box(left + (not tile.w), low, left + 2, high,
          kit.shade(STONE, 1.22), -.34)
     if not tile.n:
-        # Middle cells have identical keys. Keep the belfry beneath the steeple
-        # here, instead of repeating clocks and bells down the whole tower.
-        _box(2, 6, 14, 7, "rockDark", -.36)
-        _face([(2, 7), (8, 14), (14, 7)], "rockDark", -.38)
-        _face([(3, 8), (8, 14), (8, 8)], SLATE, -.40)
-        _box(7, 13, 8, 16, "rockDark", -.42)
-        _box(6, 14, 10, 15, "rockDark", -.42)
-        for x in (4, 10):
-            _arch(x, 1, 2, 5, "rockDark", -.44)
-            for z in (2, 4):
-                _box(x, z, x + 2, z + 1, kit.shade(STONE, .72), -.46)
-        _disc(8, 3.5, 2.5, "rockDark", -.48)
-        _disc(8, 3.5, 1.8, "paint", -.50)
-        _box(7, 3, 8, 5, "rockDark", -.52)
-        _box(8, 3, 10, 4, "rockDark", -.52)
+        _belfry()
     elif tile.s:
         # Mostly plain masonry, with one narrow slit and staggered joints.
         _arch(7, 6, 2, 5, "rockDark", -.38)
@@ -122,14 +84,36 @@ def build(tile):
             _box(x, z, x + 2, z + 1, kit.shade(STONE, .72), -.36)
 
     if not tile.s:
-        l, r = (-16 if tile.w else 1), (32 if tile.e else 15)
-        _box(l, 1, r, 11, "rockDark", -.40)
-        _box(l + 1, 2, r - 1, 11, STONE, -.42)
-        _face([(l - 1, 10), (8, 16), (r + 1, 10)], "rockDark", -.44)
-        _face([(l + 2, 11), (8, 15), (r - 2, 11)], SLATE, -.46)
-        _door(5, 6, 8)
-        _rose(8, 10.5, 2.2, glass)
-        for x in (2, 12):
-            _arch(x, 5, 2, 4, "rockDark", -.48)
-            _arch(x + .5, 6, 1, 2.5, glass, -.50)
-        _box(l, 1, r, 2, "rockDark", -.60)
+        _nave(tile, glass)
+
+
+def _belfry():
+    # Middle cells have identical keys. Keep the belfry beneath the steeple
+    # here, instead of repeating clocks and bells down the whole tower.
+    _box(2, 6, 14, 7, "rockDark", -.36)
+    _face([(2, 7), (8, 14), (14, 7)], "rockDark", -.38)
+    _face([(3, 8), (8, 14), (8, 8)], SLATE, -.40)
+    _box(7, 13, 8, 16, "rockDark", -.42)
+    _box(6, 14, 10, 15, "rockDark", -.42)
+    for x in (4, 10):
+        _arch(x, 1, 2, 5, "rockDark", -.44)
+        for z in (2, 4):
+            _box(x, z, x + 2, z + 1, kit.shade(STONE, .72), -.46)
+    _disc(8, 3.5, 2.5, "rockDark", -.48)
+    _disc(8, 3.5, 1.8, "paint", -.50)
+    _box(7, 3, 8, 5, "rockDark", -.52)
+    _box(8, 3, 10, 4, "rockDark", -.52)
+
+
+def _nave(tile, glass):
+    l, r = (-16 if tile.w else 1), (32 if tile.e else 15)
+    _box(l, 1, r, 11, "rockDark", -.40)
+    _box(l + 1, 2, r - 1, 11, STONE, -.42)
+    _face([(l - 1, 10), (8, 16), (r + 1, 10)], "rockDark", -.44)
+    _face([(l + 2, 11), (8, 15), (r - 2, 11)], SLATE, -.46)
+    _door(5, 6, 8)
+    _rose(8, 10.5, 2.2, glass)
+    for x in (2, 12):
+        _arch(x, 5, 2, 4, "rockDark", -.48)
+        _arch(x + .5, 6, 1, 2.5, glass, -.50)
+    _box(l, 1, r, 2, "rockDark", -.60)

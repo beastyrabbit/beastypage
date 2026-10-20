@@ -3,21 +3,9 @@
 import math
 
 import tilekit as kit
+from fieldkit import box as _box, poly as _poly, neighbours
 
 PALETTE = kit.ramp("foliageDark", "foliage", "trunk", "red", "grassLight")
-P = 1 / 16
-
-
-def _poly(points, color, front):
-    obj = kit.prism([(x * P, z * P) for x, z in points],
-                    kit.mat(color), front, front + 0.01)
-    obj.visible_shadow = False
-    obj.visible_diffuse = False
-    obj.visible_glossy = False
-
-
-def _box(x0, z0, x1, z1, color, front=-0.3):
-    _poly([(x0, z0), (x1, z0), (x1, z1), (x0, z1)], color, front)
 
 
 def _crown(x, z, radius, color, front):
@@ -45,42 +33,50 @@ def _tree(tile, x, foot, radius, phase):
         _box(ax - 0.6, az - 0.6, ax + 0.6, az + 0.6, "red", front - 0.06)
 
 
+def _row_x(tile, x, dx):
+    if dx == 0:
+        if not tile.w and x < 8:
+            x = 5.5
+        if not tile.e and x > 8:
+            x = 10.5
+    return x + 16 * dx
+
+
+def _row(tile, left, right):
+    # Overlapping eleven-pixel crowns, with an uninterrupted mown lane.
+    _box(left, 0, right, 3, "foliage", -0.1)
+    _box(left, 1, right, 2, "grassLight", -0.12)
+    for dx in (-1, 0, 1):
+        if tile.has(dx, 0):
+            for x in (4.5, 12.5):
+                _tree(tile, _row_x(tile, x, dx), 1, 5.2, 0)
+
+
+def _trees(tile):
+
+    # Two trees per cell rather than four tiny ones. Adjacent planting rows
+    # are offset by half a cell; neighbouring crowns overlap across joins.
+    trees = []
+    for dx, dz in neighbours(tile):
+        for x, foot, radius, phase in ((5.5, 8, 5.2, 0.7), (13, 0, 5.5, 0)):
+            if not tile.n and dz == 0 and foot == 8:
+                foot = 3
+            if not tile.e and dx == 0 and x > 8:
+                x = 10.5
+            trees.append((x + dx * 16, foot + dz * 16, radius, phase))
+    return trees
+
+
 def build(tile):
     left, right = (-1 if tile.w else 1), (17 if tile.e else 15)
     if tile.shape == "single":
         _box(2, 0, 14, 2, "foliage")
         _tree(tile, 8, 1, 5.8, 0)
         return
-
     if tile.shape == "row":
-        # Overlapping eleven-pixel crowns, with an uninterrupted mown lane.
-        _box(left, 0, right, 3, "foliage", -0.1)
-        _box(left, 1, right, 2, "grassLight", -0.12)
-        for dx in (-1, 0, 1):
-            if not tile.has(dx, 0):
-                continue
-            for x in (4.5, 12.5):
-                if dx == 0:
-                    if not tile.w and x < 8:
-                        x = 5.5
-                    if not tile.e and x > 8:
-                        x = 10.5
-                _tree(tile, x + 16 * dx, 1, 5.2, 0)
+        _row(tile, left, right)
         return
-
-    # Two trees per cell rather than four tiny ones. Adjacent planting rows
-    # are offset by half a cell; neighbouring crowns overlap across joins.
-    trees = []
-    for dz in (-1, 0, 1):
-        for dx in (-1, 0, 1):
-            if not tile.has(dx, dz):
-                continue
-            for x, foot, radius, phase in ((5.5, 8, 5.2, 0.7), (13, 0, 5.5, 0)):
-                if not tile.n and dz == 0 and foot == 8:
-                    foot = 3
-                if not tile.e and dx == 0 and x > 8:
-                    x = 10.5
-                trees.append((x + dx * 16, foot + dz * 16, radius, phase))
+    trees = _trees(tile)
     for z in (0, 8):
         _box(left, z, right, z + 3, "foliage", -0.1)
         _box(left, z + 1, right, z + 2, "grassLight", -0.12)

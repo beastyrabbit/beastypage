@@ -1,6 +1,7 @@
 """Two front-facing green frogs on notched lily pads, blinking and croaking."""
 
 import tilekit as kit
+import waterkit
 
 PALETTE = kit.ramp("#61b84f", "#31734a", "#d5d98b", "waterLight") + ["#234634"]
 COLORS = {"D": "#234634", "G": "#61b84f", "g": "#31734a",
@@ -8,18 +9,7 @@ COLORS = {"D": "#234634", "G": "#61b84f", "g": "#31734a",
 
 
 def _stamp(rows, x, z, y=0):
-    for symbol in set("".join(rows)) - {"."}:
-        verts, faces = [], []
-        for row, line in enumerate(rows):
-            for col, value in enumerate(line):
-                if value != symbol:
-                    continue
-                a, b = (x + col) / 16, (z + len(rows) - row - 1) / 16
-                n = len(verts)
-                verts.extend([(a, y, b), (a + 1 / 16, y, b),
-                              (a + 1 / 16, y, b + 1 / 16), (a, y, b + 1 / 16)])
-                faces.append((n, n + 1, n + 2, n + 3))
-        kit.mesh(verts, faces, kit.mat(COLORS[symbol]), name="frog-pixels")
+    waterkit.stamp(rows, x, z, COLORS, "frog-pixels", y)
 
 
 def build(tile):

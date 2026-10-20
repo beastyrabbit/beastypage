@@ -32,16 +32,7 @@ def _cattail(x, height, sway, bright=False):
                (x + direction * 1.5, 4)], "#99b650" if direction == -1 else stem, -0.12)
 
 
-def build(tile):
-    wave = math.sin(2 * math.pi * tile.t)
-    if tile.shape == "single":
-        # An isolated fan stays inside its cell, with no water painted behind it.
-        _poly([(2, 1), (4, 0), (12, 0), (14, 1), (10, 2), (5, 2)], "#314d2f", 0.16)
-        stems = ((5, 9), (8, 12), (11, 8)) if tile.alt == 0 else ((4, 8), (7, 10), (11, 11))
-        for i, (x, height) in enumerate(stems):
-            _cattail(x, height, wave * (0.75 if i % 2 else 1), i % 2 == 0)
-        return
-
+def _bed(tile, wave):
     # The shared base and edge fans repeat every cell. Closed ends are inset.
     left, right = (0 if tile.w else 1), (16 if tile.e else 15)
     _poly([(left, 0), (right, 0), (right, 1.5), (left, 1.5)], "#314d2f", 0.16)
@@ -52,6 +43,19 @@ def build(tile):
             continue
         for x, height in ((3 + repeat, 10), (13 + repeat, 9)):
             _cattail(x, height, wave * 0.8, True)
+
+
+def build(tile):
+    wave = math.sin(2 * math.pi * tile.t)
+    if tile.shape == "single":
+        # An isolated fan stays inside its cell, with no water painted behind it.
+        _poly([(2, 1), (4, 0), (12, 0), (14, 1), (10, 2), (5, 2)], "#314d2f", 0.16)
+        stems = ((5, 9), (8, 12), (11, 8)) if tile.alt == 0 else ((4, 8), (7, 10), (11, 11))
+        for i, (x, height) in enumerate(stems):
+            _cattail(x, height, wave * (0.75 if i % 2 else 1), i % 2 == 0)
+        return
+
+    _bed(tile, wave)
     # Alternatives affect only the middle, safely away from E/W borders.
     x, height = (8, 12) if tile.alt == 0 else (7, 9)
     _cattail(x, height, -wave * 0.7, False)

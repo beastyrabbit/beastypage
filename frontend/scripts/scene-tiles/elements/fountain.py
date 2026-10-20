@@ -3,33 +3,12 @@
 import math
 
 import tilekit as kit
+import townkit
 
 PALETTE = kit.ramp("rockDark", "rockLight", "water", "waterLight") + [kit.BASE["foam"]]
-P = 1 / 16
-_PAINT = {}
-
-
-def _paint(color):
-    if color not in _PAINT:
-        material = kit.mat(color).copy()
-        material.node_tree.nodes.clear()
-        node = material.node_tree.nodes.new("ShaderNodeEmission")
-        node.inputs["Color"].default_value = kit.linear(kit.BASE.get(color, color))
-        node.inputs["Strength"].default_value = 1
-        out = material.node_tree.nodes.new("ShaderNodeOutputMaterial")
-        material.node_tree.links.new(node.outputs[0], out.inputs["Surface"])
-        material.cycles.emission_sampling = "NONE"
-        _PAINT[color] = material
-    return _PAINT[color]
-
-
-def _face(points, color, y=-.3):
-    obj = kit.prism([(x * P, z * P) for x, z in points], _paint(color), y, y + .01)
-    obj.visible_shadow = obj.visible_diffuse = obj.visible_glossy = False
-
-
-def _box(a, b, c, d, color, y):
-    _face([(a, b), (c, b), (c, d), (a, d)], color, y)
+_shapes = townkit.Shapes(painted=True)
+_face = _shapes.face
+_box = _shapes.polygon_box
 
 
 def _oval(x, z, rx, rz, color, y):
