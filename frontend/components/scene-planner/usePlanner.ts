@@ -16,6 +16,7 @@ import {
   type Theme,
   type Zone,
 } from "@/lib/scene-planner/catalog";
+import { imageCoverage } from "@/lib/scene-planner/coverage";
 import {
   type Atmosphere,
   canPlace,
@@ -54,7 +55,8 @@ export interface Overlay {
   opacity: number;
   /** Share of a cell the subject must cover to ignore it. */
   threshold: number;
-  coverage: number[] | null;
+  /** The decoded image, measured against the grid whenever it changes. */
+  image: HTMLImageElement;
 }
 
 /** What the stage highlights while a roll runs. */
@@ -140,17 +142,24 @@ export function usePlannerState() {
     [rows, settings.skyShare],
   );
 
+  // Measured in step with the grid, so a roll never sees a stale mask.
+  const overlayImage = overlay?.image;
+  const coverage = useMemo(
+    () => (overlayImage ? imageCoverage(overlayImage, cols, rows) : null),
+    [overlayImage, cols, rows],
+  );
+
   const ignored = useMemo(() => {
     const result = new Array<boolean>(cols * rows).fill(false);
-    if (overlay?.coverage?.length === cols * rows) {
-      overlay.coverage.forEach((share, cell) => {
+    if (overlay && coverage) {
+      coverage.forEach((share, cell) => {
         result[cell] = share >= overlay.threshold;
       });
     }
     for (const [cell, value] of painted)
       if (cell < result.length) result[cell] = value;
     return result;
-  }, [cols, rows, overlay, painted]);
+  }, [cols, rows, overlay, coverage, painted]);
 
   const appear = useCallback((list: Placement[], stagger = 0) => {
     const now = performance.now();
@@ -305,8 +314,6 @@ export function usePlannerState() {
       appear(next);
       setPlacements(next);
       setPainted(new Map());
-      // The old coverage belongs to the old cells; it is measured again.
-      setOverlay((o) => (o ? { ...o, coverage: null } : o));
       setSettings((s) => ({ ...s, cols: nextCols, rows: nextRows }));
     },
     [cols, rows, settings, placements, appear],
@@ -347,6 +354,8 @@ export function usePlannerState() {
     rollAtmosphere: () =>
       setAtmosphere(rollAtmosphere(createRng(randomSeed()))),
     overlay,
+    /** Share of each cell the foreground covers; null without one. */
+    coverage,
     setOverlay,
     painted,
     setPainted,

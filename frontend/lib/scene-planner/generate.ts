@@ -618,14 +618,21 @@ export class PlanBuilder {
       if (this.occupied[cell]) return null;
       return { origin: start, candidates: [cell] };
     }
-    const row = pathStartRow(element.zones[0], this.starts);
-    const free = Array.from({ length: cols }, (_, col) => col).filter(
-      (col) => !this.occupied[row * cols + col] && !ignored[row * cols + col],
+    // Any of its zones may hold the start, such as a road in the far or the
+    // middle distance.
+    const rows = [
+      ...new Set(element.zones.map((z) => pathStartRow(z, this.starts))),
+    ];
+    const free = rows.flatMap((row) =>
+      Array.from({ length: cols }, (_, col) => row * cols + col).filter(
+        (cell) => !this.occupied[cell] && !ignored[cell],
+      ),
     );
     if (free.length === 0) return null;
+    const cell = pick(rng, free);
     return {
-      origin: { col: pick(rng, free), row },
-      candidates: free.map((col) => row * cols + col),
+      origin: { col: cell % cols, row: Math.floor(cell / cols) },
+      candidates: free,
     };
   }
 

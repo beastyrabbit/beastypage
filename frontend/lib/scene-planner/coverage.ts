@@ -30,3 +30,27 @@ export function hasTransparency(data: Uint8ClampedArray): boolean {
   }
   return false;
 }
+
+/**
+ * How much of each grid cell a decoded image covers, stretched over the grid
+ * as the stage shows it; null for an image without transparency, which
+ * cannot mark cells. Synchronous, so the mask always matches the grid.
+ */
+export function imageCoverage(
+  image: CanvasImageSource,
+  cols: number,
+  rows: number,
+): number[] | null {
+  const width = cols * 8;
+  const height = rows * 8;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(image, 0, 0, width, height);
+  const { data } = ctx.getImageData(0, 0, width, height);
+  return hasTransparency(data)
+    ? cellCoverage(data, width, height, cols, rows)
+    : null;
+}

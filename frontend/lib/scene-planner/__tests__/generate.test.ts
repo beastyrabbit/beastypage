@@ -119,6 +119,29 @@ describe("generatePlan", () => {
     expect(fed).toBeGreaterThan(0);
   });
 
+  it("starts a road in the middle distance when the far row is taken", () => {
+    const cols = 16;
+    const rows = 16;
+    const starts = zoneStarts(rows, 0.3);
+    // The far zone's start row is all foreground: roads must use their
+    // other zone.
+    const ignored = new Array(cols * rows).fill(false);
+    for (let col = 0; col < cols; col++)
+      ignored[starts.far * cols + col] = true;
+    let roads = 0;
+    for (const seed of "abcdefghijklmnopqrstuvwxyz") {
+      const { placements } = generatePlan(
+        options({ cols, rows, seed, ignored, themes: ["urban"] }),
+      );
+      for (const road of placements.filter((p) => p.elementId === "road")) {
+        roads++;
+        const top = Math.floor(Math.min(...road.cells) / cols);
+        expect(top).toBe(starts.mid);
+      }
+    }
+    expect(roads).toBeGreaterThan(0);
+  });
+
   it("drops a locked rider whose host is gone", () => {
     const ducks = {
       key: "ducks",

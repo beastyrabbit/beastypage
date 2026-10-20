@@ -1,9 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { cellCoverage, hasTransparency } from "@/lib/scene-planner/coverage";
 import { cn } from "@/lib/utils";
 
 import { AtlasMode } from "./AtlasMode";
@@ -78,38 +77,7 @@ function Segmented<T extends string>({
 export function ScenePlannerClient() {
   const planner = usePlannerState();
   const [mode, setMode] = useState<Mode>("board");
-  const { overlay, setOverlay, settings, rolling } = planner;
-
-  // Measure how much of each cell the foreground covers.
-  const overlaySrc = overlay?.src;
-  useEffect(() => {
-    if (!overlaySrc) return;
-    // A resize starts a new measurement; the old one must not land after it.
-    let current = true;
-    const image = new Image();
-    image.onload = () => {
-      if (!current) return;
-      const width = settings.cols * 8;
-      const height = settings.rows * 8;
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) return;
-      ctx.drawImage(image, 0, 0, width, height);
-      const { data } = ctx.getImageData(0, 0, width, height);
-      const coverage = hasTransparency(data)
-        ? cellCoverage(data, width, height, settings.cols, settings.rows)
-        : null;
-      setOverlay((shown) =>
-        shown && shown.src === overlaySrc ? { ...shown, coverage } : shown,
-      );
-    };
-    image.src = overlaySrc;
-    return () => {
-      current = false;
-    };
-  }, [overlaySrc, settings.cols, settings.rows, setOverlay]);
+  const { rolling } = planner;
 
   const changeMode = (next: Mode) => {
     setMode(next);

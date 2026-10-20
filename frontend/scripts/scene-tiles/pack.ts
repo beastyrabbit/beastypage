@@ -26,20 +26,26 @@ if (!existsSync(source)) {
 }
 
 // The pack replaces the whole published index, so every sheet must hold every
-// tile the manifest lists; a `run.py --key` debug render does not.
+// tile the manifest lists, with the frame count it lists: a `run.py --key`
+// debug render, a failed frame or a changed animation all need a re-render.
 const manifest = JSON.parse(
   readFileSync(join(here, "out", "manifest.json"), "utf8"),
-) as { jobs: { sheet: string; key: string }[] };
+) as { jobs: { sheet: string; key: string; frames: number }[] };
 const staged = (sheet: string) => {
   const file = join(source, `${sheet}.json`);
   return existsSync(file)
-    ? (JSON.parse(readFileSync(file, "utf8")).tiles as Record<string, unknown>)
+    ? (JSON.parse(readFileSync(file, "utf8")).tiles as Record<
+        string,
+        [number, number]
+      >)
     : {};
 };
 const incomplete = [...new Set(manifest.jobs.map((j) => j.sheet))].filter(
   (sheet) => {
     const tiles = staged(sheet);
-    return manifest.jobs.some((j) => j.sheet === sheet && !(j.key in tiles));
+    return manifest.jobs.some(
+      (j) => j.sheet === sheet && tiles[j.key]?.[1] !== j.frames,
+    );
   },
 );
 if (incomplete.length > 0) {

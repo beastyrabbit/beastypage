@@ -38,11 +38,14 @@ function Reel({
   label,
   idle,
   rare,
+  still,
   ref,
 }: Readonly<{
   label: string;
   idle?: boolean;
   rare?: boolean;
+  /** Reduced motion: the rare border stays put instead of spinning. */
+  still?: boolean;
   ref: React.Ref<ReelHandle>;
 }>) {
   const [items, setItems] = useState([{ key: "idle", label: "?" }]);
@@ -124,7 +127,7 @@ function Reel({
               mask: "linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0)",
               padding: 2,
             }}
-            animate={{ rotate: 360 }}
+            animate={still ? undefined : { rotate: 360 }}
             transition={{
               duration: seconds(DURATION.scene * 4),
               repeat: Number.POSITIVE_INFINITY,
@@ -325,7 +328,7 @@ export function GachaMode() {
     <div className="flex flex-col gap-4">
       <div className="flex gap-2 rounded-2xl border border-white/10 bg-gradient-to-b from-violet-500/10 to-transparent p-3">
         <Reel ref={reels[0]} label="Category" />
-        <Reel ref={reels[1]} label="Variant" rare={rare} />
+        <Reel ref={reels[1]} label="Variant" rare={rare} still={reduced} />
         <Reel ref={reels[2]} label="Column" />
         <Reel ref={reels[3]} label="Row" />
         <Reel ref={reels[4]} label="Length" idle={!pathReel} />

@@ -178,6 +178,9 @@ export function Stage() {
     bands,
   };
 
+  // One loop for the Stage's lifetime: it reads the scene from frameRef each
+  // tick, so planner updates never restart it (which would reset the clock).
+  const { anim } = planner;
   useEffect(() => {
     // The loop picks the Blender tiles up as soon as they arrive.
     void loadTileSet();
@@ -188,7 +191,6 @@ export function Stage() {
     let raf = 0;
     let last = 0;
     let tick = 0;
-    const { anim } = planner;
 
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
@@ -249,7 +251,7 @@ export function Stage() {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [planner]);
+  }, [anim]);
 
   useEffect(() => {
     planner.stage.current = {

@@ -123,7 +123,7 @@ export function Controls() {
         visible: true,
         opacity: 0.85,
         threshold: 0.5,
-        coverage: null,
+        image,
       });
     };
     image.src = src;
@@ -402,7 +402,7 @@ export function Controls() {
                 className="accent-[oklch(0.77_0.12_300)]"
               />
             </Field>
-            {overlay.coverage ? (
+            {planner.coverage ? (
               <Field
                 label="Ignore cells covered by"
                 value={`${Math.round(overlay.threshold * 100)}%`}
