@@ -151,8 +151,8 @@ function connectStep(
   if (cells.has(target)) return target;
   const queue = [start];
   const previous = new Map([[start, start]]);
-  for (let i = 0; i < queue.length; i++) {
-    const cell = queue[i];
+  // The iterator also visits cells pushed while it runs.
+  for (const cell of queue) {
     if (cell === target) break;
     for (const next of neighbours(cell, grid)) {
       if (taken.has(next) || previous.has(next)) continue;
