@@ -598,7 +598,11 @@ export function BoardMode() {
           <>
             <button
               type="button"
-              onClick={() => director.skip()}
+              onClick={() => {
+                director.skip();
+                // Free draw waits on its own countdown; Skip ends it too.
+                freeDone.current?.();
+              }}
               className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:bg-white/10"
             >
               Skip

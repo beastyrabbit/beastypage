@@ -63,10 +63,16 @@ export function AtlasMode() {
     () => groupTiles(placements, cols, rows),
     [placements, cols, rows],
   );
-  const entries = useMemo(
-    () => atlasEntries(groups, cols, rows).slice(0, MAX_TILES),
+  const allEntries = useMemo(
+    () => atlasEntries(groups, cols, rows),
     [groups, cols, rows],
   );
+  // Each atlas tile is a live sample of the board, so only the first few draw.
+  const entries = allEntries.slice(0, MAX_TILES);
+  const shown =
+    entries.length < allEntries.length
+      ? `${entries.length} of ${allEntries.length}`
+      : String(entries.length);
   const seams = useMemo(
     () => transitions(groups, cols, rows, starts),
     [groups, cols, rows, starts],
@@ -178,7 +184,7 @@ export function AtlasMode() {
         <h3 className="section-eyebrow">
           Tile atlas{" "}
           <span className="font-mono normal-case tracking-normal text-muted-foreground/70">
-            · {entries.length} tiles
+            · {shown} tiles
           </span>
         </h3>
         {entries.length === 0 ? (

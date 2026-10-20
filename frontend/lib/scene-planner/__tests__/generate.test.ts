@@ -7,6 +7,7 @@ import {
   createRng,
   generatePlan,
   type PlanOptions,
+  withHosts,
   zoneOfRow,
   zoneStarts,
 } from "../generate";
@@ -86,6 +87,18 @@ describe("generatePlan", () => {
       }
     }
     expect(riders).toBeGreaterThan(0);
+  });
+
+  it("keeps riders only where an allowed host remains", () => {
+    const pond = { key: "pond", elementId: "pond", cells: [60, 61] };
+    const ducks = { key: "ducks", elementId: "ducks", cells: [60] };
+    const swans = { key: "swans", elementId: "swans", cells: [60] };
+    const fish = { key: "fish", elementId: "fish", cells: [62] };
+    expect(withHosts([pond, ducks, swans, fish]).map((p) => p.key)).toEqual([
+      "pond",
+      "ducks",
+    ]);
+    expect(withHosts([ducks])).toEqual([]);
   });
 
   it("drops a locked rider whose host is gone", () => {

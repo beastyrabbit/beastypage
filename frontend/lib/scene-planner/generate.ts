@@ -207,6 +207,27 @@ export function canPlace(
   return cells.every((c) => !ridden.has(c) && on.includes(host.get(c) ?? ""));
 }
 
+/**
+ * The placements that can stay once hosts are gone: a rider such as a duck
+ * needs an allowed host under every cell, and one rider per cell.
+ */
+export function withHosts(placements: Placement[]) {
+  const host = new Map<number, string>();
+  for (const p of placements)
+    if (!ELEMENTS_BY_ID.get(p.elementId)?.on)
+      for (const cell of p.cells) host.set(cell, p.elementId);
+  const ridden = new Set<number>();
+  return placements.filter((p) => {
+    const on = ELEMENTS_BY_ID.get(p.elementId)?.on;
+    if (!on) return true;
+    const fits = p.cells.every(
+      (c) => !ridden.has(c) && on.includes(host.get(c) ?? ""),
+    );
+    if (fits) for (const cell of p.cells) ridden.add(cell);
+    return fits;
+  });
+}
+
 export type PathDrift = "left" | "straight" | "right";
 
 /** Everything one roll decided, in the order it was decided. */

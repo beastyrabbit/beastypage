@@ -27,6 +27,7 @@ import {
   type RollChain,
   randomSeed,
   rollAtmosphere,
+  withHosts,
   zoneOfRow,
   zoneStarts,
 } from "@/lib/scene-planner/generate";
@@ -116,7 +117,8 @@ function remap(
     }
   }
   const taken = new Set(placements.flatMap((p) => cells.get(p.key) ?? []));
-  return placements.flatMap((p) => {
+  // A rider whose host did not survive the resize has nothing to sit on.
+  const kept = placements.flatMap((p) => {
     let next = cells.get(p.key) ?? [];
     if (next.length === 0) {
       const first = p.cells[0];
@@ -140,6 +142,7 @@ function remap(
     };
     return [{ ...p, cells: next, rect }];
   });
+  return withHosts(kept);
 }
 
 export function usePlannerState() {
@@ -279,12 +282,16 @@ export function usePlannerState() {
     [appear],
   );
 
+  /** Removes placements, and any rider left without its host. */
   const remove = useCallback(
     (keys: string[]) => {
       const current = latest.current.placements;
-      vanish(current.filter((p) => keys.includes(p.key)));
-      latest.current.placements = current.filter((p) => !keys.includes(p.key));
-      setPlacements((list) => list.filter((p) => !keys.includes(p.key)));
+      const next = withHosts(current.filter((p) => !keys.includes(p.key)));
+      vanish(current.filter((p) => !next.includes(p)));
+      latest.current.placements = next;
+      setPlacements((list) =>
+        withHosts(list.filter((p) => !keys.includes(p.key))),
+      );
     },
     [vanish],
   );
@@ -296,8 +303,9 @@ export function usePlannerState() {
   }, []);
 
   const clearUnlocked = useCallback(() => {
-    vanish(placements.filter((p) => !p.locked));
-    setPlacements((current) => current.filter((p) => p.locked));
+    const next = withHosts(placements.filter((p) => p.locked));
+    vanish(placements.filter((p) => !next.includes(p)));
+    setPlacements(next);
   }, [placements, vanish]);
 
   /** Places an element by hand. Returns false when a cell is taken. */
