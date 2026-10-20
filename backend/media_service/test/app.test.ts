@@ -113,8 +113,8 @@ describe("raw media delivery", () => {
 			"fetch",
 			vi.fn(async () =>
 				controlResponse([
-					item("derivatives/a.png", "image/png"),
-					item("derivatives/b.mp4", "video/mp4"),
+					item("derivatives/a.mp4", "video/mp4"),
+					item("derivatives/b.png", "image/png"),
 				]),
 			),
 		);
@@ -123,12 +123,13 @@ describe("raw media delivery", () => {
 		const html = await response.text();
 		expect(response.status).toBe(200);
 		expect(html).toContain(
-			'<a href="/i/Abcdefg1/0" aria-label="Open image 1"><img src="/i/Abcdefg1/0"',
+			'<video controls playsinline preload="metadata" src="/i/Abcdefg1/0">',
 		);
+		// Labels count images only, so the image after a video is image 1.
 		expect(html).toContain(
-			'<video controls playsinline preload="metadata" src="/i/Abcdefg1/1">',
+			'<a href="/i/Abcdefg1/1" aria-label="Open image 1"><img src="/i/Abcdefg1/1"',
 		);
-		expect(html).toContain('<dialog id="viewer">');
+		expect(html).toContain('<dialog id="viewer" aria-label="Image viewer">');
 	});
 	it("falls back to the legacy public operation only for unknown-operation 400s", async () => {
 		const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
