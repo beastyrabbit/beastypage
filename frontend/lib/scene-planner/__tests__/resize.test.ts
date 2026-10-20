@@ -287,6 +287,46 @@ describe("remapPlacements", () => {
     expect(movedRocks.rect).toEqual({ col: 0, row: 1, w: 1, h: 1 });
   });
 
+  it("describes a resized hairpin path by its ends", () => {
+    // C2 → C3 → D3 → D2 on 5×5: the walk touches its own start on the way.
+    const trail = {
+      key: "trail",
+      elementId: "trail",
+      cells: [7, 12, 13, 8],
+      ends: [7, 8],
+    };
+    const [moved] = remapPlacements(
+      [trail],
+      { cols: 5, rows: 5 },
+      { cols: 5, rows: 10 },
+    );
+    const [start, end] = moved.ends ?? [];
+    expect(Math.abs(start - end)).toBe(1);
+    expect(describeCells(moved, 5)).toBe(
+      `${cellName(start, 5)} → ${cellName(end, 5)}`,
+    );
+  });
+
+  it("places a locked point before an unlocked path takes every cell", () => {
+    // A serpentine trail fills a 10×5 grid except J5, where a locked fox is.
+    const cells = Array.from({ length: 5 }, (_, row) => {
+      const line = Array.from({ length: 10 }, (_, col) => row * 10 + col);
+      return row % 2 ? line.reverse() : line;
+    })
+      .flat()
+      .filter((cell) => cell !== 49);
+    const trail = { key: "trail", elementId: "trail", cells, ends: [0, 48] };
+    const fox = { key: "fox", elementId: "fox", cells: [49], locked: true };
+    const next = remapPlacements(
+      [trail, fox],
+      { cols: 10, rows: 5 },
+      { cols: 5, rows: 5 },
+    );
+    const movedFox = next.find((p) => p.key === "fox");
+    expect(movedFox).toMatchObject({ cells: [24], locked: true });
+    expect(next.find((p) => p.key === "trail")?.cells).not.toContain(24);
+  });
+
   it("drops a rider whose host has no cell left", () => {
     // Shrinking 10 columns to 5, new column 0 samples old column 1: the
     // meadow there wins the cell, and the pond on column 0 has none left.

@@ -179,8 +179,10 @@ export function describeCells(placement: Placement, cols: number): string {
     if (w === 1 && h === 1) return start;
     return `${start}–${cellName((row + h - 1) * cols + col + w - 1, cols)}`;
   }
-  const first = placement.cells[0];
-  const last = placement.cells.at(-1) ?? first;
+  // A resized path's cells are not in walking order; its ends are recorded.
+  const route = placement.ends ?? placement.cells;
+  const first = route[0];
+  const last = route.at(-1) ?? first;
   return `${cellName(first, cols)} → ${cellName(last, cols)}`;
 }
 

@@ -211,8 +211,12 @@ function remapGrounded(placements: Placement[], from: Grid, to: Grid) {
     (p) => !["point", "path"].includes(shapeOf(p) ?? ""),
   );
   const { result, taken } = remapBlocks(blocks, from, to);
-  for (const p of placements) {
-    if (result.has(p.key) || blocks.includes(p)) continue;
+  // Locked points and paths claim their cells before unlocked ones route.
+  const rest = placements
+    .filter((p) => !blocks.includes(p))
+    .sort((a, b) => Number(Boolean(b.locked)) - Number(Boolean(a.locked)));
+  for (const p of rest) {
+    if (result.has(p.key)) continue;
     const free = freeCells(taken, to);
     if (free.length === 0) break;
     const cells =
