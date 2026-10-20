@@ -4,4 +4,5 @@ url = "https://mcp.clerk.com/mcp"
 
 [mcp_servers.posthog]
 url = "https://mcp.posthog.com/mcp"
+bearer_token_env_var = "POSTHOG_API_KEY"
 # <<< bytefleet:mcp <<<
