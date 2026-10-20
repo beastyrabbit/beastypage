@@ -46,6 +46,28 @@ def _soil(tile, several_rows):
         _rect(left, z, right - left, 1, "#393c31", .02)
 
 
+def _middle_lane(tile):
+    # Neighbour copies complete the half bushes at open edges; closed edges
+    # finish with a whole rounded mound in the centre.
+    centers = []
+    if tile.w:
+        centers.append(0)
+    if tile.e:
+        centers.append(16)
+    if not (tile.w and tile.e):
+        centers.append(8)
+    return centers
+
+
+def _lanes(tile, sway):
+    # Masses repeat in both axes, interleaving two lanes of bushes.
+    if tile.n:
+        _bush(8, 14, sway, .10)
+    for x in _middle_lane(tile):
+        _bush(x, 6, sway, .20)
+    _bush(8, -2 if tile.s else 0, sway, .30)
+
+
 def build(tile):
     # A row is one lane of full-size bushes; masses interleave two lanes.
     # Soil stays below the northern flowers, leaving their tops transparent.
@@ -53,15 +75,6 @@ def build(tile):
     _soil(tile, several_rows)
     sway = round(.7 * math.sin(math.tau * tile.t))
     if several_rows:
-        # Repeat in both axes. Neighbour copies complete the half bushes at
-        # open edges; closed edges finish with a whole rounded mound.
-        if tile.n:
-            _bush(8, 14, sway, .10)
-        centers = ([0] if tile.w else []) + ([16] if tile.e else [])
-        if not (tile.w and tile.e):
-            centers.append(8)
-        for x in centers:
-            _bush(x, 6, sway, .20)
-        _bush(8, -2 if tile.s else 0, sway, .30)
+        _lanes(tile, sway)
     else:
         _bush(8, 1, sway, .30)

@@ -297,7 +297,8 @@ function flood(
       queue.push(n);
     }
   }
-  return { cells: cells.sort((a, b) => a - b), keys: [...keys] };
+  cells.sort((a, b) => a - b);
+  return { cells, keys: [...keys] };
 }
 
 function boundingRect(cells: number[], cols: number): Rect {

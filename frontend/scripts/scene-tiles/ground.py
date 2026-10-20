@@ -111,10 +111,14 @@ def _fields(surface, alt):
         surface.polygon(hedge + [(x, z + 1) for x, z in hedge[::-1]], HEDGE)
 
 
+# The seeded random streams below are art noise, not security: the same seed
+# must keep drawing the same tiles, so their generator stays as it is.
+
+
 def _patches(seed):
     rng = random.Random(seed)
     return [(rng.uniform(0, 16), rng.uniform(0, 16),
-             rng.uniform(1.1, 2.1), rng.choice((-1, 1))) for _ in range(28)]  # NOSONAR: seeded art noise, not security
+             rng.uniform(1.1, 2.1), rng.choice((-1, 1))) for _ in range(28)]  # NOSONAR(S2245)
 
 
 def _patch_value(patches, x, z):
@@ -166,15 +170,15 @@ def _grass(surface, tile):
         height = rng.uniform(2.5, 3.4) if large and i < 3 else rng.uniform(1, 1.9)
         x = rng.uniform(1.1, 13.7)
         z = rng.uniform(1.1, 14.8 - height)
-        color = rng.choice((GRASS, LIGHT, SOFT) if large else (SHADE, SOFT))  # NOSONAR: seeded art noise, not security
-        _blade(surface, x, z, height, color, rng.random(), tile.t)  # NOSONAR: seeded art noise, not security
+        color = rng.choice((GRASS, LIGHT, SOFT) if large else (SHADE, SOFT))  # NOSONAR(S2245)
+        _blade(surface, x, z, height, color, rng.random(), tile.t)  # NOSONAR(S2245)
 
     if large and tile.alt in (1, 3):
         x, z = rng.uniform(2, 11), rng.uniform(2, 11)
         surface.rect(x, z, 2, 1, LEAF)
         surface.rect(x + 0.5, z + 0.75, 1, 1, SOFT)
     for _ in range((0, 1, 0, 2)[tile.alt]):
-        x, z = rng.randrange(1, 15), rng.randrange(1, 15)  # NOSONAR: seeded art noise, not security
+        x, z = rng.randrange(1, 15), rng.randrange(1, 15)  # NOSONAR(S2245)
         surface.rect(x, z, 1, 1, FLOWER)
 
 
