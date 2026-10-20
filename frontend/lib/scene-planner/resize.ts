@@ -91,6 +91,13 @@ function movedPlacement(p: Placement, cells: number[], from: Grid, to: Grid) {
   return moved;
 }
 
+function freeCells(taken: Set<number>, grid: Grid) {
+  return Array.from(
+    { length: grid.cols * grid.rows },
+    (_, cell) => cell,
+  ).filter((cell) => !taken.has(cell));
+}
+
 function remapBlocks(placements: Placement[], from: Grid, to: Grid) {
   const cells = sampleCentres(placements, from, to);
   const taken = new Set([...cells.values()].flat());
@@ -98,8 +105,16 @@ function remapBlocks(placements: Placement[], from: Grid, to: Grid) {
   for (const p of placements) {
     let next = cells.get(p.key) ?? [];
     if (next.length === 0) {
-      const cell = cornerCell(p.cells[0], from, to);
-      if (taken.has(cell)) continue;
+      let cell: number | undefined = cornerCell(p.cells[0], from, to);
+      // A shrink may drop a block nothing sampled, but never a locked one.
+      if (taken.has(cell) && p.locked) {
+        const free = freeCells(taken, to);
+        cell =
+          free.length > 0
+            ? nearestCell(free, scaled(p.cells[0], from, to), to.cols)
+            : undefined;
+      }
+      if (cell === undefined || taken.has(cell)) continue;
       taken.add(cell);
       next = [cell];
     }
@@ -198,10 +213,7 @@ function remapGrounded(placements: Placement[], from: Grid, to: Grid) {
   const { result, taken } = remapBlocks(blocks, from, to);
   for (const p of placements) {
     if (result.has(p.key) || blocks.includes(p)) continue;
-    const free = Array.from(
-      { length: to.cols * to.rows },
-      (_, cell) => cell,
-    ).filter((cell) => !taken.has(cell));
+    const free = freeCells(taken, to);
     if (free.length === 0) break;
     const cells =
       shapeOf(p) === "path"

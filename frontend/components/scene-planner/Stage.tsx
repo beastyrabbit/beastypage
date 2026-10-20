@@ -305,9 +305,12 @@ export function Stage() {
 
   const [pointerHover, setPointerHover] = useState<number | null>(null);
   const [cursor, setCursor] = useState(0);
-  const [draft, setDraft] = useState<{ start: number; cells: number[] } | null>(
-    null,
-  );
+  /** `at` is where the pointer or cursor is now, even over a covered cell. */
+  const [draft, setDraft] = useState<{
+    start: number;
+    at: number;
+    cells: number[];
+  } | null>(null);
   const paintValue = useRef(true);
   /** Whether the open draft came from keys; a ref so blur sees it at once. */
   const keyDraft = useRef(false);
@@ -396,7 +399,11 @@ export function Stage() {
       paintValue.current = !ignored[cell];
       planner.paintCell(cell, paintValue.current);
     } else if (tool.kind === "place") {
-      setDraft({ start: cell, cells: draftCells(cell, cell, [cell]) });
+      setDraft({
+        start: cell,
+        at: cell,
+        cells: draftCells(cell, cell, [cell]),
+      });
     } else if (tool.kind === "erase") {
       const key = occupied.get(cell);
       const target = planner.placements.find((p) => p.key === key);
@@ -410,17 +417,20 @@ export function Stage() {
   const extend = (cell: number) => {
     if (tool.kind === "paint") planner.paintCell(cell, paintValue.current);
     if (tool.kind === "place" && draft) {
-      // A draft always holds its start cell.
-      const last = draft.cells.at(-1) ?? draft.start;
+      // A path grows from where the pointer was, which after retracing is
+      // not the last new cell.
       const trail =
-        placeElement?.shape === "path" && cell !== last
+        placeElement?.shape === "path" && cell !== draft.at
           ? [
               ...draft.cells,
-              ...walk(last, cell, cols).filter((c) => !draft.cells.includes(c)),
+              ...walk(draft.at, cell, cols).filter(
+                (c) => !draft.cells.includes(c),
+              ),
             ]
           : draft.cells;
       setDraft({
         start: draft.start,
+        at: cell,
         cells:
           placeElement?.shape === "path"
             ? trail
@@ -914,9 +924,9 @@ export function Stage() {
           <span className="flex items-center gap-2">
             {(() => {
               const element = ELEMENTS_BY_ID.get(selectedPlacement.elementId);
-              return element
-                ? `${element.icon} ${elementLabel(element, atmosphere.time).label}`
-                : "";
+              if (!element) return "";
+              const name = elementLabel(element, atmosphere.time);
+              return `${name.icon} ${name.label}`;
             })()}
             <button
               type="button"

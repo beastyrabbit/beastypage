@@ -163,6 +163,7 @@ export function AtlasMode() {
                   <motion.button
                     key={e.id}
                     type="button"
+                    aria-label={name.label}
                     aria-pressed={active === e.id}
                     title={`${name.label} · ${SHAPES[e.shape]} · ${e.zones.join(", ")}`}
                     onClick={() =>

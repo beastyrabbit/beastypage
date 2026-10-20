@@ -838,27 +838,30 @@ function FreeDrawPicker({ until }: Readonly<{ until: number }>) {
         Free draw · {Math.ceil(left / 1000)} s
       </div>
       <div className="flex max-h-20 flex-wrap justify-center gap-1 overflow-y-auto">
-        {elements.map((e) => (
-          <button
-            key={e.id}
-            type="button"
-            title={e.label}
-            aria-label={e.label}
-            aria-pressed={active === e.id}
-            onClick={() => {
-              planner.setTool({ kind: "place", elementId: e.id });
-              planner.stage.current?.focus();
-            }}
-            className={cn(
-              "rounded-md border px-1 text-base",
-              active === e.id
-                ? "border-primary bg-primary/30"
-                : "border-white/10 hover:bg-white/10",
-            )}
-          >
-            {e.icon}
-          </button>
-        ))}
+        {elements.map((e) => {
+          const name = elementLabel(e, planner.atmosphere.time);
+          return (
+            <button
+              key={e.id}
+              type="button"
+              title={name.label}
+              aria-label={name.label}
+              aria-pressed={active === e.id}
+              onClick={() => {
+                planner.setTool({ kind: "place", elementId: e.id });
+                planner.stage.current?.focus();
+              }}
+              className={cn(
+                "rounded-md border px-1 text-base",
+                active === e.id
+                  ? "border-primary bg-primary/30"
+                  : "border-white/10 hover:bg-white/10",
+              )}
+            >
+              {name.icon}
+            </button>
+          );
+        })}
       </div>
       <span className="text-[10px] text-muted-foreground">
         Pick one, then drag on the grid

@@ -231,6 +231,27 @@ describe("stage interactions and announcements", () => {
     expect(planner.status.text).toContain("grid size changed");
   });
 
+  it("grows a retraced path from the pointer, not the last new cell", async () => {
+    await render(<Stage />);
+    await act(async () =>
+      planner.setTool({ kind: "place", elementId: "trail" }),
+    );
+    // 12 columns over 120 px: A1 B1 B2 A2, back over A1 and B1, on to C1.
+    const at = (col: number, row: number) => [col * 10 + 5, row * 10 + 5];
+    await pointer("pointerdown", ...at(0, 0));
+    for (const [col, row] of [
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+      [1, 0],
+      [2, 0],
+    ])
+      await pointer("pointermove", ...at(col, row));
+    await pointer("pointerup");
+    expect(planner.placements.map((p) => p.cells)).toEqual([[0, 1, 13, 12, 2]]);
+  });
+
   it("retains the keyboard cursor after the pointer leaves", async () => {
     await render(<Stage />);
     for (let i = 0; i < 3; i++) {
@@ -469,6 +490,31 @@ describe("roll labels and free draw", () => {
     await advance(500);
     expect(document.activeElement).toBe(button("Roll dice"));
     expect(planner.status.text).toContain("Free draw done");
+  });
+
+  it("names free-draw and atlas choices by their current variant", async () => {
+    fixedTurn(7);
+    await render(
+      <>
+        <BoardMode />
+        <AtlasMode />
+      </>,
+    );
+    await act(async () =>
+      planner.setAtmosphere((s) => ({ ...s, time: "night" })),
+    );
+    await click(button("Roll dice"));
+    await advance(1200);
+    const names = (selector: string) =>
+      Array.from(container.querySelectorAll(selector), (item) =>
+        item.getAttribute("aria-label"),
+      );
+    const freeDraw = names('button[title][aria-label]:not([title*=" · "])');
+    expect(freeDraw).toContain("Moon");
+    expect(freeDraw).not.toContain("Sun");
+    const atlas = names('button[title*=" · "]');
+    expect(atlas).toContain("Moon");
+    expect(new Set(atlas).size).toBe(atlas.length);
   });
 
   it("restores focus when free draw expires without a placement", async () => {

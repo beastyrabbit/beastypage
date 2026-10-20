@@ -258,6 +258,35 @@ describe("remapPlacements", () => {
     );
   });
 
+  it("moves a locked block the shrink did not sample to a free cell", () => {
+    // Shrinking 10 columns to 5, new A1 samples old B1: the meadow there
+    // wins it, and the locked rocks on old A1 move to the nearest free cell:
+    // A2, whose centre is closer to theirs than B1's.
+    const rocks = {
+      key: "rocks",
+      elementId: "rocks",
+      cells: [0],
+      rect: { col: 0, row: 0, w: 1, h: 1 },
+      locked: true,
+    };
+    const meadow = {
+      key: "meadow",
+      elementId: "meadow",
+      cells: [1],
+      rect: { col: 1, row: 0, w: 1, h: 1 },
+    };
+    const next = remapPlacements(
+      [rocks, meadow],
+      { cols: 10, rows: 5 },
+      { cols: 5, rows: 5 },
+    );
+    expect(next.map((p) => p.key)).toEqual(["rocks", "meadow"]);
+    const [movedRocks, movedMeadow] = next;
+    expect(movedMeadow.cells).toEqual([0]);
+    expect(movedRocks).toMatchObject({ cells: [5], locked: true });
+    expect(movedRocks.rect).toEqual({ col: 0, row: 1, w: 1, h: 1 });
+  });
+
   it("drops a rider whose host has no cell left", () => {
     // Shrinking 10 columns to 5, new column 0 samples old column 1: the
     // meadow there wins the cell, and the pond on column 0 has none left.

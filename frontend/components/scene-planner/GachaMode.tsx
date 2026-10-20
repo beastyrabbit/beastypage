@@ -268,7 +268,7 @@ export function GachaMode() {
     );
     const variantPool = SCENE_ELEMENTS.filter(
       (e) => e.theme === chain.theme,
-    ).map((e) => e.icon);
+    ).map((e) => elementLabel(e, planner.latest.current.atmosphere.time).icon);
     const colPool = Array.from({ length: settings.cols }, (_, c) =>
       columnName(c),
     );
@@ -309,7 +309,9 @@ export function GachaMode() {
       label: name.label,
       where,
       rare: isRare,
-      bonus: chain.fed ? `+ ${chain.fed.element.label}` : undefined,
+      bonus: chain.fed
+        ? `+ ${elementLabel(chain.fed.element, planner.latest.current.atmosphere.time).label}`
+        : undefined,
     };
     setCard(next);
     await sequence.current.wait(director.wait(DURATION.place));
