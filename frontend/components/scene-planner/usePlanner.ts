@@ -298,7 +298,7 @@ export function usePlannerState() {
         // A hand-drawn path is one cell wide, in drawing order.
         ends:
           ELEMENTS_BY_ID.get(elementId)?.shape === "path"
-            ? [...new Set([cells[0], cells[cells.length - 1]])]
+            ? [...new Set([cells[0], cells.at(-1) ?? cells[0]])]
             : undefined,
       };
       appear([placement]);

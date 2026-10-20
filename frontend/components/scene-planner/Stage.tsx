@@ -372,7 +372,8 @@ export function Stage() {
   const extend = (cell: number) => {
     if (tool.kind === "paint") planner.paintCell(cell, paintValue.current);
     if (tool.kind === "place" && draft) {
-      const last = draft.cells[draft.cells.length - 1];
+      // A draft always holds its start cell.
+      const last = draft.cells.at(-1) ?? draft.start;
       const trail =
         placeElement?.shape === "path" && cell !== last
           ? [
