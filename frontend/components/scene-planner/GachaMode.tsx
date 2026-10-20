@@ -292,6 +292,12 @@ export function GachaMode() {
 
   async function run(untilFull: boolean) {
     if (rolling) return;
+    // "Pull until full" on a full scene would overfill it by one.
+    if (untilFull && planner.boardStatus().full) {
+      setCard(null);
+      setMessage("The scene is already full.");
+      return;
+    }
     director.reset();
     setRolling(true);
     setMessage(null);

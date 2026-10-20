@@ -84,8 +84,11 @@ export function ScenePlannerClient() {
   const overlaySrc = overlay?.src;
   useEffect(() => {
     if (!overlaySrc) return;
+    // A resize starts a new measurement; the old one must not land after it.
+    let current = true;
     const image = new Image();
     image.onload = () => {
+      if (!current) return;
       const width = settings.cols * 8;
       const height = settings.rows * 8;
       const canvas = document.createElement("canvas");
@@ -98,13 +101,14 @@ export function ScenePlannerClient() {
       const coverage = hasTransparency(data)
         ? cellCoverage(data, width, height, settings.cols, settings.rows)
         : null;
-      setOverlay((current) =>
-        current && current.src === overlaySrc
-          ? { ...current, coverage }
-          : current,
+      setOverlay((shown) =>
+        shown && shown.src === overlaySrc ? { ...shown, coverage } : shown,
       );
     };
     image.src = overlaySrc;
+    return () => {
+      current = false;
+    };
   }, [overlaySrc, settings.cols, settings.rows, setOverlay]);
 
   const changeMode = (next: Mode) => {

@@ -409,6 +409,11 @@ export function BoardMode() {
 
   async function run(autoplay: boolean) {
     if (rolling) return;
+    // "Play until full" on a full scene would overfill it by one.
+    if (autoplay && planner.boardStatus().full) {
+      note("The scene is already full");
+      return;
+    }
     director.reset();
     setRolling(true);
     autoRef.current = autoplay;

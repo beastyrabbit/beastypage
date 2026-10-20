@@ -272,11 +272,18 @@ export function usePlannerState() {
 
   const addChain = useCallback(
     (chain: RollChain) => {
-      const rolled = chain.fed
-        ? [chain.placement, chain.fed.placement]
-        : [chain.placement];
-      // The board can change during the reveal; a rider whose host was
-      // removed meanwhile has nowhere to sit.
+      // The board can change during the reveal: cells painted as ignored
+      // meanwhile turn a block away (paths may run behind the foreground),
+      // and a rider whose host was removed has nowhere to sit.
+      const { ignored: ig } = latest.current;
+      const open = (p: Placement) =>
+        ELEMENTS_BY_ID.get(p.elementId)?.shape === "path" ||
+        p.cells.every((cell) => !ig[cell]);
+      if (!open(chain.placement)) return;
+      const rolled =
+        chain.fed && open(chain.fed.placement)
+          ? [chain.placement, chain.fed.placement]
+          : [chain.placement];
       const next = withHosts([...latest.current.placements, ...rolled]);
       const list = rolled.filter((p) => next.includes(p));
       appear(list, 260);
