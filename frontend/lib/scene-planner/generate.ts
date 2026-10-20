@@ -440,9 +440,7 @@ export class PlanBuilder {
 
   private rectFits(rect: Rect, element: SceneElement) {
     const { on } = element;
-    const bottom = rect.row + rect.h - 1;
-    // Riders keep to their zones too: no ducks on a far-off river.
-    if (!element.zones.includes(zoneOfRow(bottom, this.starts))) return false;
+    // Riders ignore zones: their host decides where they can go.
     if (on)
       return rectCells(rect, this.options.cols).every(
         (cell) =>
@@ -450,6 +448,8 @@ export class PlanBuilder {
           !this.ridden[cell] &&
           this.hosts(on, cell),
       );
+    const bottom = rect.row + rect.h - 1;
+    if (!element.zones.includes(zoneOfRow(bottom, this.starts))) return false;
     const inSky = zoneOfRow(rect.row, this.starts) === "sky";
     if (inSky && !element.zones.includes("sky") && !RISING.has(element.id)) {
       return false;

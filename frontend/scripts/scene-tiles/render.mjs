@@ -110,6 +110,17 @@ if (failed.length) {
   console.log("Not packing: fix the failed sheets and render again.");
   process.exit(1);
 }
+// The pack replaces the whole published index, so every sheet must exist.
+const missing = all.filter(
+  (sheet) => !existsSync(join(here, "out", "sheets", `${sheet}.png`)),
+);
+if (missing.length) {
+  console.log(
+    `Not packing: ${missing.length} sheets are not rendered yet ` +
+      `(${missing.slice(0, 5).join(", ")}…). Render them all, then pack.`,
+  );
+  process.exit(0);
+}
 
 const packed = await new Promise((resolve) => {
   const pack = spawn(

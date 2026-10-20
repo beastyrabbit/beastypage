@@ -26,6 +26,20 @@ function sortKey(p: Placement) {
   return Math.min(...p.cells);
 }
 
+/**
+ * The element a placement actually feeds, such as the stream starting right
+ * below a waterfall; undefined when no such placement exists.
+ */
+function fedBy(p: Placement, placements: Placement[], cols: number) {
+  const feeds = ELEMENTS_BY_ID.get(p.elementId)?.feeds;
+  if (!feeds) return undefined;
+  const below = new Set(p.cells.map((cell) => cell + cols));
+  const fed = placements.some(
+    (q) => q.elementId === feeds && q.cells.some((cell) => below.has(cell)),
+  );
+  return fed ? feeds : undefined;
+}
+
 function planText(planner: Planner) {
   const { settings, atmosphere, placements, ignored } = planner;
   const time = TIMES_OF_DAY.find((t) => t.id === atmosphere.time)?.label;
@@ -37,8 +51,9 @@ function planText(planner: Planner) {
   for (const p of [...placements].sort((a, b) => sortKey(a) - sortKey(b))) {
     const element = ELEMENTS_BY_ID.get(p.elementId);
     if (!element) continue;
-    const feeds = element.feeds
-      ? ` (feeds a ${ELEMENTS_BY_ID.get(element.feeds)?.label.toLowerCase()})`
+    const fed = fedBy(p, placements, settings.cols);
+    const feeds = fed
+      ? ` (feeds a ${ELEMENTS_BY_ID.get(fed)?.label.toLowerCase()})`
       : "";
     lines.push(
       `${describeCells(p, settings.cols).padEnd(9)} ${elementLabel(element, atmosphere.time).label}${feeds}`,

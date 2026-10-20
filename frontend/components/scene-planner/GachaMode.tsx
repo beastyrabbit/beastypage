@@ -176,8 +176,7 @@ interface Flight {
 
 export function GachaMode() {
   const planner = usePlanner();
-  const { director, settings, atmosphere, rolling, setRolling, reduced } =
-    planner;
+  const { director, settings, rolling, setRolling, reduced } = planner;
   const reels = [
     useRef<ReelHandle>(null),
     useRef<ReelHandle>(null),
@@ -219,7 +218,11 @@ export function GachaMode() {
       setMessage("The machine is empty: nothing has room left.");
       return false;
     }
-    const name = elementLabel(chain.element, atmosphere.time);
+    // The time can change while "Pull until full" runs.
+    const name = elementLabel(
+      chain.element,
+      planner.latest.current.atmosphere.time,
+    );
     const theme = THEMES.find((t) => t.id === chain.theme);
     const first = chain.placement.rect
       ? chain.placement.rect.row * settings.cols + chain.placement.rect.col

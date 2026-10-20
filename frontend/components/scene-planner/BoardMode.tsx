@@ -202,13 +202,15 @@ export function BoardMode() {
   const [dieA, animateA] = useAnimate<HTMLDivElement>();
   const [dieB, animateB] = useAnimate<HTMLDivElement>();
   const positionRef = useRef(0);
-  const placedCount = planner.placements.length;
+  const { placements } = planner;
 
-  // Free draw ends when the artist places something.
-  const placedAtStart = useRef(0);
+  // Free draw ends when the artist places something new; removals in the
+  // meantime do not count against it.
+  const placedAtStart = useRef(new Set<string>());
   useEffect(() => {
-    if (freeDraw && placedCount > placedAtStart.current) freeDone.current?.();
-  }, [freeDraw, placedCount]);
+    if (freeDraw && placements.some((p) => !placedAtStart.current.has(p.key)))
+      freeDone.current?.();
+  }, [freeDraw, placements]);
 
   const note = (text: string) => {
     const id = logId.current++;
@@ -309,7 +311,8 @@ export function BoardMode() {
     const info = squareInfo(kind);
     if (THEMES.some((t) => t.id === kind)) {
       const theme = kind as Theme;
-      if (!settings.themes.includes(theme)) {
+      // Themes can be switched on or off while autoplay runs.
+      if (!planner.latest.current.settings.themes.includes(theme)) {
         setReadout({
           title: "Closed",
           detail: `${info.label} is switched off`,
@@ -373,7 +376,9 @@ export function BoardMode() {
         note("✏️ Free draw skipped");
         return;
       }
-      placedAtStart.current = planner.latest.current.placements.length;
+      placedAtStart.current = new Set(
+        planner.latest.current.placements.map((p) => p.key),
+      );
       setFreeDraw({ until: Date.now() + FREE_DRAW_MS });
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, FREE_DRAW_MS);

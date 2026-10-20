@@ -119,8 +119,9 @@ describe("generatePlan", () => {
     const starts = zoneStarts(opts.rows, opts.skyShare);
     for (const seed of ["a", "b", "c", "d", "e"]) {
       for (const p of generatePlan({ ...opts, seed }).placements) {
-        if (!p.rect) continue;
         const element = ELEMENTS_BY_ID.get(p.elementId);
+        // Riders follow their host's zone instead of their own.
+        if (!p.rect || element?.on) continue;
         const zone = zoneOfRow(p.rect.row + p.rect.h - 1, starts);
         expect(element?.zones).toContain(zone);
       }

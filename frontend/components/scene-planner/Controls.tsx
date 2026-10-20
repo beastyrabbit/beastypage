@@ -99,9 +99,18 @@ export function Controls() {
   } = planner;
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /** Only the latest pick may land; an older image can finish decoding later. */
+  const loading = useRef(0);
+  const clearOverlay = () => {
+    loading.current++;
+    setOverlay(null);
+  };
+
   const loadOverlay = (src: string, name: string) => {
+    const request = ++loading.current;
     const image = new Image();
-    image.onload = () =>
+    image.onload = () => {
+      if (request !== loading.current) return;
       setOverlay({
         src,
         name,
@@ -111,6 +120,7 @@ export function Controls() {
         threshold: 0.5,
         coverage: null,
       });
+    };
     image.src = src;
   };
 
@@ -349,7 +359,7 @@ export function Controls() {
             Sample subject
           </Chip>
           {overlay && (
-            <Chip on={false} onClick={() => setOverlay(null)}>
+            <Chip on={false} onClick={clearOverlay}>
               Remove
             </Chip>
           )}
