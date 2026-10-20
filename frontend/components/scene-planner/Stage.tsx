@@ -355,7 +355,8 @@ export function Stage() {
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
-    const at = hover ?? 0;
+    // The grid may have shrunk since the cursor last moved.
+    const at = hover !== null && hover < cols * rows ? hover : 0;
     const col = at % cols;
     const step: Record<string, number | null> = {
       ArrowUp: at >= cols ? -cols : null,
@@ -756,11 +757,18 @@ export function Stage() {
             onPointerCancel={() => setDraft(null)}
             onKeyDown={onKeyDown}
             onFocus={(event) => {
-              if (!event.currentTarget.matches(":focus-visible")) return;
-              setKeyboard(true);
-              setHover((cell) => cell ?? 0);
+              setHover((cell) =>
+                cell !== null && cell < cols * rows ? cell : 0,
+              );
+              if (event.currentTarget.matches(":focus-visible"))
+                setKeyboard(true);
             }}
-            onBlur={() => setKeyboard(false)}
+            onBlur={() => {
+              // Leaving the grid may change the tool or its size; a
+              // keyboard draft from before would be stale.
+              setKeyboard(false);
+              setDraft(null);
+            }}
           />
         </div>
       </div>
