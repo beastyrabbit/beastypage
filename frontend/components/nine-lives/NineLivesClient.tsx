@@ -413,6 +413,7 @@ export function NineLivesClient() /* NOSONAR */ {
 
   const startGame = useCallback((src: string) => {
     setGameSrc(src);
+    setAwaitingSignIn(false);
     setStarted(true);
     requestAnimationFrame(() => iframeRef.current?.focus());
   }, []);
@@ -430,9 +431,7 @@ export function NineLivesClient() /* NOSONAR */ {
   );
 
   useEffect(() => {
-    if (!awaitingSignIn || !isSignedIn) return;
-    setAwaitingSignIn(false);
-    startGame(GAME_URL);
+    if (awaitingSignIn && isSignedIn) startGame(GAME_URL);
   }, [awaitingSignIn, isSignedIn, startGame]);
 
   const powerOn = useCallback(() => {
