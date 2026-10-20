@@ -28,6 +28,11 @@ export interface Placement {
   locked?: boolean;
   /** Placed by hand, so it may stand outside its zones. */
   manual?: boolean;
+  /**
+   * Key of the element this one flows from, such as the waterfall above a
+   * stream. It starts where its source ends, not in its own zone.
+   */
+  fedBy?: string;
 }
 
 export interface Atmosphere {
@@ -256,7 +261,8 @@ export function zoneAllows(
  */
 export function outOfZone(p: Placement, starts: ZoneStarts, cols: number) {
   const element = ELEMENTS_BY_ID.get(p.elementId);
-  if (!element || element.on) return false;
+  // Riders follow their host; fed paths start where their source ends.
+  if (!element || element.on || p.fedBy) return false;
   if (p.rect) return !zoneAllows(element, p.rect, starts);
   const row = Math.floor(Math.min(...p.cells) / cols);
   return !element.zones.includes(zoneOfRow(row, starts));
@@ -438,7 +444,9 @@ export class PlanBuilder {
           theme: fed.theme,
           element: fed,
           candidates: stream.candidates,
-          placement: this.record(fed, stream.cells),
+          placement: this.record(fed, stream.cells, undefined, {
+            fedBy: chain.placement.key,
+          }),
           path: { length: stream.length, drift: stream.drift },
         };
       }
@@ -446,12 +454,18 @@ export class PlanBuilder {
     return chain;
   }
 
-  private record(element: SceneElement, cells: number[], rect?: Rect) {
+  private record(
+    element: SceneElement,
+    cells: number[],
+    rect?: Rect,
+    extra?: Pick<Placement, "fedBy">,
+  ) {
     const placement: Placement = {
       key: `${element.id}-${this.options.seed}-${this.serial++}`,
       elementId: element.id,
       cells,
       rect,
+      ...extra,
     };
     this.add(placement);
     return placement;

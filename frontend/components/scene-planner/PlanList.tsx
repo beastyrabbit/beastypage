@@ -27,23 +27,12 @@ function sortKey(p: Placement) {
 }
 
 /**
- * The element a placement actually feeds, such as the stream starting right
- * below a waterfall; undefined when no such placement exists. The stream
- * must begin where the generator starts one: the row below the source,
- * under its middle.
+ * The element a placement feeds, such as the stream the generator started
+ * below a waterfall; undefined when there is none. A stream drawn by hand
+ * near a waterfall is not fed by it.
  */
-function fedBy(p: Placement, placements: Placement[], cols: number) {
-  const feeds = ELEMENTS_BY_ID.get(p.elementId)?.feeds;
-  if (!feeds || !p.rect) return undefined;
-  const row = p.rect.row + p.rect.h;
-  const origin = row * cols + p.rect.col + Math.floor(p.rect.w / 2);
-  const fed = placements.some(
-    (q) =>
-      q.elementId === feeds &&
-      q.cells.includes(origin) &&
-      Math.min(...q.cells) >= row * cols,
-  );
-  return fed ? feeds : undefined;
+function feedsInto(p: Placement, placements: Placement[]) {
+  return placements.find((q) => q.fedBy === p.key)?.elementId;
 }
 
 function planText(planner: Planner) {
@@ -57,7 +46,7 @@ function planText(planner: Planner) {
   for (const p of [...placements].sort((a, b) => sortKey(a) - sortKey(b))) {
     const element = ELEMENTS_BY_ID.get(p.elementId);
     if (!element) continue;
-    const fed = fedBy(p, placements, settings.cols);
+    const fed = feedsInto(p, placements);
     const feeds = fed
       ? ` (feeds a ${ELEMENTS_BY_ID.get(fed)?.label.toLowerCase()})`
       : "";

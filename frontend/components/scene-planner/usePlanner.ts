@@ -32,6 +32,7 @@ import {
   zoneStarts,
 } from "@/lib/scene-planner/generate";
 import type { Ghost } from "@/lib/scene-planner/render";
+import { remapPlacements } from "@/lib/scene-planner/resize";
 
 import { Director, TEMPOS, type Tempo } from "./motion";
 
@@ -90,60 +91,6 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 const STAGGER_MS = 70;
-
-/**
- * Maps placements onto a new grid: a new cell belongs to the placement that
- * owned the old cell under its centre, so shapes keep their share of the
- * picture. Elements too thin to cover any centre keep one cell.
- */
-function remap(
-  placements: Placement[],
-  from: Settings,
-  cols: number,
-  rows: number,
-) {
-  const rides = (p: Placement) => Boolean(ELEMENTS_BY_ID.get(p.elementId)?.on);
-  // Riders keep their own cell below; they would hide their host here.
-  const owner = new Map<number, string>();
-  for (const p of placements)
-    if (!rides(p)) for (const cell of p.cells) owner.set(cell, p.key);
-  const cells = new Map<string, number[]>(placements.map((p) => [p.key, []]));
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const oldCol = Math.floor(((col + 0.5) * from.cols) / cols);
-      const oldRow = Math.floor(((row + 0.5) * from.rows) / rows);
-      const key = owner.get(oldRow * from.cols + oldCol);
-      if (key) cells.get(key)?.push(row * cols + col);
-    }
-  }
-  const taken = new Set(placements.flatMap((p) => cells.get(p.key) ?? []));
-  // A rider whose host did not survive the resize has nothing to sit on.
-  const kept = placements.flatMap((p) => {
-    let next = cells.get(p.key) ?? [];
-    if (next.length === 0) {
-      const first = p.cells[0];
-      const col = Math.floor(((first % from.cols) * cols) / from.cols);
-      const row = Math.floor(
-        (Math.floor(first / from.cols) * rows) / from.rows,
-      );
-      const cell = row * cols + col;
-      if (!rides(p) && taken.has(cell)) return [];
-      taken.add(cell);
-      next = [cell];
-    }
-    if (!p.rect) return [{ ...p, cells: next }];
-    const colsOf = next.map((c) => c % cols);
-    const rowsOf = next.map((c) => Math.floor(c / cols));
-    const rect = {
-      col: Math.min(...colsOf),
-      row: Math.min(...rowsOf),
-      w: Math.max(...colsOf) - Math.min(...colsOf) + 1,
-      h: Math.max(...rowsOf) - Math.min(...rowsOf) + 1,
-    };
-    return [{ ...p, cells: next, rect }];
-  });
-  return withHosts(kept);
-}
 
 export function usePlannerState() {
   const reduced = useReducedMotion() ?? false;
@@ -233,7 +180,12 @@ export function usePlannerState() {
       const space = keySpace.current++;
       const fresh = plan.placements
         .filter((p) => !p.locked)
-        .map((p) => ({ ...p, key: `${p.key}~${space}` }));
+        .map((p) => ({
+          ...p,
+          key: `${p.key}~${space}`,
+          // A fed stream's source is fresh as well, so it moves along.
+          fedBy: p.fedBy && `${p.fedBy}~${space}`,
+        }));
       appear(fresh, STAGGER_MS);
       setPlacements([...kept, ...fresh]);
       setAtmosphere(plan.atmosphere);
@@ -341,7 +293,10 @@ export function usePlannerState() {
   const resizeGrid = useCallback(
     (nextCols: number, nextRows: number) => {
       if (nextCols === cols && nextRows === rows) return;
-      const next = remap(placements, settings, nextCols, nextRows);
+      const next = remapPlacements(placements, settings, {
+        cols: nextCols,
+        rows: nextRows,
+      });
       appear(next);
       setPlacements(next);
       setPainted(new Map());

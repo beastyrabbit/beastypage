@@ -103,6 +103,22 @@ describe("generatePlan", () => {
     expect(withHosts([ducks])).toEqual([]);
   });
 
+  it("records which waterfall feeds a stream, and spares it zone warnings", () => {
+    let fed = 0;
+    for (const seed of "abcdefghijklmnopqrstuvwxyz") {
+      const opts = options({ cols: 16, rows: 16, seed, themes: ["water"] });
+      const { placements } = generatePlan(opts);
+      const starts = zoneStarts(opts.rows, opts.skyShare);
+      for (const stream of placements.filter((p) => p.fedBy)) {
+        fed++;
+        const source = placements.find((p) => p.key === stream.fedBy);
+        expect(source?.elementId).toBe("waterfall");
+        expect(outOfZone(stream, starts, opts.cols)).toBe(false);
+      }
+    }
+    expect(fed).toBeGreaterThan(0);
+  });
+
   it("drops a locked rider whose host is gone", () => {
     const ducks = {
       key: "ducks",
