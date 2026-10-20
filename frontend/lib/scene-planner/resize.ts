@@ -209,7 +209,7 @@ function connectStep(
   const route: number[] = [];
   for (let cell = end; cell !== start; cell = previous.get(cell) as number)
     route.push(cell);
-  for (const cell of route.reverse()) cells.add(cell);
+  for (const cell of route.toReversed()) cells.add(cell);
   return end;
 }
 

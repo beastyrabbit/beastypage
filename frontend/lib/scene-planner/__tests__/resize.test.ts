@@ -403,7 +403,7 @@ describe("remapPlacements", () => {
     // A serpentine trail fills a 10×5 grid except J5, where a locked fox is.
     const cells = Array.from({ length: 5 }, (_, row) => {
       const line = Array.from({ length: 10 }, (_, col) => row * 10 + col);
-      return row % 2 ? line.reverse() : line;
+      return row % 2 ? line.toReversed() : line;
     })
       .flat()
       .filter((cell) => cell !== 49);
