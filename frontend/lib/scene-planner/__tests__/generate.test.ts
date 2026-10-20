@@ -109,11 +109,18 @@ describe("generatePlan", () => {
       const opts = options({ cols: 16, rows: 16, seed, themes: ["water"] });
       const { placements } = generatePlan(opts);
       const starts = zoneStarts(opts.rows, opts.skyShare);
+      const keys = new Set(placements.map((p) => p.key));
       for (const stream of placements.filter((p) => p.fedBy)) {
         fed++;
         const source = placements.find((p) => p.key === stream.fedBy);
         expect(source?.elementId).toBe("waterfall");
-        expect(outOfZone(stream, starts, opts.cols)).toBe(false);
+        expect(outOfZone(stream, starts, opts.cols, keys)).toBe(false);
+        // Without its waterfall, the stream is judged like any path.
+        const top = Math.floor(Math.min(...stream.cells) / opts.cols);
+        const fits = ELEMENTS_BY_ID.get("stream")?.zones.includes(
+          zoneOfRow(top, starts),
+        );
+        expect(outOfZone(stream, starts, opts.cols, new Set())).toBe(!fits);
       }
     }
     expect(fed).toBeGreaterThan(0);
@@ -260,11 +267,12 @@ describe("helpers", () => {
     const before = zoneStarts(rows, 0.3);
     const after = zoneStarts(rows, 0.4);
     const bottom = corn.rect.row + corn.rect.h - 1;
-    expect(outOfZone(corn, before, cols)).toBe(false);
+    const keys = new Set(["corn"]);
+    expect(outOfZone(corn, before, cols, keys)).toBe(false);
     // Only the top moves: the bottom row stays in the middle distance.
     expect(zoneOfRow(bottom, after)).toBe("mid");
     expect(zoneOfRow(corn.rect.row, after)).toBe("sky");
-    expect(outOfZone(corn, after, cols)).toBe(true);
+    expect(outOfZone(corn, after, cols, keys)).toBe(true);
   });
 
   it("keeps the seeded number stream stable", () => {

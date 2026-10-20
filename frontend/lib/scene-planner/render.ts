@@ -1420,11 +1420,29 @@ function atEdge(
   frame: SceneFrame,
 ) {
   const { cols, rows } = frame;
-  if (at === "end") {
-    const mask = cellMask(g.set, cell, cols, rows);
-    return [N, E, S, W].filter((bit) => mask & bit).length <= 1;
-  }
+  if (at === "end") return atPathEnd(g, cell, frame.placements, cols, rows);
   return !g.set.has(at === "top" ? cell - cols : cell + cols);
+}
+
+/**
+ * Whether a cell is at a path's start or stop. Paths record those cross-
+ * sections, so a river two cells wide ends in both of its last cells; one
+ * without them (from before ends were kept) falls back to cells with at
+ * most one neighbour.
+ */
+export function atPathEnd(
+  g: TileGroup,
+  cell: number,
+  placements: Placement[],
+  cols: number,
+  rows: number,
+) {
+  const path = placements.find(
+    (p) => g.keys.includes(p.key) && p.cells.includes(cell),
+  );
+  if (path?.ends) return path.ends.includes(cell);
+  const mask = cellMask(g.set, cell, cols, rows);
+  return [N, E, S, W].filter((bit) => mask & bit).length <= 1;
 }
 
 /**

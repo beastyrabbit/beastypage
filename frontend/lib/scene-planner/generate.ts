@@ -33,6 +33,11 @@ export interface Placement {
    * stream. It starts where its source ends, not in its own zone.
    */
   fedBy?: string;
+  /**
+   * A path's first and last cross-sections, where it meets what it flows
+   * from or into: a river mouth or a confluence draws there.
+   */
+  ends?: number[];
 }
 
 export interface Atmosphere {
@@ -257,12 +262,19 @@ export function zoneAllows(
 
 /**
  * Whether a placement no longer suits its zones, as after the horizon moves.
- * Paths are judged by the row they start on; riders follow their host.
+ * Paths are judged by the row they start on; riders follow their host, and
+ * a fed path starts where its source ends while that source (one of `keys`,
+ * the placements on the board) is still there.
  */
-export function outOfZone(p: Placement, starts: ZoneStarts, cols: number) {
+export function outOfZone(
+  p: Placement,
+  starts: ZoneStarts,
+  cols: number,
+  keys: ReadonlySet<string>,
+) {
   const element = ELEMENTS_BY_ID.get(p.elementId);
-  // Riders follow their host; fed paths start where their source ends.
-  if (!element || element.on || p.fedBy) return false;
+  if (!element || element.on) return false;
+  if (p.fedBy && keys.has(p.fedBy)) return false;
   if (p.rect) return !zoneAllows(element, p.rect, starts);
   const row = Math.floor(Math.min(...p.cells) / cols);
   return !element.zones.includes(zoneOfRow(row, starts));
@@ -417,7 +429,9 @@ export class PlanBuilder {
         theme: element.theme,
         element,
         candidates: result.candidates,
-        placement: this.record(element, result.cells),
+        placement: this.record(element, result.cells, undefined, {
+          ends: result.ends,
+        }),
         path: { length: result.length, drift: result.drift },
       };
     }
@@ -446,6 +460,7 @@ export class PlanBuilder {
           candidates: stream.candidates,
           placement: this.record(fed, stream.cells, undefined, {
             fedBy: chain.placement.key,
+            ends: stream.ends,
           }),
           path: { length: stream.length, drift: stream.drift },
         };
@@ -458,7 +473,7 @@ export class PlanBuilder {
     element: SceneElement,
     cells: number[],
     rect?: Rect,
-    extra?: Pick<Placement, "fedBy">,
+    extra?: Pick<Placement, "fedBy" | "ends">,
   ) {
     const placement: Placement = {
       key: `${element.id}-${this.options.seed}-${this.serial++}`,
@@ -578,7 +593,8 @@ export class PlanBuilder {
       this.occupied[r * cols + c] ||
       track.has(r * cols + c);
 
-    this.stampPath(cells, element, thickness, col, row);
+    const first = this.stampPath(cells, element, thickness, col, row);
+    let last = first;
     let length = 1;
     for (let step = 0; step < maxSteps; step++) {
       if (rng() < 0.3) drift = -drift;
@@ -590,12 +606,14 @@ export class PlanBuilder {
       row += next[1];
       track.add(row * cols + col);
       length++;
-      this.stampPath(cells, element, thickness, col, row);
+      last = this.stampPath(cells, element, thickness, col, row);
       if (row === rows - 1 && rng() < 0.5) break;
     }
     if (cells.size <= 1) return null;
     return {
       cells: [...cells],
+      // Where it starts and where it stops: a mouth or confluence goes here.
+      ends: [...new Set([...first, ...last])],
       candidates,
       length,
       drift: driftOf(col - origin.col),
@@ -636,7 +654,7 @@ export class PlanBuilder {
     };
   }
 
-  /** Adds a path's cross-section around column `c` on row `r`. */
+  /** Adds a path's cross-section around column `c` on row `r`; returns it. */
   private stampPath(
     cells: Set<number>,
     element: SceneElement,
@@ -652,9 +670,13 @@ export class PlanBuilder {
       Math.max(0, c - Math.floor((width - 1) / 2)),
       cols - width,
     );
+    const section: number[] = [];
     for (let x = Math.max(0, left); x < Math.min(cols, left + width); x++) {
-      if (!this.occupied[r * cols + x]) cells.add(r * cols + x);
+      if (this.occupied[r * cols + x]) continue;
+      cells.add(r * cols + x);
+      section.push(r * cols + x);
     }
+    return section;
   }
 }
 

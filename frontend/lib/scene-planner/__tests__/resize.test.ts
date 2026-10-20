@@ -37,6 +37,26 @@ describe("remapPlacements", () => {
     expect(d.cells[0]).not.toBe(s.cells[0]);
   });
 
+  it("carries a path's ends to its new cells", () => {
+    // A two-wide river down columns 2–3 of a 6×4 grid, doubled to 12×8.
+    const river = {
+      key: "river",
+      elementId: "river",
+      cells: [2, 3, 8, 9, 14, 15, 20, 21],
+      ends: [2, 3, 20, 21],
+    };
+    const [moved] = remapPlacements(
+      [river],
+      { cols: 6, rows: 4 },
+      { cols: 12, rows: 8 },
+    );
+    const rowsOf = new Set(moved.ends?.map((cell) => Math.floor(cell / 12)));
+    // The first row's two cells and the last row's become ends: rows 0–1
+    // and 6–7 of the doubled grid.
+    expect([...rowsOf].sort((a, b) => a - b)).toEqual([0, 1, 6, 7]);
+    expect(moved.ends?.every((cell) => moved.cells.includes(cell))).toBe(true);
+  });
+
   it("drops a rider whose host has no cell left", () => {
     // Shrinking 10 columns to 5, new column 0 samples old column 1: the
     // meadow there wins the cell, and the pond on column 0 has none left.

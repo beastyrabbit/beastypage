@@ -482,6 +482,8 @@ export function Stage() {
   const sceneTransition = `transform ${reduced ? 0 : DURATION.scene}ms cubic-bezier(${EASE.inout.join(",")})`;
   // The flat grid lines and labels fade out in the diorama.
   const flatOnly = diorama ? 0 : 1;
+  /** CSS fade length; instant under reduced motion, like the transforms. */
+  const fade = (ms: number) => `${reduced ? 0 : ms}ms`;
 
   return (
     <div className="flex flex-col gap-2">
@@ -498,7 +500,7 @@ export function Stage() {
           className="pointer-events-none absolute top-0 right-0 left-[22px] flex font-mono text-[10px] text-muted-foreground/70 transition-opacity"
           style={{
             opacity: flatOnly,
-            transitionDuration: `${DURATION.snap}ms`,
+            transitionDuration: fade(DURATION.snap),
           }}
         >
           {Array.from({ length: cols }, (_, c) => columnName(c)).map((name) => (
@@ -511,7 +513,7 @@ export function Stage() {
           className="pointer-events-none absolute top-[18px] bottom-0 left-0 flex w-[22px] flex-col font-mono text-[10px] text-muted-foreground/70 transition-opacity"
           style={{
             opacity: flatOnly,
-            transitionDuration: `${DURATION.snap}ms`,
+            transitionDuration: fade(DURATION.snap),
           }}
         >
           {Array.from({ length: rows }, (_, r) => String(r + 1)).map(
@@ -548,7 +550,7 @@ export function Stage() {
               style={{
                 imageRendering: "pixelated",
                 opacity: flatOnly,
-                transitionDuration: `${DURATION.scene}ms`,
+                transitionDuration: fade(DURATION.scene),
               }}
             />
             {bands.map((band, i) => (
@@ -599,7 +601,7 @@ export function Stage() {
                 className="absolute inset-0 transition-opacity"
                 style={{
                   opacity: flatOnly,
-                  transitionDuration: `${DURATION.snap}ms`,
+                  transitionDuration: fade(DURATION.snap),
                   backgroundImage:
                     "linear-gradient(to right, rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.12) 1px, transparent 1px)",
                   backgroundSize: `${100 / cols}% ${100 / rows}%`,

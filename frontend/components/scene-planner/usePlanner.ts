@@ -295,6 +295,11 @@ export function usePlannerState() {
         cells,
         rect,
         manual: true,
+        // A hand-drawn path is one cell wide, in drawing order.
+        ends:
+          ELEMENTS_BY_ID.get(elementId)?.shape === "path"
+            ? [...new Set([cells[0], cells[cells.length - 1]])]
+            : undefined,
       };
       appear([placement]);
       latest.current.placements = [...latest.current.placements, placement];
@@ -333,15 +338,14 @@ export function usePlannerState() {
   );
 
   /** Rolled elements that left their zones after a horizon change. */
-  const misplaced = useMemo(
-    () =>
-      new Set(
-        placements
-          .filter((p) => !p.manual && outOfZone(p, starts, cols))
-          .map((p) => p.key),
-      ),
-    [placements, starts, cols],
-  );
+  const misplaced = useMemo(() => {
+    const keys = new Set(placements.map((p) => p.key));
+    return new Set(
+      placements
+        .filter((p) => !p.manual && outOfZone(p, starts, cols, keys))
+        .map((p) => p.key),
+    );
+  }, [placements, starts, cols]);
 
   return {
     reduced,
