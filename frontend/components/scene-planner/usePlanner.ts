@@ -222,25 +222,30 @@ export function usePlannerState() {
     return { full: builder.full, open: builder.openThemes() };
   }, []);
 
+  /**
+   * Commits a rolled chain. The board can change during the reveal: cells
+   * painted as ignored meanwhile turn a block away (paths may run behind the
+   * foreground), and a rider whose host was removed has nowhere to sit.
+   * Returns whether the rolled element was placed, so callers report it.
+   */
   const addChain = useCallback(
     (chain: RollChain) => {
-      // The board can change during the reveal: cells painted as ignored
-      // meanwhile turn a block away (paths may run behind the foreground),
-      // and a rider whose host was removed has nowhere to sit.
       const { ignored: ig } = latest.current;
       const open = (p: Placement) =>
         ELEMENTS_BY_ID.get(p.elementId)?.shape === "path" ||
         p.cells.every((cell) => !ig[cell]);
-      if (!open(chain.placement)) return;
+      if (!open(chain.placement)) return false;
       const rolled =
         chain.fed && open(chain.fed.placement)
           ? [chain.placement, chain.fed.placement]
           : [chain.placement];
       const next = withHosts([...latest.current.placements, ...rolled]);
       const list = rolled.filter((p) => next.includes(p));
+      if (!list.includes(chain.placement)) return false;
       appear(list, 260);
       latest.current.placements = next;
       setPlacements((current) => withHosts([...current, ...list]));
+      return true;
     },
     [appear],
   );

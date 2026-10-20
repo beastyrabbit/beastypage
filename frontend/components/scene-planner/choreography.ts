@@ -24,7 +24,8 @@ function shuffled<T>(list: readonly T[]) {
 /**
  * Location step on the stage: the allowed zones light up, a locator box hops
  * between valid spots, then settles on the rolled one. Paths draw their
- * trail. Ends by placing the element (and anything it feeds).
+ * trail. Ends by placing the element (and anything it feeds), and returns
+ * false when the board changed meanwhile so that it no longer fits.
  */
 export async function revealOnStage(planner: Planner, chain: RollChain) {
   const { director, setCue, settings } = planner;
@@ -65,6 +66,7 @@ export async function revealOnStage(planner: Planner, chain: RollChain) {
     }
   }
   setCue(null);
-  planner.addChain(chain);
-  await director.wait(DURATION.place);
+  const placed = planner.addChain(chain);
+  if (placed) await director.wait(DURATION.place);
+  return placed;
 }

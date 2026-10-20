@@ -168,11 +168,13 @@ def _render_tiles(sheet, builder, jobs, tmp, factor, palette, started):
     glows = np.zeros_like(tiles)
     any_glow = False
     errors = 0
+    failed = set()
     for row, job in enumerate(jobs):
         for frame in range(job["frames"]):
             result = _render_frame(sheet, builder, job, frame, tmp, factor, palette)
             if result is None:
                 errors += 1
+                failed.add(row)
                 continue
             pixels, glow = result
             _repeat_frame(tiles, glows, row, job, frame, pixels, glow)
@@ -180,10 +182,10 @@ def _render_tiles(sheet, builder, jobs, tmp, factor, palette, started):
                 any_glow = True
         if (row + 1) % 25 == 0:
             print(f"[{sheet}] {row + 1}/{len(jobs)} tiles, {time.time() - started:.0f}s")
-    return tiles, glows, any_glow, errors
+    return tiles, glows, any_glow, errors, failed
 
 
-def _write_sheet(sheet, jobs, tiles, glows, args):
+def _write_sheet(sheet, jobs, tiles, glows, args, failed):
     columns = tiles.shape[2] // CELL
     out = os.path.join(args.out, "sheets")
     os.makedirs(out, exist_ok=True)
@@ -193,7 +195,13 @@ def _write_sheet(sheet, jobs, tiles, glows, args):
         "sheet": sheet,
         "file": f"{sheet}.png",
         "columns": columns,
-        "tiles": {job["key"]: [row, job["frames"]] for row, job in enumerate(jobs)},
+        # A tile with a failed frame stays out of the index, so the pack's
+        # completeness check refuses the sheet instead of publishing blanks.
+        "tiles": {
+            job["key"]: [row, job["frames"]]
+            for row, job in enumerate(jobs)
+            if row not in failed
+        },
     }
     if glows is not None:
         kit.write_png(
@@ -212,10 +220,10 @@ def render_sheet(sheet: str, jobs: list[dict], args, manifest: dict) -> int:
     kit.setup_scene(CELL * factor, args.threads)
     tmp = tempfile.mkdtemp(prefix=f"tiles-{sheet}-")
     started = time.time()
-    tiles, glows, any_glow, errors = _render_tiles(sheet, builder, jobs, tmp, factor, palette, started)
+    tiles, glows, any_glow, errors, failed = _render_tiles(sheet, builder, jobs, tmp, factor, palette, started)
     if not any_glow:
         glows = None
-    _write_sheet(sheet, jobs, tiles, glows, args)
+    _write_sheet(sheet, jobs, tiles, glows, args, failed)
     write_preview(sheet, jobs, tiles, glows, args, manifest)
     print(
         f"[{sheet}] done: {len(jobs)} tiles in {time.time() - started:.0f}s, "

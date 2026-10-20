@@ -331,7 +331,15 @@ export function BoardMode() {
         : `Location ${where}`,
       tone: "element",
     });
-    await revealOnStage(planner, chain);
+    if (!(await revealOnStage(planner, chain))) {
+      setReadout({
+        title: "Not placed",
+        detail: `The board changed under ${name.label.toLowerCase()}`,
+        tone: "empty",
+      });
+      note(`${name.icon} ${name.label}: board changed, not placed`);
+      return;
+    }
     note(
       `${name.icon} ${name.label} at ${where}${chain.fed ? " + stream" : ""}`,
     );

@@ -284,7 +284,12 @@ export function GachaMode() {
     planner.setCue({ zones: chain.element.zones });
     await fly(name.icon, chain);
     planner.setCue(null);
-    planner.addChain(chain);
+    if (!planner.addChain(chain)) {
+      // The board changed during the pull; the card goes, nothing landed.
+      setCard(null);
+      setMessage(`${name.label} no longer fits there: nothing was placed.`);
+      return true;
+    }
     setHistory((current) => [next, ...current].slice(0, 12));
     await director.wait(DURATION.place);
     return true;

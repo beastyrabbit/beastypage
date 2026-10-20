@@ -208,6 +208,8 @@ export function Controls() {
             max={0.5}
             step={0.05}
             value={settings.skyShare}
+            // A pending roll picked its cells for the current zones.
+            disabled={rolling}
             onChange={(e) =>
               setSettings((s) => ({ ...s, skyShare: Number(e.target.value) }))
             }
