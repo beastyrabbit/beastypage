@@ -5,6 +5,7 @@ import {
   setCatTrait,
   syncChangedRegistryTraitsFromLegacy,
 } from "../cat-system/document";
+import { deduplicateTortieLayers } from "../cat-system/tortieLayers";
 import {
   applyCoatChoice,
   getCoatChoiceValue,
@@ -1250,9 +1251,11 @@ export class AdoptionGenerator {
   buildLegacyRenderParams(state) {
     const accessories = state.accessorySlots.filter((v) => v && v !== "none");
     const scars = state.scarSlots.filter((v) => v && v !== "none");
-    const tortieLayers = state.tortieLayers
-      .filter(Boolean)
-      .map((layer) => ({ ...layer }));
+    // A reveal frame can briefly repeat another layer exactly. Drawing a
+    // layer twice looks the same as once, and cat documents reject repeats.
+    const tortieLayers = deduplicateTortieLayers(
+      state.tortieLayers.filter(Boolean).map((layer) => ({ ...layer })),
+    );
 
     return {
       spriteNumber: state.spriteNumber,
