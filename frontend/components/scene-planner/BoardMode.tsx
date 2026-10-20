@@ -195,14 +195,39 @@ export function BoardMode() {
   const [auto, setAuto] = useState(false);
   const autoRef = useRef(false);
   const freeDone = useRef<(() => void) | null>(null);
-  /** Themes whose roll found no room since the board last changed. */
-  const stuck = useRef(new Set<Theme>());
+  /**
+   * Themes whose roll found no room, and the board they failed on. Any
+   * change since (a placement, a removal, a painted mask, a moved horizon)
+   * may have made room, so they count only while the board is the same.
+   */
+  const stuck = useRef({ themes: new Set<Theme>(), board: [] as unknown[] });
+  const boardNow = () => {
+    const { placements, ignored, settings: s } = planner.latest.current;
+    return [placements, ignored, s.skyShare];
+  };
+  const stuckThemes = () => {
+    const now = boardNow();
+    const same = stuck.current.board.every((v, i) => v === now[i]);
+    if (!same) stuck.current = { themes: new Set(), board: now };
+    return stuck.current.themes;
+  };
 
   const [tokenScope, animateToken] = useAnimate<HTMLDivElement>();
   const [dieA, animateA] = useAnimate<HTMLDivElement>();
   const [dieB, animateB] = useAnimate<HTMLDivElement>();
   const positionRef = useRef(0);
   const { placements } = planner;
+
+  /** Dice and token animations running now; Skip jumps them to the end. */
+  const moving = useRef(new Set<ReturnType<typeof animateA>>());
+  const track = async (controls: ReturnType<typeof animateA>) => {
+    moving.current.add(controls);
+    try {
+      await controls;
+    } finally {
+      moving.current.delete(controls);
+    }
+  };
 
   // Free draw ends when the artist places something new; removals in the
   // meantime do not count against it.
@@ -227,15 +252,19 @@ export function BoardMode() {
       ease: EASE.out,
     };
     await Promise.all([
-      animateA(
-        dieA.current,
-        { rotateX: [0, turns(a).rotateX], rotateY: [0, turns(a).rotateY] },
-        options,
+      track(
+        animateA(
+          dieA.current,
+          { rotateX: [0, turns(a).rotateX], rotateY: [0, turns(a).rotateY] },
+          options,
+        ),
       ),
-      animateB(
-        dieB.current,
-        { rotateX: [0, turns(b).rotateX], rotateY: [0, turns(b).rotateY] },
-        options,
+      track(
+        animateB(
+          dieB.current,
+          { rotateX: [0, turns(b).rotateX], rotateY: [0, turns(b).rotateY] },
+          options,
+        ),
       ),
     ]);
   }
@@ -247,14 +276,16 @@ export function BoardMode() {
       const { col, row } = squarePosition(index);
       setFlash(index);
       const duration = seconds(director.scale(DURATION.walk * 2));
-      await animateToken(
-        tokenScope.current,
-        {
-          left: `${(col / BOARD_COLS) * 100}%`,
-          top: `${(row / BOARD_ROWS) * 100}%`,
-          y: duration > 0 ? [0, -16, 0] : 0,
-        },
-        { duration, ease: EASE.inout },
+      await track(
+        animateToken(
+          tokenScope.current,
+          {
+            left: `${(col / BOARD_COLS) * 100}%`,
+            top: `${(row / BOARD_ROWS) * 100}%`,
+            y: duration > 0 ? [0, -16, 0] : 0,
+          },
+          { duration, ease: EASE.inout },
+        ),
       );
     }
     setPosition(positionRef.current);
@@ -270,7 +301,7 @@ export function BoardMode() {
         ? builder.roll(rng, { theme: category })
         : null;
     if (!chain) {
-      if (category) stuck.current.add(category);
+      if (category) stuckThemes().add(category);
       setReadout({
         title: "Nothing fits",
         detail: `No ${label.toLowerCase()} element has room left`,
@@ -280,7 +311,6 @@ export function BoardMode() {
       await director.wait(DURATION.step);
       return;
     }
-    stuck.current.clear();
     // A Weather square earlier in this run may have changed the time.
     const { time } = planner.latest.current.atmosphere;
     const name = elementLabel(chain.element, time);
@@ -362,8 +392,6 @@ export function BoardMode() {
       const victim = pick(rng, loose);
       const element = ELEMENTS_BY_ID.get(victim.elementId);
       planner.remove([victim.key]);
-      // The storm made room again.
-      stuck.current.clear();
       note(`🌪️ Storm took ${element?.label ?? victim.elementId}`);
       await director.wait(DURATION.place);
     } else if (kind === "free") {
@@ -418,7 +446,7 @@ export function BoardMode() {
     setRolling(true);
     autoRef.current = autoplay;
     setAuto(autoplay);
-    stuck.current.clear();
+    stuck.current = { themes: new Set(), board: boardNow() };
     try {
       let turns = 0;
       do {
@@ -426,7 +454,8 @@ export function BoardMode() {
         turns++;
         const status = planner.boardStatus();
         // Themes can stay open by count while none of their elements fits.
-        const open = status.open.filter((t) => !stuck.current.has(t));
+        const blocked = stuckThemes();
+        const open = status.open.filter((t) => !blocked.has(t));
         if (status.full || open.length === 0) break;
       } while (autoRef.current && turns < 60);
     } finally {
@@ -626,8 +655,10 @@ export function BoardMode() {
               type="button"
               onClick={() => {
                 director.skip();
-                // Free draw waits on its own countdown; Skip ends it too.
+                // Free draw waits on its own countdown, and the dice and
+                // token run on their own clocks; Skip ends them too.
                 freeDone.current?.();
+                for (const controls of moving.current) controls.complete();
               }}
               className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:bg-white/10"
             >

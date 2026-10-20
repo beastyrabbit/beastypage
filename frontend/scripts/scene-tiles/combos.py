@@ -2,6 +2,7 @@
 
 import math
 
+import lightkit
 import tilekit as kit
 import waterkit
 
@@ -46,14 +47,7 @@ class _Canvas:
         groups = waterkit.edge_batches(side, self.pixels)
         for colour, (verts, faces) in groups.items():
             if colour.startswith("lit-"):
-                material = kit.glow({
-                    "lit-core": "#ffd27a", "lit-mid": "#e3c58c",
-                    "lit-edge": "#c9a66b",
-                }[colour], strength=0.65)
-                # Alpha still cuts to binary in tilekit; sparse outer pixels
-                # preserve the scenery underneath the illuminated footprint.
-                if colour == "lit-edge":
-                    material.node_tree.nodes.get("Principled BSDF").inputs["Alpha"].default_value = 0.7
+                material = lightkit.material(colour)
             elif colour == "mist":
                 material = kit.transparent("foam", 0.72)
             else:
@@ -174,29 +168,26 @@ def _beam_colour(tile, u, v):
     return None
 
 
-def _pool_colour(pulse, u, v):
-    distance = ((u + 0.5 - 8) / (6.5 + pulse)) ** 2 + ((v + 0.5 - 5) / 4) ** 2
-    if distance > 1:
-        return None
-    if distance < 0.18:
-        return "lit-core"
-    if distance < 0.58 and (u + v) % 4 != 0:
-        return "lit-mid"
-    if (u + v) % 2 == 0:
-        return "lit-edge"
-    return None
-
-
-def _light(c, tile, beam=False):
-    pulse = (0, 0.7, 0.35, -0.5)[tile.frame % 4]
+def _beam(c, tile):
     for u in range(16):
         for v in range(16):
-            colour = _beam_colour(tile, u, v) if beam else _pool_colour(pulse, u, v)
+            colour = _beam_colour(tile, u, v)
             if colour is not None:
                 c.dot(u, v, colour)
 
 
+# Where the receiving cell sits relative to the lamp's foot, by the side the
+# lamp touches: below it, or to its left or right.
+_FROM_FOOT = {"N": (0, 1), "E": (-1, 0), "W": (1, 0)}
+
+
 def build(tile):
+    if tile.combo == "lamp-pool":
+        # Light on the ground keeps its own orientation: it is drawn in the
+        # receiving cell's coordinates, not turned towards the source side.
+        dx, dy = _FROM_FOOT[tile.side]
+        lightkit.draw(lightkit.cell(dx, dy, tile.frame % 4), y=-0.1)
+        return
     c = _Canvas()
     frame = tile.frame % 4
     combo = tile.combo
@@ -210,8 +201,8 @@ def build(tile):
         _posts(c, frame)
     elif combo == "wake":
         _wake(c, frame)
-    elif combo in ("lamp-pool", "lighthouse-beam"):
-        _light(c, tile, beam=combo == "lighthouse-beam")
+    elif combo == "lighthouse-beam":
+        _beam(c, tile)
     else:
         raise ValueError("Unknown combo: " + combo)
     c.draw(tile.side)

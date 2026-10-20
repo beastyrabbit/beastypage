@@ -6,6 +6,8 @@ import {
   columnName,
   createRng,
   generatePlan,
+  gridFor,
+  outOfZone,
   type PlanOptions,
   withHosts,
   zoneOfRow,
@@ -197,6 +199,33 @@ describe("zoneStarts", () => {
 describe("helpers", () => {
   it("names columns like a spreadsheet", () => {
     expect([0, 25, 26].map(columnName)).toEqual(["A", "Z", "AA"]);
+  });
+
+  it("fits the grid to an image in both dimensions", () => {
+    // 3:1 cannot be reached by changing only one side of 12×12.
+    expect(gridFor(3, { cols: 12, rows: 12 })).toEqual({ cols: 15, rows: 5 });
+    expect(gridFor(1, { cols: 12, rows: 12 })).toEqual({ cols: 12, rows: 12 });
+    const portrait = gridFor(3 / 4, { cols: 12, rows: 12 });
+    expect(portrait.cols / portrait.rows).toBeCloseTo(3 / 4);
+  });
+
+  it("flags blocks whose top the horizon moved into the sky", () => {
+    const cols = 20;
+    const rows = 20;
+    const corn = {
+      key: "corn",
+      elementId: "cornfield",
+      cells: [],
+      rect: { col: 2, row: 7, w: 4, h: 7 },
+    };
+    const before = zoneStarts(rows, 0.3);
+    const after = zoneStarts(rows, 0.4);
+    const bottom = corn.rect.row + corn.rect.h - 1;
+    expect(outOfZone(corn, before, cols)).toBe(false);
+    // Only the top moves: the bottom row stays in the middle distance.
+    expect(zoneOfRow(bottom, after)).toBe("mid");
+    expect(zoneOfRow(corn.rect.row, after)).toBe("sky");
+    expect(outOfZone(corn, after, cols)).toBe(true);
   });
 
   it("keeps the seeded number stream stable", () => {

@@ -117,7 +117,13 @@ def glow_pass(path: str, factor: int):
     if not colours:
         _restore_materials(swapped)
         return None
-    palette = [c for value in colours for c in (value, kit.shade(value, 0.8), kit.shade(value, 1.15))]
+    # Sorted: the palette order breaks ties when pixels are snapped, so a set's
+    # per-process order would make the glow sheet vary from run to run.
+    palette = [
+        c
+        for value in sorted(colours)
+        for c in (value, kit.shade(value, 0.8), kit.shade(value, 1.15))
+    ]
     try:
         return render(path, factor, palette)
     finally:
@@ -269,18 +275,23 @@ def over(canvas, x, y, tile):
     region[...] = tile * a + region * (1 - a)
 
 
+def _ground_panel(index, frames, frame_of, zone):
+    panel = np.zeros((3 * CELL, 6 * CELL * frames, 4), dtype=np.float32)
+    for f in range(frames):
+        for y in range(3):
+            for x in range(6):
+                key = f"{zone}:{(x * 7 + y * 13) % 4}"
+                # A --key run renders only some alternatives.
+                if key in index:
+                    over(panel, x + 6 * f, y, frame_of(index[key], f))
+    return panel
+
+
 def _ground_previews(index, frames, frame_of):
-    # Each zone as a 6 x 3 field with alternatives scattered as in the app.
-    panels = []
-    for zone in ("far", "mid", "front"):
-        panel = np.zeros((3 * CELL, 6 * CELL * frames, 4), dtype=np.float32)
-        for f in range(frames):
-            for y in range(3):
-                for x in range(6):
-                    alt = (x * 7 + y * 13) % 4
-                    over(panel, x + 6 * f, y, frame_of(index[f"{zone}:{alt}"], f))
-        panels.append(panel)
-    return panels
+    # Each rendered zone as a 6 x 3 field with alternatives scattered as in
+    # the app.
+    zones = [z for z in ("far", "mid", "front") if any(k.startswith(z + ":") for k in index)]
+    return [_ground_panel(index, frames, frame_of, zone) for zone in zones]
 
 
 def _combo_backdrop(first, manifest):

@@ -1131,7 +1131,9 @@ function paintWeather(ctx: CanvasRenderingContext2D, frame: SceneFrame) {
       const ry = (Math.floor(hash(i + 3) * height) + tick * 6) % height;
       ctx.fillRect(rx, ry, 1, 3);
     }
-    if (weather === "Storm" && tick % 97 < 2) {
+    // A flash now and then on the running clock; tick 0, which exports and
+    // reduced motion show, is never one.
+    if (weather === "Storm" && tick % 97 >= 95) {
       ctx.fillStyle = "rgba(255,255,255,0.18)";
       ctx.fillRect(0, 0, width, height);
     }

@@ -24,6 +24,31 @@ if (!existsSync(source)) {
   console.error(`No sheets in ${source}; run render.mjs first.`);
   process.exit(1);
 }
+
+// The pack replaces the whole published index, so every sheet must hold every
+// tile the manifest lists; a `run.py --key` debug render does not.
+const manifest = JSON.parse(
+  readFileSync(join(here, "out", "manifest.json"), "utf8"),
+) as { jobs: { sheet: string; key: string }[] };
+const staged = (sheet: string) => {
+  const file = join(source, `${sheet}.json`);
+  return existsSync(file)
+    ? (JSON.parse(readFileSync(file, "utf8")).tiles as Record<string, unknown>)
+    : {};
+};
+const incomplete = [...new Set(manifest.jobs.map((j) => j.sheet))].filter(
+  (sheet) => {
+    const tiles = staged(sheet);
+    return manifest.jobs.some((j) => j.sheet === sheet && !(j.key in tiles));
+  },
+);
+if (incomplete.length > 0) {
+  console.error(
+    `Not packing: ${incomplete.length} sheets are missing or incomplete ` +
+      `(${incomplete.slice(0, 5).join(", ")}). Render them in full first.`,
+  );
+  process.exit(1);
+}
 mkdirSync(target, { recursive: true });
 
 const hash = createHash("sha256");

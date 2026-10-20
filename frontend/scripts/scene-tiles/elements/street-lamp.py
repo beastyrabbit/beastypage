@@ -2,6 +2,7 @@
 
 import math
 
+import lightkit
 import tilekit as kit
 
 PALETTE = kit.ramp("rockDark", "builtDark", "rock", "cloudShade", "glow")
@@ -15,6 +16,10 @@ def build(tile):
     kit.box(0.455, bottom, 0.545, top, iron, -0.08, 0.06)
     kit.box(0.455, bottom, 0.48, top, highlight, -0.09, -0.08)
     if not tile.s:
+        if tile.variant == "night":
+            # The middle of the pool of light, on the ground behind the post;
+            # combo tiles carry it on into the neighbouring cells.
+            lightkit.draw(lightkit.cell(0, 0, tile.frame % 4), y=0.3)
         kit.box(0.35, 0.065, 0.65, 0.15, iron, -0.13, 0.14)
         kit.prism([(0.395, 0.15), (0.605, 0.15), (0.55, 0.32), (0.45, 0.32)],
                   iron, -0.10, 0.09)

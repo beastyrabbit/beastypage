@@ -10,7 +10,7 @@ import {
   TIMES_OF_DAY,
   WEATHER,
 } from "@/lib/scene-planner/catalog";
-import { DENSITIES, randomSeed } from "@/lib/scene-planner/generate";
+import { DENSITIES, gridFor, randomSeed } from "@/lib/scene-planner/generate";
 import { cn } from "@/lib/utils";
 
 import { DURATION } from "./motion";
@@ -153,15 +153,8 @@ export function Controls() {
   const matchImage = () => {
     // Pending rolls hold cells of the current grid, like the size sliders.
     if (!overlay || rolling) return;
-    const rows = Math.round(settings.cols / overlay.aspect);
-    if (rows >= 5 && rows <= 20) planner.resizeGrid(settings.cols, rows);
-    else {
-      const cols = Math.min(
-        20,
-        Math.max(5, Math.round(settings.rows * overlay.aspect)),
-      );
-      planner.resizeGrid(cols, settings.rows);
-    }
+    const { cols, rows } = gridFor(overlay.aspect, settings);
+    planner.resizeGrid(cols, rows);
   };
 
   return (

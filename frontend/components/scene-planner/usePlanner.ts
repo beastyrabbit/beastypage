@@ -21,6 +21,7 @@ import {
   canPlace,
   createRng,
   generatePlan,
+  outOfZone,
   type Placement,
   PlanBuilder,
   type Rect,
@@ -28,7 +29,6 @@ import {
   randomSeed,
   rollAtmosphere,
   withHosts,
-  zoneOfRow,
   zoneStarts,
 } from "@/lib/scene-planner/generate";
 import type { Ghost } from "@/lib/scene-planner/render";
@@ -328,6 +328,7 @@ export function usePlannerState() {
         elementId,
         cells,
         rect,
+        manual: true,
       };
       appear([placement]);
       latest.current.placements = [...latest.current.placements, placement];
@@ -364,23 +365,16 @@ export function usePlannerState() {
     [ignored],
   );
 
-  /**
-   * Elements that left their zones after a horizon change: a block by its
-   * bottom row, a path by the row it starts on.
-   */
-  const misplaced = useMemo(() => {
-    const result = new Set<string>();
-    for (const p of placements) {
-      const element = ELEMENTS_BY_ID.get(p.elementId);
-      // Riders follow their host's zone, so they cannot be out of place.
-      if (!element || element.on || p.key.includes("-hand-")) continue;
-      const row = p.rect
-        ? p.rect.row + p.rect.h - 1
-        : Math.floor(Math.min(...p.cells) / cols);
-      if (!element.zones.includes(zoneOfRow(row, starts))) result.add(p.key);
-    }
-    return result;
-  }, [placements, starts, cols]);
+  /** Rolled elements that left their zones after a horizon change. */
+  const misplaced = useMemo(
+    () =>
+      new Set(
+        placements
+          .filter((p) => !p.manual && outOfZone(p, starts, cols))
+          .map((p) => p.key),
+      ),
+    [placements, starts, cols],
+  );
 
   return {
     reduced,

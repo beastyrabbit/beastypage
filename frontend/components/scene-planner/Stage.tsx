@@ -195,7 +195,8 @@ export function Stage() {
       if (now - last < TICK_MS) return;
       last = now;
       const f = frameRef.current;
-      if (!f.reduced) tick++;
+      // Reduced motion shows the still first frame, as the export does.
+      tick = f.reduced ? 0 : tick + 1;
       const { appearing } = anim.current;
       if (f.reduced) {
         appearing.clear();

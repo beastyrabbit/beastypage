@@ -35,7 +35,9 @@ blender -b --factory-startup -P scripts/scene-tiles/run.py -- --sheet lake --thr
 # preview: scripts/scene-tiles/out/preview/lake.png (sample groups, every frame, 4x)
 ```
 
-`--key square:` limits the run to matching keys while iterating.
+`--key square:` limits the run to matching keys while iterating. Such a sheet
+is for the preview only: the pack refuses any staged sheet that misses tiles
+from the manifest, so render it in full before publishing.
 
 ## Full run
 
@@ -43,6 +45,9 @@ blender -b --factory-startup -P scripts/scene-tiles/run.py -- --sheet lake --thr
 pnpm exec tsx scripts/scene-tiles/manifest.ts
 node scripts/scene-tiles/render.mjs --jobs 6 --threads 3   # renders, then packs
 ```
+
+Renders are deterministic: an unchanged builder reproduces its sheet byte for
+byte, so a diff in `public/scene-planner/tiles/` is always a real change.
 
 The script uses `/usr/bin/blender` on Linux. On macOS, it uses
 `/Applications/Blender.app/Contents/MacOS/Blender` when that file exists.

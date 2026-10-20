@@ -26,6 +26,8 @@ export interface Placement {
   /** Bounding box for block-like shapes; absent for paths. */
   rect?: Rect;
   locked?: boolean;
+  /** Placed by hand, so it may stand outside its zones. */
+  manual?: boolean;
 }
 
 export interface Atmosphere {
@@ -205,6 +207,59 @@ export function canPlace(
   if (cells.length === 0) return false;
   if (!on) return cells.every((c) => !host.has(c));
   return cells.every((c) => !ridden.has(c) && on.includes(host.get(c) ?? ""));
+}
+
+/**
+ * The grid between 5 and 20 cells a side closest to an image's shape. Of
+ * grids that match about equally well, the one nearest the current size wins.
+ */
+export function gridFor(
+  aspect: number,
+  current: { cols: number; rows: number },
+) {
+  let best = { cols: current.cols, rows: current.rows };
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let cols = 5; cols <= 20; cols++) {
+    for (let rows = 5; rows <= 20; rows++) {
+      const miss = Math.abs(Math.log(cols / rows / aspect));
+      const change =
+        Math.abs(cols - current.cols) + Math.abs(rows - current.rows);
+      // Shape first; the size change only breaks near-ties.
+      const score = miss * 1000 + change;
+      if (score < bestScore) {
+        bestScore = score;
+        best = { cols, rows };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Whether a block's position suits its zones: its bottom row stands in one
+ * of them, and its top stays out of the sky unless it may rise into it.
+ */
+export function zoneAllows(
+  element: SceneElement,
+  rect: Rect,
+  starts: ZoneStarts,
+) {
+  const bottom = rect.row + rect.h - 1;
+  if (!element.zones.includes(zoneOfRow(bottom, starts))) return false;
+  const inSky = zoneOfRow(rect.row, starts) === "sky";
+  return !inSky || element.zones.includes("sky") || RISING.has(element.id);
+}
+
+/**
+ * Whether a placement no longer suits its zones, as after the horizon moves.
+ * Paths are judged by the row they start on; riders follow their host.
+ */
+export function outOfZone(p: Placement, starts: ZoneStarts, cols: number) {
+  const element = ELEMENTS_BY_ID.get(p.elementId);
+  if (!element || element.on) return false;
+  if (p.rect) return !zoneAllows(element, p.rect, starts);
+  const row = Math.floor(Math.min(...p.cells) / cols);
+  return !element.zones.includes(zoneOfRow(row, starts));
 }
 
 /**
@@ -448,12 +503,7 @@ export class PlanBuilder {
           !this.ridden[cell] &&
           this.hosts(on, cell),
       );
-    const bottom = rect.row + rect.h - 1;
-    if (!element.zones.includes(zoneOfRow(bottom, this.starts))) return false;
-    const inSky = zoneOfRow(rect.row, this.starts) === "sky";
-    if (inSky && !element.zones.includes("sky") && !RISING.has(element.id)) {
-      return false;
-    }
+    if (!zoneAllows(element, rect, this.starts)) return false;
     for (const cell of rectCells(rect, this.options.cols)) {
       if (this.options.ignored[cell] || this.occupied[cell]) return false;
     }
