@@ -7,6 +7,8 @@ import LockIcon from "@/components/ui/lock-icon";
 import {
   ELEMENTS_BY_ID,
   elementLabel,
+  type SceneElement,
+  type TimeOfDay,
   ZONES,
   type Zone,
 } from "@/lib/scene-planner/catalog";
@@ -14,8 +16,10 @@ import {
   canPlace,
   cellName,
   columnName,
+  type Placement,
   type Rect,
   rectCells,
+  type ZoneStarts,
   zoneBands,
   zoneOfRow,
 } from "@/lib/scene-planner/generate";
@@ -69,6 +73,56 @@ function walk(a: number, b: number, cols: number) {
     cells.push(row * cols + col);
   }
   return cells;
+}
+
+/** Diorama tilt at rest; a steeper fixed view replaces pointer tilt. */
+function restingTilt(diorama: boolean, reduced: boolean) {
+  if (!diorama) return 0;
+  return reduced ? 8 : 6;
+}
+
+const ARROWS: Record<string, [number, number]> = {
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+};
+
+/** Where an arrow key moves the cursor; null at the grid's edge. */
+function arrowTarget(key: string, at: number, cols: number, rows: number) {
+  const [dx, dy] = ARROWS[key];
+  const col = (at % cols) + dx;
+  const row = Math.floor(at / cols) + dy;
+  if (col < 0 || col >= cols || row < 0 || row >= rows) return null;
+  return row * cols + col;
+}
+
+/** The element under the cursor; riders win over their host. */
+function elementOn(
+  cell: number | null,
+  placements: Placement[],
+  occupied: Map<number, string>,
+) {
+  if (cell === null) return undefined;
+  const key = occupied.get(cell);
+  const placement = placements.find((p) => p.key === key);
+  return placement ? ELEMENTS_BY_ID.get(placement.elementId) : undefined;
+}
+
+/** Status line for a cell: its name, zone, and what is on it. */
+function cellStatus(
+  cell: number,
+  cols: number,
+  starts: ZoneStarts,
+  ignored: boolean,
+  element: SceneElement | undefined,
+  time: TimeOfDay,
+) {
+  const zone = zoneOfRow(Math.floor(cell / cols), starts);
+  const parts = [cellName(cell, cols), ZONES.find((z) => z.id === zone)?.label];
+  if (ignored) parts.push("ignored");
+  if (element) parts.push(elementLabel(element, time).label);
+  return parts.join(" · ");
 }
 
 export function Stage() {
@@ -214,7 +268,7 @@ export function Stage() {
   const rotateX = useSpring(0, spring);
   const rotateY = useSpring(0, spring);
   useEffect(() => {
-    rotateX.set(diorama ? (reduced ? 8 : 6) : 0);
+    rotateX.set(restingTilt(diorama, reduced));
     rotateY.set(diorama && reduced ? -8 : 0);
   }, [diorama, reduced, rotateX, rotateY]);
 
@@ -240,6 +294,10 @@ export function Stage() {
   const keyDraft = useRef(false);
   /** Shows the keyboard cursor; a mouse click focuses the grid too. */
   const [keyboard, setKeyboard] = useState(false);
+  const ignoredCells = useMemo(
+    () => ignored.flatMap((on, cell) => (on ? [cell] : [])),
+    [ignored],
+  );
   const occupied = useMemo(() => {
     // Riders such as ducks win over their host: they are what you point at.
     const map = new Map<number, string>();
@@ -357,42 +415,42 @@ export function Stage() {
       extend(cell);
   };
 
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    // The grid may have shrunk since the cursor last moved.
-    const at = hover !== null && hover < cols * rows ? hover : 0;
-    const col = at % cols;
-    const step: Record<string, number | null> = {
-      ArrowUp: at >= cols ? -cols : null,
-      ArrowDown: at + cols < cols * rows ? cols : null,
-      ArrowLeft: col > 0 ? -1 : null,
-      ArrowRight: col < cols - 1 ? 1 : null,
-    };
-    if (event.key in step) {
-      event.preventDefault();
-      setKeyboard(true);
-      const by = step[event.key];
-      if (by === null) return;
-      setHover(at + by);
-      if (draft) extend(at + by);
-    } else if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      setKeyboard(true);
-      if (draft) finish(draft);
-      else if (placeElement?.shape === "point")
-        finish({ cells: draftCells(at, at, [at]) });
-      else {
-        keyDraft.current = true;
-        begin(at);
-      }
-    } else if (event.key === "Escape") {
-      setDraft(null);
+  /** Enter or Space: finish the draft, place a point, or start a draft. */
+  const activate = (at: number) => {
+    if (draft) finish(draft);
+    else if (placeElement?.shape === "point")
+      finish({ cells: draftCells(at, at, [at]) });
+    else {
+      keyDraft.current = true;
+      begin(at);
     }
   };
 
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape") {
+      setDraft(null);
+      return;
+    }
+    const arrow = event.key in ARROWS;
+    if (!arrow && event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    setKeyboard(true);
+    // The grid may have shrunk since the cursor last moved.
+    const at = hover !== null && hover < cols * rows ? hover : 0;
+    if (!arrow) {
+      activate(at);
+      return;
+    }
+    const next = arrowTarget(event.key, at, cols, rows);
+    if (next === null) return;
+    setHover(next);
+    if (draft) extend(next);
+  };
+
   const draftValid =
-    draft && placeElement
-      ? canPlace(placements, placeElement.id, draft.cells)
-      : true;
+    !draft ||
+    !placeElement ||
+    canPlace(placements, placeElement.id, draft.cells);
 
   // ---------------------------------------------------------------------
   // Overlay content
@@ -400,18 +458,14 @@ export function Stage() {
 
   const ratio = overlay?.aspect ?? cols / rows;
   const selectedPlacement = placements.find((p) => p.key === selected);
-  const hoverElement =
-    hover !== null
-      ? ELEMENTS_BY_ID.get(
-          placements.find((p) => p.key === occupied.get(hover))?.elementId ??
-            "",
-        )
-      : undefined;
+  const hoverElement = elementOn(hover, placements, occupied);
   const transition = (ms: number, ease: readonly number[]) => ({
     duration: reduced ? 0 : seconds(ms),
     ease: ease as [number, number, number, number],
   });
   const sceneTransition = `transform ${reduced ? 0 : DURATION.scene}ms cubic-bezier(${EASE.inout.join(",")})`;
+  // The flat grid lines and labels fade out in the diorama.
+  const flatOnly = diorama ? 0 : 1;
 
   return (
     <div className="flex flex-col gap-2">
@@ -427,7 +481,7 @@ export function Stage() {
         <div
           className="pointer-events-none absolute top-0 right-0 left-[22px] flex font-mono text-[10px] text-muted-foreground/70 transition-opacity"
           style={{
-            opacity: diorama ? 0 : 1,
+            opacity: flatOnly,
             transitionDuration: `${DURATION.snap}ms`,
           }}
         >
@@ -440,7 +494,7 @@ export function Stage() {
         <div
           className="pointer-events-none absolute top-[18px] bottom-0 left-0 flex w-[22px] flex-col font-mono text-[10px] text-muted-foreground/70 transition-opacity"
           style={{
-            opacity: diorama ? 0 : 1,
+            opacity: flatOnly,
             transitionDuration: `${DURATION.snap}ms`,
           }}
         >
@@ -477,7 +531,7 @@ export function Stage() {
               className="absolute inset-0 h-full w-full overflow-hidden rounded-xl transition-opacity"
               style={{
                 imageRendering: "pixelated",
-                opacity: diorama ? 0 : 1,
+                opacity: flatOnly,
                 transitionDuration: `${DURATION.scene}ms`,
               }}
             />
@@ -528,35 +582,32 @@ export function Stage() {
               <div
                 className="absolute inset-0 transition-opacity"
                 style={{
-                  opacity: diorama ? 0 : 1,
+                  opacity: flatOnly,
                   transitionDuration: `${DURATION.snap}ms`,
                   backgroundImage:
                     "linear-gradient(to right, rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.12) 1px, transparent 1px)",
                   backgroundSize: `${100 / cols}% ${100 / rows}%`,
                 }}
               />
-              {ignored.map((on, cell) =>
-                on ? (
-                  <motion.div
-                    // biome-ignore lint/suspicious/noArrayIndexKey: cells are fixed positions
-                    key={cell}
-                    className="absolute bg-[repeating-linear-gradient(135deg,rgba(9,11,19,0.55)_0_3px,rgba(9,11,19,0.15)_3px_6px)] outline outline-1 outline-white/10"
-                    style={boxStyle(
-                      {
-                        col: cell % cols,
-                        row: Math.floor(cell / cols),
-                        w: 1,
-                        h: 1,
-                      },
-                      cols,
-                      rows,
-                    )}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={transition(DURATION.snap, EASE.out)}
-                  />
-                ) : null,
-              )}
+              {ignoredCells.map((cell) => (
+                <motion.div
+                  key={cell}
+                  className="absolute bg-[repeating-linear-gradient(135deg,rgba(9,11,19,0.55)_0_3px,rgba(9,11,19,0.15)_3px_6px)] outline outline-1 outline-white/10"
+                  style={boxStyle(
+                    {
+                      col: cell % cols,
+                      row: Math.floor(cell / cols),
+                      w: 1,
+                      h: 1,
+                    },
+                    cols,
+                    rows,
+                  )}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={transition(DURATION.snap, EASE.out)}
+                />
+              ))}
 
               <AnimatePresence>
                 {cue?.zones &&
@@ -782,11 +833,16 @@ export function Stage() {
 
       <div className="flex min-h-6 flex-wrap items-center justify-between gap-2 px-1 font-mono text-xs text-muted-foreground">
         <span>
-          {hover !== null
-            ? `${cellName(hover, cols)} · ${ZONES.find((z) => z.id === zoneOfRow(Math.floor(hover / cols), starts))?.label}${
-                ignored[hover] ? " · ignored" : ""
-              }${hoverElement ? ` · ${elementLabel(hoverElement, atmosphere.time).label}` : ""}`
-            : `${cols} × ${rows} cells`}
+          {hover === null
+            ? `${cols} × ${rows} cells`
+            : cellStatus(
+                hover,
+                cols,
+                starts,
+                ignored[hover],
+                hoverElement,
+                atmosphere.time,
+              )}
         </span>
         {selectedPlacement && (
           <span className="flex items-center gap-2">

@@ -139,7 +139,9 @@ const FACE_TRANSFORM: Record<number, string> = {
   6: "rotateY(180deg)",
 };
 
-function Die({ scope }: { scope: React.RefObject<HTMLDivElement | null> }) {
+function Die({
+  scope,
+}: Readonly<{ scope: React.RefObject<HTMLDivElement | null> }>) {
   return (
     <div className="size-11" style={{ perspective: 400 }}>
       <div
@@ -642,7 +644,7 @@ export function BoardMode() {
 }
 
 /** Element picker with a countdown ring for free-draw squares. */
-function FreeDrawPicker({ until }: { until: number }) {
+function FreeDrawPicker({ until }: Readonly<{ until: number }>) {
   const planner = usePlanner();
   const [left, setLeft] = useState(FREE_DRAW_MS);
   useEffect(() => {

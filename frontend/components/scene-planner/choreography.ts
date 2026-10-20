@@ -11,6 +11,16 @@ export function chainLocation(chain: RollChain, cols: number) {
   return `${columnName(first % cols)}${Math.floor(first / cols) + 1}`;
 }
 
+/** A shuffled copy; only the locator's decoy hops use it. */
+function shuffled<T>(list: readonly T[]) {
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1)); // NOSONAR: animation decoys, not security
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 /**
  * Location step on the stage: the allowed zones light up, a locator box hops
  * between valid spots, then settles on the rolled one. Paths draw their
@@ -32,9 +42,7 @@ export async function revealOnStage(planner: Planner, chain: RollChain) {
     if (step === chain) {
       setCue({ zones });
       await director.wait(DURATION.snap * 2);
-      const hops = [...step.candidates]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 5);
+      const hops = shuffled(step.candidates).slice(0, 5);
       for (const anchor of hops) {
         if (director.skipped) break;
         setCue({

@@ -4,6 +4,7 @@ import { ELEMENTS_BY_ID, THEMES } from "../catalog";
 import { cellCoverage } from "../coverage";
 import {
   columnName,
+  createRng,
   generatePlan,
   type PlanOptions,
   zoneOfRow,
@@ -182,6 +183,14 @@ describe("zoneStarts", () => {
 describe("helpers", () => {
   it("names columns like a spreadsheet", () => {
     expect([0, 25, 26].map(columnName)).toEqual(["A", "Z", "AA"]);
+  });
+
+  it("keeps the seeded number stream stable", () => {
+    // Shared seeds must keep rolling the same scene.
+    const rng = createRng("test");
+    expect([rng(), rng(), rng()]).toEqual([
+      0.3064163029193878, 0.0808415119536221, 0.2020526642445475,
+    ]);
   });
 
   it("measures cell coverage from alpha", () => {

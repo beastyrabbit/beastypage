@@ -38,13 +38,13 @@ function Segmented<T extends string>({
   onChange,
   id,
   disabled,
-}: {
+}: Readonly<{
   items: { id: T; label: string; hint?: string }[];
   value: T;
   onChange: (value: T) => void;
   id: string;
   disabled?: boolean;
-}) {
+}>) {
   return (
     <div className="flex rounded-full border border-white/10 bg-black/30 p-1">
       {items.map((item) => (

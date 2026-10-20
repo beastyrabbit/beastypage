@@ -28,31 +28,37 @@ interface ReelHandle {
 const nextFrame = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
+/** Any reel face; the filler only has to look random while it spins. */
+const filler = (pool: string[]) =>
+  pool[Math.floor(Math.random() * pool.length)]; // NOSONAR: visual filler, not security
+
 function Reel({
   label,
   idle,
   rare,
   ref,
-}: {
+}: Readonly<{
   label: string;
   idle?: boolean;
   rare?: boolean;
   ref: React.Ref<ReelHandle>;
-}) {
-  const [items, setItems] = useState<string[]>(["?"]);
+}>) {
+  const [items, setItems] = useState([{ key: "idle", label: "?" }]);
   const [locked, setLocked] = useState(false);
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const offset = (WINDOW_H - ITEM_H) / 2;
   const current = useRef("?");
+  /** Each spin builds a fresh strip; its faces are keyed by spin and slot. */
+  const spins = useRef(0);
 
   useImperativeHandle(ref, () => ({
     async spin(result, pool, ms) {
       const strip = [current.current];
-      for (let i = 0; i < FILLERS; i++)
-        strip.push(pool[Math.floor(Math.random() * pool.length)]);
-      strip.push(result, pool[Math.floor(Math.random() * pool.length)]);
+      for (let i = 0; i < FILLERS; i++) strip.push(filler(pool));
+      strip.push(result, filler(pool));
+      const spin = ++spins.current;
       setLocked(false);
-      setItems(strip);
+      setItems(strip.map((label, slot) => ({ key: `${spin}:${slot}`, label })));
       await nextFrame();
       await nextFrame();
       const el = scope.current;
@@ -120,14 +126,13 @@ function Reel({
           className="absolute inset-x-0 top-0"
           style={{ transform: `translateY(${offset}px)` }}
         >
-          {items.map((item, i) => (
+          {items.map((item) => (
             <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: strip positions
-              key={i}
+              key={item.key}
               className="flex items-center justify-center truncate px-1 text-center text-xl font-bold"
               style={{ height: ITEM_H }}
             >
-              {item}
+              {item.label}
             </div>
           ))}
         </div>

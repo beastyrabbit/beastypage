@@ -289,12 +289,12 @@ export function masksFor(shape: ShapeClass) {
   return shape === "path" ? [...masks, FILL] : masks;
 }
 
-const NIGHT: TimeOfDay[] = ["dusk", "night"];
+const NIGHT = new Set<TimeOfDay>(["dusk", "night"]);
 
 /** Variant an element shows in an atmosphere. */
 export function tileVariant(elementId: string, time: TimeOfDay) {
   const variants = TILE_SPECS[elementId]?.variants ?? [];
-  if (!NIGHT.includes(time)) return "base";
+  if (!NIGHT.has(time)) return "base";
   if (variants.includes("moon")) return "moon";
   if (variants.includes("night")) return "night";
   if (variants.includes("aurora") && time === "night") return "aurora";
@@ -372,8 +372,11 @@ export interface Combo {
   label: string;
   /** Element whose cell causes the overlay. */
   from: string[];
-  /** Elements, or the empty ground or sky, whose cell shows the overlay. */
-  onto: (string | "empty-ground" | "empty-sky")[];
+  /**
+   * Elements whose cell shows the overlay; "empty-ground" and "empty-sky"
+   * stand for empty land and sky.
+   */
+  onto: string[];
   /** Sides of the receiving cell the source may touch. */
   sides: Side[];
   frames: number;
@@ -515,46 +518,65 @@ export interface TileJob {
 }
 
 export function tileJobs(): TileJob[] {
+  return [
+    ...Object.entries(TILE_SPECS).flatMap(([id, spec]) =>
+      elementJobs(id, spec),
+    ),
+    ...groundJobs(),
+    ...edgeJobs(),
+    ...comboJobs(),
+  ];
+}
+
+function elementJobs(elementId: string, spec: TileSpec): TileJob[] {
   const jobs: TileJob[] = [];
-  for (const [elementId, spec] of Object.entries(TILE_SPECS)) {
-    for (const shape of spec.shapes)
-      for (const mask of masksFor(shape))
-        for (const variant of ["base", ...(spec.variants ?? [])])
-          for (let alt = 0; alt < (spec.alts ?? 1); alt++)
-            jobs.push({
-              kind: "tile",
-              sheet: elementId,
-              key: tileKey(shape, mask, variant, alt),
-              frames: spec.frames,
-              params: { element: elementId, shape, mask, variant, alt },
-            });
-  }
-  for (const zone of GROUND_ZONES)
-    for (let alt = 0; alt < GROUND_ALTS; alt++)
-      jobs.push({
-        kind: "ground",
-        sheet: "ground",
-        key: groundKey(zone, alt),
-        frames: LOOP,
-        params: { zone, alt },
-      });
-  for (const { from, onto } of edgePairs())
-    for (const side of SIDES)
-      jobs.push({
-        kind: "edge",
-        sheet: "edges",
-        key: edgeKey(from, onto, side),
-        frames: edgeFrames(from, onto),
-        params: { from, onto, side },
-      });
-  for (const combo of COMBOS)
-    for (const side of combo.sides)
-      jobs.push({
-        kind: "combo",
-        sheet: "combos",
-        key: comboKey(combo.id, side),
-        frames: combo.frames,
-        params: { combo: combo.id, side },
-      });
+  const variants = ["base", ...(spec.variants ?? [])];
+  for (const shape of spec.shapes)
+    for (const mask of masksFor(shape))
+      for (const variant of variants)
+        for (let alt = 0; alt < (spec.alts ?? 1); alt++)
+          jobs.push({
+            kind: "tile",
+            sheet: elementId,
+            key: tileKey(shape, mask, variant, alt),
+            frames: spec.frames,
+            params: { element: elementId, shape, mask, variant, alt },
+          });
   return jobs;
+}
+
+function groundJobs(): TileJob[] {
+  return GROUND_ZONES.flatMap((zone) =>
+    Array.from({ length: GROUND_ALTS }, (_, alt) => ({
+      kind: "ground" as const,
+      sheet: "ground",
+      key: groundKey(zone, alt),
+      frames: LOOP,
+      params: { zone, alt },
+    })),
+  );
+}
+
+function edgeJobs(): TileJob[] {
+  return edgePairs().flatMap(({ from, onto }) =>
+    SIDES.map((side) => ({
+      kind: "edge" as const,
+      sheet: "edges",
+      key: edgeKey(from, onto, side),
+      frames: edgeFrames(from, onto),
+      params: { from, onto, side },
+    })),
+  );
+}
+
+function comboJobs(): TileJob[] {
+  return COMBOS.flatMap((combo) =>
+    combo.sides.map((side) => ({
+      kind: "combo" as const,
+      sheet: "combos",
+      key: comboKey(combo.id, side),
+      frames: combo.frames,
+      params: { combo: combo.id, side },
+    })),
+  );
 }

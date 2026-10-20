@@ -192,7 +192,7 @@ export function usePlannerState() {
 
   const ignored = useMemo(() => {
     const result = new Array<boolean>(cols * rows).fill(false);
-    if (overlay?.coverage && overlay.coverage.length === cols * rows) {
+    if (overlay?.coverage?.length === cols * rows) {
       overlay.coverage.forEach((share, cell) => {
         result[cell] = share >= overlay.threshold;
       });

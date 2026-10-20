@@ -234,51 +234,83 @@ export function groupTiles(
   const seen = new Set<string>();
   const groups: TileGroup[] = [];
   for (const p of placements) {
-    const id = (cell: number) => `${p.elementId}:${cell}`;
     for (const first of p.cells) {
-      if (seen.has(id(first))) continue;
-      const cells: number[] = [];
-      const keys = new Set<string>();
-      const queue = [first];
-      seen.add(id(first));
-      while (queue.length > 0) {
-        const cell = queue.pop() as number;
-        cells.push(cell);
-        keys.add((owner.get(id(cell)) as Placement).key);
-        const col = cell % cols;
-        const next = [
-          cell >= cols ? cell - cols : -1,
-          col < cols - 1 ? cell + 1 : -1,
-          cell + cols < cols * rows ? cell + cols : -1,
-          col > 0 ? cell - 1 : -1,
-        ];
-        for (const n of next) {
-          if (n < 0 || seen.has(id(n)) || !owner.has(id(n))) continue;
-          seen.add(id(n));
-          queue.push(n);
-        }
-      }
-      cells.sort((a, b) => a - b);
-      const colsOf = cells.map((c) => c % cols);
-      const rowsOf = cells.map((c) => Math.floor(c / cols));
-      const rect = {
-        col: Math.min(...colsOf),
-        row: Math.min(...rowsOf),
-        w: Math.max(...colsOf) - Math.min(...colsOf) + 1,
-        h: Math.max(...rowsOf) - Math.min(...rowsOf) + 1,
-      };
+      if (seen.has(`${p.elementId}:${first}`)) continue;
+      const { cells, keys } = flood(
+        p.elementId,
+        first,
+        owner,
+        seen,
+        cols,
+        rows,
+      );
+      const rect = boundingRect(cells, cols);
       groups.push({
-        id: [...keys].sort().join("+"),
+        id: [...keys].sort((a, b) => a.localeCompare(b)).join("+"),
         elementId: p.elementId,
         cells,
         set: new Set(cells),
         rect,
         shape: shapeOf(p.elementId, rect, cells.length),
-        keys: [...keys],
+        keys,
       });
     }
   }
   return groups;
+}
+
+/** Cells sharing a side with `cell`: north, east, south, west. */
+function neighbours(cell: number, cols: number, rows: number) {
+  const col = cell % cols;
+  const result: number[] = [];
+  if (cell >= cols) result.push(cell - cols);
+  if (col < cols - 1) result.push(cell + 1);
+  if (cell + cols < cols * rows) result.push(cell + cols);
+  if (col > 0) result.push(cell - 1);
+  return result;
+}
+
+/**
+ * Cells of one element connected to `first`, and the placements they come
+ * from. Marks every cell it reaches as seen.
+ */
+function flood(
+  elementId: string,
+  first: number,
+  owner: Map<string, Placement>,
+  seen: Set<string>,
+  cols: number,
+  rows: number,
+) {
+  const id = (cell: number) => `${elementId}:${cell}`;
+  const cells: number[] = [];
+  const keys = new Set<string>();
+  const queue = [first];
+  seen.add(id(first));
+  while (queue.length > 0) {
+    const cell = queue.pop() as number;
+    cells.push(cell);
+    keys.add((owner.get(id(cell)) as Placement).key);
+    for (const n of neighbours(cell, cols, rows)) {
+      if (seen.has(id(n)) || !owner.has(id(n))) continue;
+      seen.add(id(n));
+      queue.push(n);
+    }
+  }
+  return { cells: cells.sort((a, b) => a - b), keys: [...keys] };
+}
+
+function boundingRect(cells: number[], cols: number): Rect {
+  const colsOf = cells.map((c) => c % cols);
+  const rowsOf = cells.map((c) => Math.floor(c / cols));
+  const col = Math.min(...colsOf);
+  const row = Math.min(...rowsOf);
+  return {
+    col,
+    row,
+    w: Math.max(...colsOf) - col + 1,
+    h: Math.max(...rowsOf) - row + 1,
+  };
 }
 
 export interface AtlasEntry {
@@ -328,6 +360,47 @@ export function transitions(
   rows: number,
   starts: ZoneStarts,
 ) {
+  const { material, group } = cellMaterials(groups);
+  const at = (cell: number) =>
+    material.get(cell) ??
+    zoneMaterial(zoneOfRow(Math.floor(cell / cols), starts));
+
+  const pairs = new Map<string, Transition>();
+  for (let cell = 0; cell < cols * rows; cell++) {
+    for (const n of laterNeighbours(cell, cols, rows)) {
+      if (!isBorder(group, cell, n)) continue;
+      const pair = materialPair(at(cell), at(n));
+      if (pair) countPair(pairs, pair);
+    }
+  }
+  return [...pairs.values()].sort((x, y) => y.count - x.count);
+}
+
+/** Right and lower neighbours, so each border between two cells counts once. */
+function laterNeighbours(cell: number, cols: number, rows: number) {
+  const result: number[] = [];
+  if (cell % cols < cols - 1) result.push(cell + 1);
+  if (cell + cols < cols * rows) result.push(cell + cols);
+  return result;
+}
+
+/** A border runs between two groups, or a group and empty land or sky. */
+function isBorder(group: Map<number, string>, a: number, b: number) {
+  return group.get(a) !== group.get(b) && (group.has(a) || group.has(b));
+}
+
+function countPair(
+  pairs: Map<string, Transition>,
+  [a, b]: [Material, Material],
+) {
+  const key = `${a}|${b}`;
+  const entry = pairs.get(key);
+  if (entry) entry.count++;
+  else pairs.set(key, { key, a, b, count: 1 });
+}
+
+/** Material and group of every cell an element covers; riders do not count. */
+function cellMaterials(groups: TileGroup[]) {
   const material = new Map<number, Material>();
   const group = new Map<number, string>();
   for (const g of groups) {
@@ -338,24 +411,11 @@ export function transitions(
       group.set(cell, g.id);
     }
   }
-  const at = (cell: number) =>
-    material.get(cell) ??
-    zoneMaterial(zoneOfRow(Math.floor(cell / cols), starts));
+  return { material, group };
+}
 
-  const pairs = new Map<string, Transition>();
-  for (let cell = 0; cell < cols * rows; cell++) {
-    const right = cell % cols < cols - 1 ? cell + 1 : -1;
-    const below = cell + cols < cols * rows ? cell + cols : -1;
-    for (const n of [right, below]) {
-      if (n < 0 || group.get(cell) === group.get(n)) continue;
-      if (!group.has(cell) && !group.has(n)) continue;
-      const [a, b] = [at(cell), at(n)].sort() as [Material, Material];
-      if (a === b && a === "ground") continue;
-      const key = `${a}|${b}`;
-      const pair = pairs.get(key);
-      if (pair) pair.count++;
-      else pairs.set(key, { key, a, b, count: 1 });
-    }
-  }
-  return [...pairs.values()].sort((x, y) => y.count - x.count);
+/** Two materials in a fixed order; null for plain ground meeting ground. */
+function materialPair(x: Material, y: Material): [Material, Material] | null {
+  if (x === "ground" && y === "ground") return null;
+  return x <= y ? [x, y] : [y, x];
 }

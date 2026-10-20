@@ -69,12 +69,13 @@ export type Rng = () => number;
 export function createRng(seed: string): Rng {
   let h = 1779033703 ^ seed.length;
   for (let i = 0; i < seed.length; i++) {
-    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
+    h = Math.imul(h ^ (seed.codePointAt(i) ?? 0), 3432918353);
     h = (h << 13) | (h >>> 19);
   }
   let a = h >>> 0;
   return () => {
-    a = (a + 0x6d2b79f5) | 0;
+    // Wraps to 32 bits; every later step only reads those bits.
+    a = (a + 0x6d2b79f5) >>> 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -82,7 +83,7 @@ export function createRng(seed: string): Rng {
 }
 
 export function randomSeed(): string {
-  return Math.random().toString(36).slice(2, 8);
+  return Math.random().toString(36).slice(2, 8); // NOSONAR: a scene seed, not a secret
 }
 
 export function pick<T>(rng: Rng, items: readonly T[]): T {
@@ -149,7 +150,7 @@ export function columnName(col: number): string {
   let n = col + 1;
   while (n > 0) {
     const rem = (n - 1) % 26;
-    name = String.fromCharCode(65 + rem) + name;
+    name = String.fromCodePoint(65 + rem) + name;
     n = Math.floor((n - 1) / 26);
   }
   return name;
@@ -167,7 +168,7 @@ export function describeCells(placement: Placement, cols: number): string {
     return `${start}–${cellName((row + h - 1) * cols + col + w - 1, cols)}`;
   }
   const first = placement.cells[0];
-  const last = placement.cells[placement.cells.length - 1];
+  const last = placement.cells.at(-1) ?? first;
   return `${cellName(first, cols)} → ${cellName(last, cols)}`;
 }
 
@@ -314,7 +315,7 @@ export class PlanBuilder {
         list.find((e) => {
           roll -= weight(e);
           return roll <= 0;
-        }) ?? list[list.length - 1];
+        }) ?? (list.at(-1) as SceneElement);
 
       const chain = this.place(element, rng);
       if (chain) return chain;
@@ -464,27 +465,10 @@ export class PlanBuilder {
     rng: Rng,
     start?: { col: number; row: number },
   ) {
-    const { cols, rows, ignored } = this.options;
-    const { starts, occupied } = this;
-    let origin = start;
-    let candidates: number[] = [];
-    if (origin) {
-      candidates = [origin.row * cols + origin.col];
-    } else {
-      const zone = element.zones[0];
-      const row =
-        zone === "far"
-          ? starts.far
-          : zone === "mid"
-            ? starts.mid
-            : starts.front;
-      const free = Array.from({ length: cols }, (_, col) => col).filter(
-        (col) => !occupied[row * cols + col] && !ignored[row * cols + col],
-      );
-      if (free.length === 0) return null;
-      candidates = free.map((col) => row * cols + col);
-      origin = { col: pick(rng, free), row };
-    }
+    const { cols, rows } = this.options;
+    const begin = this.pathOrigin(element, rng, start);
+    if (!begin) return null;
+    const { origin, candidates } = begin;
     if (origin.row >= rows) return null;
 
     const thickness = Math.max(
@@ -499,59 +483,110 @@ export class PlanBuilder {
     let drift = rng() < 0.5 ? -1 : 1;
     const cells = new Set<number>();
     const blocked = (c: number, r: number) =>
-      c < 0 || c >= cols || r >= rows || occupied[r * cols + c];
+      c < 0 || c >= cols || r >= rows || this.occupied[r * cols + c];
 
-    const stamp = (c: number, r: number) => {
-      const width =
-        thickness +
-        (element.widens && zoneOfRow(r, starts) === "front" ? 1 : 0);
-      const left = Math.min(
-        Math.max(0, c - Math.floor((width - 1) / 2)),
-        cols - width,
-      );
-      for (let x = Math.max(0, left); x < Math.min(cols, left + width); x++) {
-        if (!occupied[r * cols + x]) cells.add(r * cols + x);
-      }
-    };
-
-    stamp(col, row);
+    this.stampPath(cells, element, thickness, col, row);
     let length = 1;
     for (let step = 0; step < maxSteps; step++) {
       if (rng() < 0.3) drift = -drift;
-      const moves =
-        rng() < 0.55
-          ? [
-              [0, 1],
-              [drift, 0],
-              [-drift, 0],
-            ]
-          : [
-              [drift, 0],
-              [0, 1],
-              [-drift, 0],
-            ];
-      const next = moves.find(([dc, dr]) => !blocked(col + dc, row + dr));
+      const next = pathMoves(rng, drift).find(
+        ([dc, dr]) => !blocked(col + dc, row + dr),
+      );
       if (!next) break;
       col += next[0];
       row += next[1];
       length++;
-      stamp(col, row);
+      this.stampPath(cells, element, thickness, col, row);
       if (row === rows - 1 && rng() < 0.5) break;
     }
     if (cells.size <= 1) return null;
-    const shift = col - origin.col;
-    const pathDrift: PathDrift =
-      shift < 0 ? "left" : shift > 0 ? "right" : "straight";
-    return { cells: [...cells], candidates, length, drift: pathDrift };
+    return {
+      cells: [...cells],
+      candidates,
+      length,
+      drift: driftOf(col - origin.col),
+    };
   }
+
+  /**
+   * Where a path starts: the given cell, or a free cell on the first row of
+   * its zone. `candidates` are the cells the locator may hop between.
+   */
+  private pathOrigin(
+    element: SceneElement,
+    rng: Rng,
+    start?: { col: number; row: number },
+  ) {
+    const { cols, ignored } = this.options;
+    if (start) {
+      return { origin: start, candidates: [start.row * cols + start.col] };
+    }
+    const row = pathStartRow(element.zones[0], this.starts);
+    const free = Array.from({ length: cols }, (_, col) => col).filter(
+      (col) => !this.occupied[row * cols + col] && !ignored[row * cols + col],
+    );
+    if (free.length === 0) return null;
+    return {
+      origin: { col: pick(rng, free), row },
+      candidates: free.map((col) => row * cols + col),
+    };
+  }
+
+  /** Adds a path's cross-section around column `c` on row `r`. */
+  private stampPath(
+    cells: Set<number>,
+    element: SceneElement,
+    thickness: number,
+    c: number,
+    r: number,
+  ) {
+    const { cols } = this.options;
+    const widen =
+      element.widens && zoneOfRow(r, this.starts) === "front" ? 1 : 0;
+    const width = thickness + widen;
+    const left = Math.min(
+      Math.max(0, c - Math.floor((width - 1) / 2)),
+      cols - width,
+    );
+    for (let x = Math.max(0, left); x < Math.min(cols, left + width); x++) {
+      if (!this.occupied[r * cols + x]) cells.add(r * cols + x);
+    }
+  }
+}
+
+/** First row of a zone, where paths start. */
+function pathStartRow(zone: Zone, starts: ZoneStarts) {
+  if (zone === "far") return starts.far;
+  if (zone === "mid") return starts.mid;
+  return starts.front;
+}
+
+/** Moves a path tries in order: usually down first, sometimes sideways. */
+function pathMoves(rng: Rng, drift: number) {
+  if (rng() < 0.55)
+    return [
+      [0, 1],
+      [drift, 0],
+      [-drift, 0],
+    ];
+  return [
+    [drift, 0],
+    [0, 1],
+    [-drift, 0],
+  ];
+}
+
+/** Which way a path leans overall. */
+function driftOf(shift: number): PathDrift {
+  if (shift < 0) return "left";
+  return shift > 0 ? "right" : "straight";
 }
 
 export function generatePlan(options: PlanOptions): Plan {
   const rng = createRng(`${options.seed}:${options.cols}x${options.rows}`);
   const atmosphere = rollAtmosphere(rng);
   const builder = new PlanBuilder(options);
-  for (let turn = 0; !builder.full; turn++) {
-    if (!builder.roll(rng, { preferPaths: turn < 2 })) break;
-  }
+  let turn = 0;
+  while (!builder.full && builder.roll(rng, { preferPaths: turn < 2 })) turn++;
   return { placements: builder.placements, atmosphere };
 }

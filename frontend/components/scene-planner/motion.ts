@@ -62,11 +62,11 @@ export function seconds(ms: number) {
  */
 export class Director {
   private skipping = false;
-  private pending = new Set<() => void>();
+  private readonly pending = new Set<() => void>();
 
   constructor(
-    private factor: () => number,
-    private reduced: () => boolean,
+    private readonly factor: () => number,
+    private readonly reduced: () => boolean,
   ) {}
 
   get skipped() {
@@ -95,7 +95,8 @@ export class Director {
 
   skip() {
     this.skipping = true;
-    for (const done of [...this.pending]) done();
+    // Each `done` removes itself; a Set iterator tolerates that.
+    for (const done of this.pending) done();
   }
 
   reset() {

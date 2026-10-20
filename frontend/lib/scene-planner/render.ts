@@ -230,7 +230,7 @@ function hash(n: number) {
 function seedOf(text: string) {
   let h = 7;
   for (let i = 0; i < text.length; i++)
-    h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+    h = Math.imul(h ^ (text.codePointAt(i) ?? 0), 16777619);
   return h >>> 0;
 }
 
@@ -385,42 +385,66 @@ const flowingPath =
     kind: "water" | "dirt" | "road",
   ): Painter =>
   (pt) => {
-    const { ctx, p, tick } = pt;
+    const { ctx, p } = pt;
     eachCell(pt, (px, py, mask, cell) => {
       rect(ctx, px, py, CELL, CELL, p.c[fill]);
-      if (kind === "water") {
-        // Highlights run downstream, one pixel per tick.
-        for (let i = 0; i < 4; i++) {
-          const ly = (Math.floor(pt.rnd(cell + i * 97) * 16) + tick) % 16;
-          const lx = 2 + Math.floor(pt.rnd(cell * 5 + i) * 11);
-          rect(ctx, px + lx, py + ly, 1, 3, p.c[light]);
-        }
-      } else if (kind === "dirt") {
-        for (let i = 0; i < 4; i++) {
-          rect(
-            ctx,
-            px + Math.floor(pt.rnd(cell * 7 + i) * 15),
-            py + Math.floor(pt.rnd(cell * 11 + i) * 15),
-            1,
-            1,
-            p.c[light],
-          );
-        }
-      } else {
-        const vertical = (mask & (N | S)) !== 0;
-        const horizontal = (mask & (E | W)) !== 0;
-        if (vertical)
-          for (let y = 1; y < CELL; y += 6)
-            rect(ctx, px + 7, py + y, 2, 3, p.c.paint);
-        else if (horizontal)
-          for (let x = 1; x < CELL; x += 6)
-            rect(ctx, px + x, py + 7, 3, 2, p.c.paint);
-      }
+      PATH_MARKS[kind](pt, p.c[light], px, py, mask, cell);
       // Banks on open sides.
       if (!(mask & W)) rect(ctx, px, py, 2, CELL, p.c[dark]);
       if (!(mask & E)) rect(ctx, px + CELL - 2, py, 2, CELL, p.c[dark]);
     });
   };
+
+type PathMarks = (
+  pt: Paint,
+  light: string,
+  px: number,
+  py: number,
+  mask: number,
+  cell: number,
+) => void;
+
+const PATH_MARKS: Record<"water" | "dirt" | "road", PathMarks> = {
+  // Highlights run downstream, one pixel per tick.
+  water(pt, light, px, py, _mask, cell) {
+    for (let i = 0; i < 4; i++) {
+      const ly = (Math.floor(pt.rnd(cell + i * 97) * 16) + pt.tick) % 16;
+      const lx = 2 + Math.floor(pt.rnd(cell * 5 + i) * 11);
+      rect(pt.ctx, px + lx, py + ly, 1, 3, light);
+    }
+  },
+  dirt(pt, light, px, py, _mask, cell) {
+    for (let i = 0; i < 4; i++) {
+      rect(
+        pt.ctx,
+        px + Math.floor(pt.rnd(cell * 7 + i) * 15),
+        py + Math.floor(pt.rnd(cell * 11 + i) * 15),
+        1,
+        1,
+        light,
+      );
+    }
+  },
+  // Centre line along the road's direction.
+  road(pt, _light, px, py, mask) {
+    const { ctx, p } = pt;
+    if (mask & (N | S)) {
+      for (let y = 1; y < CELL; y += 6)
+        rect(ctx, px + 7, py + y, 2, 3, p.c.paint);
+    } else if (mask & (E | W)) {
+      for (let x = 1; x < CELL; x += 6)
+        rect(ctx, px + x, py + 7, 3, 2, p.c.paint);
+    }
+  },
+};
+
+/** Rain clouds go grey; night clouds go blue. */
+function cloudColors(atm: Atmosphere, p: Palette) {
+  if (atm.weather === "Storm" || atm.weather === "Rain")
+    return { body: "#8a90a3", shade: "#646a7d" };
+  if (p.dark) return { body: "#4a5272", shade: "#363d59" };
+  return { body: p.c.cloud, shade: p.c.cloudShade };
+}
 
 /** Stand-in for elements without a painter until their tiles load. */
 const swatch: Painter = (pt) => {
@@ -475,9 +499,7 @@ const PAINTERS: Record<string, Painter> = {
   clouds(pt) {
     const { ctx, x, y, w, h, tick, p, atm } = pt;
     const drift = Math.round(tri(tick + (pt.seed % 40), 96) * 3);
-    const dark = atm.weather === "Storm" || atm.weather === "Rain";
-    const body = dark ? "#8a90a3" : p.dark ? "#4a5272" : p.c.cloud;
-    const shade = dark ? "#646a7d" : p.dark ? "#363d59" : p.c.cloudShade;
+    const { body, shade } = cloudColors(atm, p);
     const puffs = Math.max(2, Math.round(w / 9));
     const base = y + h - 3;
     for (let i = 0; i < puffs; i++) {
@@ -986,10 +1008,8 @@ const PAINTERS: Record<string, Painter> = {
 // ---------------------------------------------------------------------------
 
 function paintBackground(ctx: CanvasRenderingContext2D, frame: SceneFrame) {
-  const { cols, rows, starts, atmosphere, tick } = frame;
-  const p = palette(atmosphere);
-  const width = cols * CELL;
-  const skyEnd = starts.far * CELL;
+  const p = palette(frame.atmosphere);
+  const skyEnd = frame.starts.far * CELL;
   // Sky in two-pixel bands for a stepped gradient.
   for (let y = 0; y < skyEnd + CELL; y += 2) {
     const t = Math.min(1, y / Math.max(1, skyEnd));
@@ -997,28 +1017,43 @@ function paintBackground(ctx: CanvasRenderingContext2D, frame: SceneFrame) {
       ctx,
       0,
       y,
-      width,
+      frame.cols * CELL,
       2,
       css(mix(p.skyTop, p.skyBottom, Math.round(t * 8) / 8)),
     );
   }
-  if (p.night) {
-    for (let i = 0; i < cols * starts.far * 2; i++) {
-      const sx = Math.floor(hash(i) * width);
-      const sy = Math.floor(hash(i + 999) * skyEnd);
-      const on = (tick + i * 7) % 48 > (p.dark ? 4 : 30);
-      if (on)
-        rect(
-          ctx,
-          sx,
-          sy,
-          1,
-          1,
-          i % 9 === 0 ? "#ffffff" : "rgba(226,232,255,0.7)",
-        );
-    }
+  if (p.night) paintStars(ctx, frame, p);
+  if (!paintGround(ctx, frame)) paintPlainLand(ctx, frame, p);
+}
+
+/** Twinkling stars; fewer are lit while the sky is still light. */
+function paintStars(
+  ctx: CanvasRenderingContext2D,
+  frame: SceneFrame,
+  p: Palette,
+) {
+  const { cols, starts, tick } = frame;
+  const width = cols * CELL;
+  const skyEnd = starts.far * CELL;
+  const threshold = p.dark ? 4 : 30;
+  for (let i = 0; i < cols * starts.far * 2; i++) {
+    if ((tick + i * 7) % 48 <= threshold) continue;
+    const sx = Math.floor(hash(i) * width);
+    const sy = Math.floor(hash(i + 999) * skyEnd);
+    const color = i % 9 === 0 ? "#ffffff" : "rgba(226,232,255,0.7)";
+    rect(ctx, sx, sy, 1, 1, color);
   }
-  if (paintGround(ctx, frame)) return;
+}
+
+/** Flat land in three bands with swaying tufts, until ground tiles load. */
+function paintPlainLand(
+  ctx: CanvasRenderingContext2D,
+  frame: SceneFrame,
+  p: Palette,
+) {
+  const { cols, rows, starts, atmosphere, tick } = frame;
+  const width = cols * CELL;
+  const skyEnd = starts.far * CELL;
   const far = palette(atmosphere, 0.25);
   rect(ctx, 0, skyEnd, width, (starts.mid - starts.far) * CELL, far.c.farLand);
   rect(ctx, 0, skyEnd, width, 1, css(mix(p.skyBottom, [255, 255, 255], 0.3)));
@@ -1163,52 +1198,108 @@ function paintSeams(
   // With tile overlays loaded, edge and combo tiles replace the dither.
   if (fill && overlays) return;
   for (const cell of g.cells) {
-    const mask = cellMask(g.set, cell, cols, rows);
+    const open = openSides(g, cell, cols, rows);
     const px = (cell % cols) * CELL;
     const py = Math.floor(cell / cols) * CELL;
-    const col = cell % cols;
-    const row = Math.floor(cell / cols);
-
     if (!fill) {
-      if (!(mask & S) && row < rows - 1) {
-        ctx.fillStyle = "rgba(0,0,0,0.22)";
-        ctx.fillRect(px + 1, py + CELL, CELL - 2, 1);
-        for (let i = 2; i < CELL - 2; i += 2)
-          ctx.fillRect(px + i, py + CELL + 1, 1, 1);
-      }
+      if (open.s) contactShadow(ctx, px, py);
       continue;
     }
-
     ctx.fillStyle = p.c[fill];
-    for (let i = 0; i < CELL; i++) {
-      // First pixel row: every other pixel; second row: every fourth.
-      const near = i % 2 === 0;
-      const far = i % 4 === 1;
-      if (!(mask & W) && col > 0) {
-        if (near) ctx.fillRect(px - 1, py + i, 1, 1);
-        if (far) ctx.fillRect(px - 2, py + i, 1, 1);
-      }
-      if (!(mask & E) && col < cols - 1) {
-        if (!near) ctx.fillRect(px + CELL, py + i, 1, 1);
-        if (i % 4 === 3) ctx.fillRect(px + CELL + 1, py + i, 1, 1);
-      }
-      if (!(mask & S) && row < rows - 1) {
-        if (near) ctx.fillRect(px + i, py + CELL, 1, 1);
-        if (far) ctx.fillRect(px + i, py + CELL + 1, 1, 1);
-      }
-      if (!(mask & N) && row > 0) {
-        if (!near) ctx.fillRect(px + i, py - 1, 1, 1);
-      }
-    }
+    bleed(ctx, open, px, py);
     // Waterfalls throw spray onto whatever is below their foot.
-    if (g.elementId === "waterfall" && !(mask & S) && row < rows - 1) {
-      ctx.fillStyle = p.c.foam;
-      for (let i = 0; i < 5; i++) {
-        const sx = px + ((i * 5 + tick) % CELL);
-        ctx.fillRect(sx, py + CELL + 1 + ((i + tick) % 3), 1, 1);
-      }
-    }
+    if (g.elementId === "waterfall" && open.s) spray(ctx, p, px, py, tick);
   }
+}
+
+interface OpenSides {
+  n: boolean;
+  e: boolean;
+  s: boolean;
+  w: boolean;
+}
+
+/** Sides of a group cell that face another grid cell outside the group. */
+function openSides(
+  g: TileGroup,
+  cell: number,
+  cols: number,
+  rows: number,
+): OpenSides {
+  const mask = cellMask(g.set, cell, cols, rows);
+  const col = cell % cols;
+  const row = Math.floor(cell / cols);
+  return {
+    n: !(mask & N) && row > 0,
+    e: !(mask & E) && col < cols - 1,
+    s: !(mask & S) && row < rows - 1,
+    w: !(mask & W) && col > 0,
+  };
+}
+
+function spray(
+  ctx: CanvasRenderingContext2D,
+  p: Palette,
+  px: number,
+  py: number,
+  tick: number,
+) {
+  ctx.fillStyle = p.c.foam;
+  for (let i = 0; i < 5; i++) {
+    const sx = px + ((i * 5 + tick) % CELL);
+    ctx.fillRect(sx, py + CELL + 1 + ((i + tick) % 3), 1, 1);
+  }
+}
+
+/** Short dithered shadow under an object standing on the ground. */
+function contactShadow(ctx: CanvasRenderingContext2D, px: number, py: number) {
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.fillRect(px + 1, py + CELL, CELL - 2, 1);
+  for (let i = 2; i < CELL - 2; i += 2)
+    ctx.fillRect(px + i, py + CELL + 1, 1, 1);
+}
+
+const even = (i: number) => i % 2 === 0;
+const odd = (i: number) => i % 2 === 1;
+
+/**
+ * Bleeds the current fill colour two pixels past each open side: every
+ * other pixel next to the cell, every fourth one pixel further out.
+ */
+function bleed(
+  ctx: CanvasRenderingContext2D,
+  open: OpenSides,
+  px: number,
+  py: number,
+) {
+  const dots = (
+    x: number,
+    y: number,
+    along: "x" | "y",
+    keep: (i: number) => boolean,
+  ) => {
+    for (let i = 0; i < CELL; i++)
+      if (keep(i))
+        ctx.fillRect(
+          along === "x" ? x + i : x,
+          along === "y" ? y + i : y,
+          1,
+          1,
+        );
+  };
+  if (open.w) {
+    dots(px - 1, py, "y", even);
+    dots(px - 2, py, "y", (i) => i % 4 === 1);
+  }
+  if (open.e) {
+    dots(px + CELL, py, "y", odd);
+    dots(px + CELL + 1, py, "y", (i) => i % 4 === 3);
+  }
+  if (open.s) {
+    dots(px, py + CELL, "x", even);
+    dots(px, py + CELL + 1, "x", (i) => i % 4 === 1);
+  }
+  if (open.n) dots(px, py - 1, "x", odd);
 }
 
 // ---------------------------------------------------------------------------
@@ -1346,76 +1437,144 @@ function paintOverlays(
   groupOf: Map<number, TileGroup>,
   settled: Set<TileGroup>,
 ) {
-  const { cols, rows, starts, atmosphere, tick } = frame;
-  const hasEdges = Boolean(set.index.sheets.edges);
-  const hasCombos = Boolean(set.index.sheets.combos);
+  const { cols, rows, starts, atmosphere } = frame;
   for (let cell = 0; cell < cols * rows; cell++) {
     const target = groupOf.get(cell);
-    if (target && !settled.has(target)) continue;
-    // Objects stand on the ground; nothing spills over them.
-    if (target && TILE_SPECS[target.elementId]?.layer === "object") continue;
-    const col = cell % cols;
+    if (!receivesOverlays(target, settled)) continue;
     const row = Math.floor(cell / cols);
-    const sky = zoneOfRow(row, starts) === "sky";
-    const onto: Material = target
-      ? (MATERIALS[target.elementId] ?? "ground")
-      : sky
-        ? "air"
-        : "ground";
-    const p = palette(atmosphere, row < starts.mid ? 0.25 : 0);
-    const px = col * CELL;
-    const py = row * CELL;
-
+    const far = row < starts.mid;
+    const spot: OverlaySpot = {
+      ctx,
+      set,
+      frame,
+      target,
+      sky: zoneOfRow(row, starts) === "sky",
+      p: palette(atmosphere, far ? 0.25 : 0),
+      px: (cell % cols) * CELL,
+      py: row * CELL,
+    };
     for (const side of SIDES) {
-      const [dx, dy] = SIDE_STEP[side];
-      const nc = col + dx;
-      const nr = row + dy;
-      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
-      const source = groupOf.get(nr * cols + nc);
-      if (!source || source === target || !settled.has(source)) continue;
-
-      if (hasCombos) {
-        const variant = tileVariant(source.elementId, atmosphere.time);
-        const receiver =
-          target?.elementId ?? (sky ? "empty-sky" : "empty-ground");
-        for (const combo of COMBOS) {
-          if (
-            combo.from.includes(source.elementId) &&
-            combo.onto.includes(receiver) &&
-            combo.sides.includes(side) &&
-            (!combo.variant || combo.variant === variant) &&
-            (!combo.at || atEdge(source, nr * cols + nc, combo.at, frame))
-          )
-            drawTile({
-              ctx,
-              set,
-              sheet: "combos",
-              key: comboKey(combo.id, side),
-              px,
-              py,
-              tick,
-              grade: gradeFor(p, atmosphere, false),
-            });
-        }
-      }
-
-      if (!hasEdges) continue;
-      const from = MATERIALS[source.elementId];
-      const fromRank = EDGE_ORDER.indexOf(from);
-      const ontoRank = EDGE_ORDER.indexOf(onto);
-      if (fromRank <= ontoRank || ontoRank < 0) continue;
-      drawTile({
-        ctx,
-        set,
-        sheet: "edges",
-        key: edgeKey(from, onto, side),
-        px,
-        py,
-        tick,
-        grade: gradeFor(p, atmosphere, SEASONAL.has(from)),
-      });
+      const from = neighbourOf(cell, side, cols, rows);
+      const source = from === null ? undefined : groupOf.get(from);
+      if (from !== null && source && spills(source, target, settled))
+        drawSide(spot, source, from, side);
     }
   }
+}
+
+/** Whether a settled neighbouring group overlaps onto the target cell. */
+function spills(
+  source: TileGroup,
+  target: TileGroup | undefined,
+  settled: Set<TileGroup>,
+) {
+  return source !== target && settled.has(source);
+}
+
+/** Combos first, then the material edge, for one side of a spot. */
+function drawSide(
+  spot: OverlaySpot,
+  source: TileGroup,
+  from: number,
+  side: Side,
+) {
+  const { sheets } = spot.set.index;
+  if (sheets.combos) drawCombos(spot, source, from, side);
+  if (sheets.edges) drawEdge(spot, source, side);
+}
+
+/** A cell receiving overlays, with what it needs to draw them. */
+interface OverlaySpot {
+  ctx: CanvasRenderingContext2D;
+  set: TileSet;
+  frame: SceneFrame;
+  /** Group on the cell, or undefined for empty land or sky. */
+  target: TileGroup | undefined;
+  sky: boolean;
+  p: Palette;
+  px: number;
+  py: number;
+}
+
+/**
+ * Empty cells and settled ground cover take overlays. Objects stand on the
+ * ground, so nothing spills over them.
+ */
+function receivesOverlays(
+  target: TileGroup | undefined,
+  settled: Set<TileGroup>,
+) {
+  if (!target) return true;
+  return (
+    settled.has(target) && TILE_SPECS[target.elementId]?.layer !== "object"
+  );
+}
+
+/** The cell next to `cell` on a side, or null at the grid's edge. */
+function neighbourOf(cell: number, side: Side, cols: number, rows: number) {
+  const [dx, dy] = SIDE_STEP[side];
+  const col = (cell % cols) + dx;
+  const row = Math.floor(cell / cols) + dy;
+  if (col < 0 || col >= cols || row < 0 || row >= rows) return null;
+  return row * cols + col;
+}
+
+/** Combo overlays a source group throws onto the spot from one side. */
+function drawCombos(
+  spot: OverlaySpot,
+  source: TileGroup,
+  from: number,
+  side: Side,
+) {
+  const { atmosphere, tick } = spot.frame;
+  const variant = tileVariant(source.elementId, atmosphere.time);
+  const receiver =
+    spot.target?.elementId ?? (spot.sky ? "empty-sky" : "empty-ground");
+  for (const combo of COMBOS) {
+    const applies =
+      combo.from.includes(source.elementId) &&
+      combo.onto.includes(receiver) &&
+      combo.sides.includes(side) &&
+      (!combo.variant || combo.variant === variant);
+    if (!applies) continue;
+    if (combo.at && !atEdge(source, from, combo.at, spot.frame)) continue;
+    drawTile({
+      ctx: spot.ctx,
+      set: spot.set,
+      sheet: "combos",
+      key: comboKey(combo.id, side),
+      px: spot.px,
+      py: spot.py,
+      tick,
+      grade: gradeFor(spot.p, atmosphere, false),
+    });
+  }
+}
+
+/** Material the spot's cell shows to its neighbours. */
+function ontoMaterial(spot: OverlaySpot): Material {
+  if (spot.target) return MATERIALS[spot.target.elementId] ?? "ground";
+  return spot.sky ? "air" : "ground";
+}
+
+/** The source's material spilling over the side, when it ranks above. */
+function drawEdge(spot: OverlaySpot, source: TileGroup, side: Side) {
+  const { atmosphere, tick } = spot.frame;
+  const onto = ontoMaterial(spot);
+  const from = MATERIALS[source.elementId];
+  const fromRank = EDGE_ORDER.indexOf(from);
+  const ontoRank = EDGE_ORDER.indexOf(onto);
+  if (fromRank <= ontoRank || ontoRank < 0) return;
+  drawTile({
+    ctx: spot.ctx,
+    set: spot.set,
+    sheet: "edges",
+    key: edgeKey(from, onto, side),
+    px: spot.px,
+    py: spot.py,
+    tick,
+    grade: gradeFor(spot.p, atmosphere, SEASONAL.has(from)),
+  });
 }
 
 // ---------------------------------------------------------------------------

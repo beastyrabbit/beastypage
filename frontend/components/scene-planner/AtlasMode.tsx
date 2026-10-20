@@ -28,25 +28,27 @@ import { usePlanner } from "./usePlanner";
 
 const MAX_TILES = 60;
 
+/** Glyph cells in reading order with the side bit each shows. */
+const GLYPH = [
+  ["nw", 0],
+  ["n", N],
+  ["ne", 0],
+  ["w", W],
+  ["centre", -1],
+  ["e", E],
+  ["sw", 0],
+  ["s", S],
+  ["se", 0],
+] as const;
+
 /** 3 × 3 glyph of a neighbour mask: centre plus the joined sides. */
-function MaskGlyph({ mask }: { mask: number }) {
-  const on = [
-    false,
-    Boolean(mask & N),
-    false,
-    Boolean(mask & W),
-    true,
-    Boolean(mask & E),
-    false,
-    Boolean(mask & S),
-    false,
-  ];
+function MaskGlyph({ mask }: Readonly<{ mask: number }>) {
   return (
     <span className="grid size-3 grid-cols-3 grid-rows-3 gap-px" aria-hidden>
-      {on.map((value, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: fixed 3 × 3 glyph
-        <span key={i} className={value ? "bg-primary" : "bg-white/10"} />
-      ))}
+      {GLYPH.map(([id, bit]) => {
+        const lit = bit === -1 ? true : Boolean(mask & bit);
+        return <span key={id} className={lit ? "bg-primary" : "bg-white/10"} />;
+      })}
     </span>
   );
 }

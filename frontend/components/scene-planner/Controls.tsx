@@ -6,6 +6,7 @@ import RefreshIcon from "@/components/ui/refresh-icon";
 import {
   SEASONS,
   THEMES,
+  type Theme,
   TIMES_OF_DAY,
   WEATHER,
 } from "@/lib/scene-planner/catalog";
@@ -33,11 +34,11 @@ function Field({
   label,
   value,
   children,
-}: {
+}: Readonly<{
   label: string;
   value?: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between text-xs">
@@ -56,12 +57,12 @@ function Chip({
   onClick,
   children,
   title,
-}: {
+}: Readonly<{
   on: boolean;
   onClick: () => void;
   children: React.ReactNode;
   title?: string;
-}) {
+}>) {
   return (
     <button
       type="button"
@@ -116,9 +117,20 @@ export function Controls() {
   const onFile = (file: File | undefined) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => loadOverlay(String(reader.result), file.name);
+    reader.onload = () => {
+      if (typeof reader.result === "string")
+        loadOverlay(reader.result, file.name);
+    };
     reader.readAsDataURL(file);
   };
+
+  const toggleTheme = (id: Theme) =>
+    setSettings((s) => {
+      if (!s.themes.includes(id)) return { ...s, themes: [...s.themes, id] };
+      const rest = s.themes.filter((t) => t !== id);
+      // At least one theme stays on.
+      return rest.length > 0 ? { ...s, themes: rest } : s;
+    });
 
   const matchImage = () => {
     // Pending rolls hold cells of the current grid, like the size sliders.
@@ -203,16 +215,7 @@ export function Controls() {
                 <Chip
                   key={theme.id}
                   on={on}
-                  onClick={() =>
-                    setSettings((s) => ({
-                      ...s,
-                      themes: on
-                        ? s.themes.filter((t) => t !== theme.id).length > 0
-                          ? s.themes.filter((t) => t !== theme.id)
-                          : s.themes
-                        : [...s.themes, theme.id],
-                    }))
-                  }
+                  onClick={() => toggleTheme(theme.id)}
                 >
                   {theme.icon} {theme.label}
                 </Chip>
