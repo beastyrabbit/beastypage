@@ -94,7 +94,7 @@ export function Stage() {
   const baseRef = useRef<HTMLCanvasElement>(null);
   const bandRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const offRef = useRef<HTMLCanvasElement | null>(null);
-  const hitRef = useRef<HTMLDivElement>(null);
+  const hitRef = useRef<HTMLButtonElement>(null);
   const bands = useMemo(() => zoneBands(rows, starts), [rows, starts]);
 
   // Everything the render loop needs, refreshed on every render.
@@ -236,6 +236,8 @@ export function Stage() {
     null,
   );
   const paintValue = useRef(true);
+  /** Shows the keyboard cursor; a mouse click focuses the grid too. */
+  const [keyboard, setKeyboard] = useState(false);
   const occupied = useMemo(() => {
     // Riders such as ducks win over their host: they are what you point at.
     const map = new Map<number, string>();
@@ -279,10 +281,9 @@ export function Stage() {
     [placeElement, cols],
   );
 
-  const onPointerDown = (event: React.PointerEvent) => {
-    const cell = cellAt(event);
-    if (cell === null) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
+  // Pointer and keyboard drive the same three steps: press on a cell, drag
+  // (or arrow) to more cells, release (or press again) to finish.
+  const begin = (cell: number) => {
     if (tool.kind === "paint") {
       paintValue.current = !ignored[cell];
       planner.paintCell(cell, paintValue.current);
@@ -298,15 +299,7 @@ export function Stage() {
     }
   };
 
-  const onPointerMove = (event: React.PointerEvent) => {
-    onTilt(event);
-    const cell = cellAt(event);
-    setHover(cell);
-    if (
-      cell === null ||
-      !event.currentTarget.hasPointerCapture(event.pointerId)
-    )
-      return;
+  const extend = (cell: number) => {
     if (tool.kind === "paint") planner.paintCell(cell, paintValue.current);
     if (tool.kind === "place" && draft) {
       const last = draft.cells[draft.cells.length - 1];
@@ -327,7 +320,7 @@ export function Stage() {
     }
   };
 
-  const onPointerUp = () => {
+  const finish = (draft: { cells: number[] } | null) => {
     if (tool.kind === "place" && draft && placeElement) {
       const colsOf = draft.cells.map((c) => c % cols);
       const rowsOf = draft.cells.map((c) => Math.floor(c / cols));
@@ -343,6 +336,50 @@ export function Stage() {
       planner.placeManual(placeElement.id, draft.cells, rect);
     }
     setDraft(null);
+  };
+
+  const onPointerDown = (event: React.PointerEvent) => {
+    const cell = cellAt(event);
+    if (cell === null) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setKeyboard(false);
+    begin(cell);
+  };
+
+  const onPointerMove = (event: React.PointerEvent) => {
+    onTilt(event);
+    const cell = cellAt(event);
+    setHover(cell);
+    if (cell !== null && event.currentTarget.hasPointerCapture(event.pointerId))
+      extend(cell);
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const at = hover ?? 0;
+    const col = at % cols;
+    const step: Record<string, number | null> = {
+      ArrowUp: at >= cols ? -cols : null,
+      ArrowDown: at + cols < cols * rows ? cols : null,
+      ArrowLeft: col > 0 ? -1 : null,
+      ArrowRight: col < cols - 1 ? 1 : null,
+    };
+    if (event.key in step) {
+      event.preventDefault();
+      setKeyboard(true);
+      const by = step[event.key];
+      if (by === null) return;
+      setHover(at + by);
+      if (draft) extend(at + by);
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setKeyboard(true);
+      if (draft) finish(draft);
+      else if (placeElement?.shape === "point")
+        finish({ cells: draftCells(at, at, [at]) });
+      else begin(at);
+    } else if (event.key === "Escape") {
+      setDraft(null);
+    }
   };
 
   const draftValid =
@@ -661,6 +698,22 @@ export function Stage() {
                   )}
                 />
               ))}
+
+              {keyboard && hover !== null && (
+                <div
+                  className="absolute outline outline-2 -outline-offset-2 outline-white"
+                  style={boxStyle(
+                    {
+                      col: hover % cols,
+                      row: Math.floor(hover / cols),
+                      w: 1,
+                      h: 1,
+                    },
+                    cols,
+                    rows,
+                  )}
+                />
+              )}
             </div>
 
             {/* Foreground subject floats in front of every layer. */}
@@ -685,20 +738,29 @@ export function Stage() {
             </AnimatePresence>
           </motion.div>
 
-          {/* Flat hit area for pointer tools. */}
-          <div
+          {/* Flat hit area for pointer and keyboard tools. */}
+          <button
+            type="button"
             ref={hitRef}
             className={cn(
-              "absolute inset-0 touch-none",
+              "absolute inset-0 touch-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-white/60",
               tool.kind === "paint" && "cursor-cell",
               tool.kind === "place" && "cursor-crosshair",
               tool.kind === "erase" && "cursor-not-allowed",
               tool.kind === "inspect" && "cursor-pointer",
             )}
+            aria-label="Scene grid. Arrow keys move the cursor, Enter or Space uses the current tool, Escape cancels."
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
+            onPointerUp={() => finish(draft)}
             onPointerCancel={() => setDraft(null)}
+            onKeyDown={onKeyDown}
+            onFocus={(event) => {
+              if (!event.currentTarget.matches(":focus-visible")) return;
+              setKeyboard(true);
+              setHover((cell) => cell ?? 0);
+            }}
+            onBlur={() => setKeyboard(false)}
           />
         </div>
       </div>

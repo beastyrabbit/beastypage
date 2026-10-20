@@ -87,6 +87,19 @@ describe("generatePlan", () => {
     expect(riders).toBeGreaterThan(0);
   });
 
+  it("drops a locked rider whose host is gone", () => {
+    const ducks = {
+      key: "ducks",
+      elementId: "ducks",
+      cells: [60],
+      locked: true,
+    };
+    const plan = generatePlan(
+      options({ cols: 16, rows: 16, themes: ["urban"], locked: [ducks] }),
+    );
+    expect(plan.placements.some((p) => p.key === "ducks")).toBe(false);
+  });
+
   it("puts each block's bottom row in an allowed zone", () => {
     const opts = options({ cols: 20, rows: 20 });
     const starts = zoneStarts(opts.rows, opts.skyShare);

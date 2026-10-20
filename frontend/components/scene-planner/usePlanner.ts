@@ -222,14 +222,17 @@ export function usePlannerState() {
     (seed = settings.seed) => {
       const locked = placements.filter((p) => p.locked);
       const plan = generatePlan({ ...settings, seed, ignored, locked });
-      vanish(placements.filter((p) => !p.locked));
+      // A locked rider whose host was re-rolled away is dropped by the plan.
+      const kept = plan.placements.filter((p) => p.locked);
+      const keptKeys = new Set(kept.map((p) => p.key));
+      vanish(placements.filter((p) => !keptKeys.has(p.key)));
       // The same seed gives the same keys; keep them apart from the old ones.
       const space = keySpace.current++;
       const fresh = plan.placements
         .filter((p) => !p.locked)
         .map((p) => ({ ...p, key: `${p.key}~${space}` }));
       appear(fresh, STAGGER_MS);
-      setPlacements([...locked, ...fresh]);
+      setPlacements([...kept, ...fresh]);
       setAtmosphere(plan.atmosphere);
       setSettings((s) => ({ ...s, seed }));
       turn.current = 0;

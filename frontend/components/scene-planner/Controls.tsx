@@ -121,7 +121,8 @@ export function Controls() {
   };
 
   const matchImage = () => {
-    if (!overlay) return;
+    // Pending rolls hold cells of the current grid, like the size sliders.
+    if (!overlay || rolling) return;
     const rows = Math.round(settings.cols / overlay.aspect);
     if (rows >= 5 && rows <= 20) planner.resizeGrid(settings.cols, rows);
     else {
