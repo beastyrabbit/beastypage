@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk, useUser } from "@clerk/nextjs";
 import { MonitorPlay, Power } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -7,6 +8,7 @@ import {
   type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
@@ -27,6 +29,15 @@ const GAME_URL =
   process.env.NEXT_PUBLIC_NINE_LIVES_URL ??
   "https://ninelives.beastyrabbit.com";
 const GAME_ORIGIN = new URL(GAME_URL).origin;
+
+function getGuestGameUrl() {
+  const url = new URL(GAME_URL);
+  url.searchParams.set("auth", "guest");
+  return url.toString();
+}
+const GUEST_GAME_URL = getGuestGameUrl();
+
+type AuthChoice = "signin" | "guest";
 
 type ButtonName =
   | "up"
@@ -264,6 +275,109 @@ function SpeakerGrille() {
   );
 }
 
+const START_SCREEN_CLASS =
+  "absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#8ac5d4] bg-[url('/nine-lives/title-scene.png')] bg-cover bg-center p-5 text-center";
+const START_LABEL_CLASS =
+  "whitespace-nowrap rounded-full border border-[#fff4b8]/70 bg-[#1a2a3d]/85 px-3 font-mono text-[0.55rem] font-bold uppercase tracking-[0.12em] text-[#fff4b8] shadow-lg sm:px-5 sm:text-xs sm:tracking-[0.2em]";
+
+function NineLivesLogo() {
+  return (
+    <Image
+      src="/nine-lives/logo.png"
+      alt="Nine Lives"
+      width={270}
+      height={64}
+      priority
+      style={{ width: "58%", height: "auto" }}
+      className="max-w-[270px] drop-shadow-[3px_4px_0_rgba(33,44,48,0.65)] [image-rendering:pixelated] transition-transform group-hover:scale-105"
+    />
+  );
+}
+
+const AUTH_CHOICES = [
+  ["signin", "Sign in"],
+  ["guest", "Play as guest"],
+] as const;
+
+function StartScreen({
+  isLoaded,
+  isSignedIn,
+  playerName,
+  authChoice,
+  authChoiceRefs,
+  onSelectChoice,
+  onConfirmChoice,
+  onStart,
+}: Readonly<{
+  isLoaded: boolean;
+  isSignedIn: boolean;
+  playerName: string | null;
+  authChoice: AuthChoice;
+  authChoiceRefs: RefObject<Record<AuthChoice, HTMLButtonElement | null>>;
+  onSelectChoice: (choice: AuthChoice) => void;
+  onConfirmChoice: (choice: AuthChoice) => void;
+  onStart: () => void;
+}>) {
+  if (!isLoaded || isSignedIn) {
+    return (
+      <button
+        type="button"
+        disabled={!isLoaded}
+        onClick={onStart}
+        className={`group ${START_SCREEN_CLASS} focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-[-8px] focus-visible:outline-[#fff4b8]`}
+      >
+        <NineLivesLogo />
+        {isLoaded && playerName ? (
+          <span className="mt-auto max-w-full truncate rounded-md bg-[#1a2a3d]/70 px-2 py-1 font-mono text-[0.5rem] font-bold uppercase tracking-[0.12em] text-[#dcecf1] sm:text-[0.62rem]">
+            Continue as {playerName}
+          </span>
+        ) : null}
+        <span
+          className={`${START_LABEL_CLASS} py-2 ${isLoaded && playerName ? "mt-2" : "mt-auto"} ${isLoaded ? "motion-safe:animate-pulse" : "opacity-70"}`}
+        >
+          {isLoaded ? "Press START · or tap here" : "Waking up…"}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div className={`${START_SCREEN_CLASS} pb-2 sm:pb-5`}>
+      <NineLivesLogo />
+      <fieldset className="mt-auto flex min-w-0 flex-col items-center gap-1 border-0 p-0 sm:gap-2">
+        <legend className="mx-auto mb-1 rounded-md bg-[#1a2a3d]/70 px-2 py-1 font-mono text-[0.5rem] font-bold uppercase tracking-[0.12em] text-[#dcecf1] sm:mb-2 sm:text-[0.62rem]">
+          Sign in or play as a guest?
+        </legend>
+        {AUTH_CHOICES.map(([choice, label]) => {
+          const selected = authChoice === choice;
+          return (
+            <button
+              key={choice}
+              type="button"
+              ref={(node) => {
+                authChoiceRefs.current[choice] = node;
+              }}
+              onFocus={() => onSelectChoice(choice)}
+              onPointerEnter={() => onSelectChoice(choice)}
+              onClick={() => onConfirmChoice(choice)}
+              className={`${START_LABEL_CLASS} min-w-[11rem] py-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff4b8] sm:min-w-[15rem] sm:py-2 ${
+                selected
+                  ? "bg-[#1a2a3d]/95"
+                  : "border-[#fff4b8]/30 bg-[#1a2a3d]/60 text-[#dcecf1]/80"
+              }`}
+            >
+              <span aria-hidden="true" className={selected ? "" : "invisible"}>
+                ▶{" "}
+              </span>
+              {label}
+            </button>
+          );
+        })}
+      </fieldset>
+    </div>
+  );
+}
+
 // This client intentionally coordinates the device, iframe, and input bridge.
 export function NineLivesClient() /* NOSONAR */ {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -272,7 +386,16 @@ export function NineLivesClient() /* NOSONAR */ {
   const presentationInlineOpenerRef = useRef<HTMLButtonElement>(null);
   const presentationOpenerRef = useRef<HTMLElement>(null);
   const pointerButtons = useRef(new Map<number, ButtonName>());
+  const authChoiceRefs = useRef<Record<AuthChoice, HTMLButtonElement | null>>({
+    signin: null,
+    guest: null,
+  });
+  const clerk = useClerk();
+  const { isLoaded, isSignedIn, user } = useUser();
   const [started, setStarted] = useState(false);
+  const [gameSrc, setGameSrc] = useState(GAME_URL);
+  const [authChoice, setAuthChoice] = useState<AuthChoice>("signin");
+  const [awaitingSignIn, setAwaitingSignIn] = useState(false);
   const [ready, setReady] = useState(false);
   const [pressed, setPressed] = useState<ReadonlySet<ButtonName>>(new Set());
   const [frameError, setFrameError] = useState(false);
@@ -288,10 +411,36 @@ export function NineLivesClient() /* NOSONAR */ {
     });
   }, []);
 
-  const startGame = useCallback(() => {
+  const startGame = useCallback((src: string) => {
+    setGameSrc(src);
+    setAwaitingSignIn(false);
     setStarted(true);
     requestAnimationFrame(() => iframeRef.current?.focus());
   }, []);
+
+  const confirmAuthChoice = useCallback(
+    (choice: AuthChoice) => {
+      if (choice === "guest") {
+        startGame(GUEST_GAME_URL);
+        return;
+      }
+      // Clerk's modal lives outside the player's focus trap.
+      setPresentationMode("inline");
+      setAwaitingSignIn(true);
+      clerk.openSignIn();
+    },
+    [clerk, startGame],
+  );
+
+  useEffect(() => {
+    if (awaitingSignIn && isSignedIn) startGame(GAME_URL);
+  }, [awaitingSignIn, isSignedIn, startGame]);
+
+  const powerOn = useCallback(() => {
+    if (started) iframeRef.current?.focus();
+    else if (isSignedIn) startGame(GAME_URL);
+    else if (isLoaded) authChoiceRefs.current[authChoice]?.focus();
+  }, [authChoice, isLoaded, isSignedIn, startGame, started]);
 
   const closePresentation = useCallback(() => {
     setPresentationMode("inline");
@@ -347,7 +496,13 @@ export function NineLivesClient() /* NOSONAR */ {
   const press = useCallback(
     (name: ButtonName, pointerId: number) => {
       if (!started) {
-        if (name === "start") startGame();
+        if (!isLoaded) return;
+        if (isSignedIn) {
+          if (name === "start") startGame(GAME_URL);
+        } else if (name === "up" || name === "left") setAuthChoice("signin");
+        else if (name === "down" || name === "right") setAuthChoice("guest");
+        else if (name === "a" || name === "start")
+          confirmAuthChoice(authChoice);
         return;
       }
       const alreadyHeld = [...pointerButtons.current.values()].includes(name);
@@ -361,7 +516,7 @@ export function NineLivesClient() /* NOSONAR */ {
           state: "down",
         });
     },
-    [startGame, started],
+    [authChoice, confirmAuthChoice, isLoaded, isSignedIn, startGame, started],
   );
 
   const release = useCallback((pointerId: number) => {
@@ -569,28 +724,24 @@ export function NineLivesClient() /* NOSONAR */ {
               </div>
               <div className="relative aspect-[3/2] w-full overflow-hidden bg-[#9bd5dc]">
                 {!started ? (
-                  <button
-                    type="button"
-                    onClick={startGame}
-                    className="group absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#8ac5d4] bg-[url('/nine-lives/title-scene.png')] bg-cover bg-center p-5 text-center focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-[-8px] focus-visible:outline-[#fff4b8]"
-                  >
-                    <Image
-                      src="/nine-lives/logo.png"
-                      alt="Nine Lives"
-                      width={270}
-                      height={64}
-                      priority
-                      style={{ width: "58%", height: "auto" }}
-                      className="max-w-[270px] drop-shadow-[3px_4px_0_rgba(33,44,48,0.65)] [image-rendering:pixelated] transition-transform group-hover:scale-105"
-                    />
-                    <span className="mt-auto whitespace-nowrap rounded-full border border-[#fff4b8]/70 bg-[#1a2a3d]/85 px-3 py-2 font-mono text-[0.55rem] font-bold uppercase tracking-[0.12em] text-[#fff4b8] shadow-lg motion-safe:animate-pulse sm:px-5 sm:text-xs sm:tracking-[0.2em]">
-                      Press START · or tap here
-                    </span>
-                  </button>
+                  <StartScreen
+                    isLoaded={isLoaded}
+                    isSignedIn={isSignedIn ?? false}
+                    playerName={
+                      user?.username ??
+                      user?.primaryEmailAddress?.emailAddress ??
+                      null
+                    }
+                    authChoice={authChoice}
+                    authChoiceRefs={authChoiceRefs}
+                    onSelectChoice={setAuthChoice}
+                    onConfirmChoice={confirmAuthChoice}
+                    onStart={() => startGame(GAME_URL)}
+                  />
                 ) : (
                   <iframe
                     ref={iframeRef}
-                    src={GAME_URL}
+                    src={gameSrc}
                     allow="autoplay; fullscreen; gamepad"
                     title="Nine Lives"
                     className="h-full w-full border-0 bg-[#172238] [image-rendering:pixelated]"
@@ -637,7 +788,7 @@ export function NineLivesClient() /* NOSONAR */ {
                   aria-label={
                     started ? "Power: focus Nine Lives" : "Power on Nine Lives"
                   }
-                  onClick={startGame}
+                  onClick={powerOn}
                   className="group flex items-center gap-2 rounded-full px-3 py-2 font-mono text-[0.58rem] font-bold uppercase tracking-[0.18em] text-[#34455e] transition hover:text-[#17243a]"
                 >
                   <Power className="size-3.5 transition-transform group-hover:rotate-[-20deg]" />{" "}
