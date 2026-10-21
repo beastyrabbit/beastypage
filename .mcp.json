@@ -11,13 +11,6 @@
         "Authorization": "Bearer ${GLITCHTIP_MCP_TOKEN}"
       }
     },
-    "posthog": {
-      "type": "http",
-      "url": "https://mcp.posthog.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${POSTHOG_API_KEY}"
-      }
-    },
     "umami": {
       "type": "http",
       "url": "http://192.168.60.67:3000/mcp",

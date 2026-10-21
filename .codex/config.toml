@@ -6,10 +6,6 @@ url = "https://mcp.clerk.com/mcp"
 url = "http://192.168.60.68:8000/mcp"
 bearer_token_env_var = "GLITCHTIP_MCP_TOKEN"
 
-[mcp_servers.posthog]
-url = "https://mcp.posthog.com/mcp"
-bearer_token_env_var = "POSTHOG_API_KEY"
-
 [mcp_servers.umami]
 url = "http://192.168.60.67:3000/mcp"
 bearer_token_env_var = "UMAMI_MCP_TOKEN"
