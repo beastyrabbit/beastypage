@@ -20,6 +20,7 @@ type ContactMessage = {
 export async function sendContactMail(input: ContactMessage): Promise<void> {
   const key = process.env.CONTACT_RESEND_API_KEY;
   if (!key) throw new ContactMailUnavailableError();
+  const prefix = input.source ? `[${input.source}] ` : "";
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -32,7 +33,7 @@ export async function sendContactMail(input: ContactMessage): Promise<void> {
       from: "BeastyPage Kontaktformular <kontakt-formular@heerlab.com>",
       to: ["kontakt@heerlab.com"],
       reply_to: input.email,
-      subject: `${input.source ? `[${input.source}] ` : ""}Kontaktformular: ${input.name}`,
+      subject: prefix + `Kontaktformular: ${input.name}`,
       text: [
         `Name: ${input.name}`,
         `E-Mail: ${input.email}`,

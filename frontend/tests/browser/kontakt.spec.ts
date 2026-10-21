@@ -2,9 +2,10 @@ import { expect, type Page, type Route, test } from "@playwright/test";
 
 // Run against a local production server, never a deployed site or live Resend.
 const baseUrl = process.env.CONTACT_TEST_BASE_URL ?? "";
+// Skip without a started local production server configured through CONTACT_TEST_BASE_URL.
 test.skip(
   !baseUrl,
-  "Set CONTACT_TEST_BASE_URL to the local Next.js production server.",
+  "CONTACT_TEST_BASE_URL is not set; this spec runs against a started production server",
 );
 
 async function fillContactForm(page: Page) {

@@ -17,9 +17,9 @@ const CONTACT_PRIVACY_NOTICE_EN =
 
 export default async function KontaktPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}>) {
   const source = contactSource((await searchParams).from);
   return (
     <main

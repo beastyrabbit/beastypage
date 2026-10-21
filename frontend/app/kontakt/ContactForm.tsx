@@ -10,7 +10,7 @@ const FALLBACK_ERROR =
 const INPUT_CLASS =
   "mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20";
 
-export function ContactForm({ source }: { source?: ContactSource }) {
+export function ContactForm({ source }: Readonly<{ source?: ContactSource }>) {
   const [state, setState] = useState<FormState>("idle");
   const [error, setError] = useState("");
   const [hydrated, setHydrated] = useState(false);
@@ -58,18 +58,15 @@ export function ContactForm({ source }: { source?: ContactSource }) {
 
   if (state === "success") {
     return (
-      <div
-        role="status"
-        className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-emerald-100"
-      >
-        <p>
+      <output className="block rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-emerald-100">
+        <span className="block">
           Danke, Ihre Nachricht wurde gesendet. Ihre Anfrage wird per E-Mail
           beantwortet.
-        </p>
-        <p lang="en" className="mt-2 text-sm">
+        </span>
+        <span lang="en" className="mt-2 block text-sm">
           Thank you, your message has been sent. You will get a reply by email.
-        </p>
-      </div>
+        </span>
+      </output>
     );
   }
 
