@@ -1,5 +1,9 @@
 """CatGenerator V3 renderer service package."""
 
-from .config import settings
+from .monitoring import init_monitoring
+
+init_monitoring()
+
+from .config import settings  # noqa: E402
 
 __all__ = ["settings"]

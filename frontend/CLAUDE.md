@@ -19,7 +19,8 @@ A pixel cat gacha platform featuring:
 - **Data fetching**: TanStack Query hooks in `lib/data/`, live updates over SSE
 - **Package Manager**: pnpm
 - **Linter/Formatter**: Biome
-- **Analytics**: PostHog (optional)
+- **Analytics**: self-hosted Umami, enabled only in production after analytics consent
+- **Errors**: self-hosted GlitchTip via Sentry, without browser storage or user identity
 
 ## Directory Structure
 
@@ -112,8 +113,10 @@ Required for development:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` - Clerk
 
 Optional:
-- `NEXT_PUBLIC_POSTHOG_KEY` - Analytics
-- `NEXT_PUBLIC_POSTHOG_HOST` - Analytics host
+- `NEXT_PUBLIC_UMAMI_HOST`, `NEXT_PUBLIC_UMAMI_WEBSITE_ID`, `NEXT_PUBLIC_UMAMI_DOMAINS` - Consent-gated analytics
+- `NEXT_PUBLIC_GLITCHTIP_DSN` - Error reporting
+- `NEXT_PUBLIC_APP_ENV` - Telemetry runs only when exactly `production`; unset locally
+- `NEXT_PUBLIC_APP_VERSION` - Release version, derived from Docker's `APP_VERSION`
 - `RENDERER_INTERNAL_URL` - Cat card renderer service
 - `MAINTENANCE_MODE=1` - Reject writes with 503 during maintenance
 - `JOBS_ENABLED=0` - Do not start the job worker in this process

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, TypeVar
 
 import anyio
+import sentry_sdk
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import Message, Receive, Scope, Send
@@ -282,7 +283,10 @@ def create_app() -> FastAPI:
         try:
             yield
         finally:
-            await supervisor.stop()
+            try:
+                await supervisor.stop()
+            finally:
+                await asyncio.to_thread(sentry_sdk.flush, timeout=2)
 
     app = FastAPI(
         lifespan=lifespan,

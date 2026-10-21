@@ -16,6 +16,7 @@ export default defineConfig({
             "**/.next/**",
             "tests/cat-v3/render.spec.ts",
             "tests/browser/**",
+            "tests/telemetry/**",
             "**/*.db.test.ts",
           ],
         },

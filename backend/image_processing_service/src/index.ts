@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { captureException, flush } from "@sentry/node";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { config } from "./config.ts";
@@ -11,7 +12,7 @@ const app = new Hono();
 // Middleware
 // ---------------------------------------------------------------------------
 app.use("*", cors({ origin: config.corsOrigins }));
-app.use("*", errorHandler);
+app.onError(errorHandler);
 
 // ---------------------------------------------------------------------------
 // Routes
@@ -38,11 +39,13 @@ function shutdown() {
   // Stop accepting new requests, then let in-flight worker requests finish
   // before terminating. Calling process.exit immediately here aborts worker
   // threads and can leave clients with truncated responses.
-  server.close((error) => {
+  server.close(async (error) => {
     if (error) {
+      captureException(error);
       console.error("[image-processing] failed to close server", error);
       process.exitCode = 1;
     }
+    await flush(2000);
   });
 }
 

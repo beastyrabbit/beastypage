@@ -43,7 +43,7 @@ export default defineConfig({
       },
     ],
   },
-  define: { "process.env.NEXT_PUBLIC_POSTHOG_KEY": "undefined" },
+  define: { "process.env.NEXT_PUBLIC_APP_ENV": "undefined" },
   server: {
     host: "127.0.0.1",
     port: 0,

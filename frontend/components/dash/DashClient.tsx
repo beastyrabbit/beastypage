@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 import { TOOL_MAP } from "@/lib/dash/registry.generated";
 import type { DashSettings, ToolWidgetMeta } from "@/lib/dash/types";
 import { useBackendAuth } from "@/lib/data";
@@ -98,6 +99,7 @@ export function DashClient({
         isActive: true,
       }).catch((err) => {
         console.error("[Dash] save failed:", err);
+        track("core_flow_failed", { flow: "dashboard_save" });
         toast.error("Failed to save dashboard");
       });
     }, 1000);
@@ -180,6 +182,7 @@ export function DashClient({
       window.open(`/dash?slug=${encodeURIComponent(slug)}`, "_blank");
     } catch (error) {
       console.error("[DashClient] handleOpen", error);
+      track("core_flow_failed", { flow: "dashboard_share" });
       toast.error("Failed to generate share link");
     } finally {
       setOpening(false);

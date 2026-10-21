@@ -83,7 +83,7 @@ export function UserAuthButton() {
   const initial = viewer?.username?.[0]?.toUpperCase();
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={dropdownRef} className="relative rr-block" data-private>
       <button
         type="button"
         onClick={() => setDropdownOpen((prev) => !prev)}

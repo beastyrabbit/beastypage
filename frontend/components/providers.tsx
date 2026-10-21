@@ -5,7 +5,7 @@ import { shadcn } from "@clerk/ui/themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
 import { type ReactNode, useState } from "react";
-import { PosthogProvider } from "@/components/posthog-provider";
+import { TelemetryProvider } from "@/components/telemetry-provider";
 import { BackendAuthProvider } from "@/lib/data";
 
 function makeQueryClient() {
@@ -43,14 +43,15 @@ export function AppProviders({ children }: Readonly<{ children: ReactNode }>) {
   const appContent = (
     <BackendAuthProvider>
       <MotionConfig reducedMotion="user">
-        <PosthogProvider>{children}</PosthogProvider>
+        <TelemetryProvider>{children}</TelemetryProvider>
       </MotionConfig>
     </BackendAuthProvider>
   );
   return (
     <ClerkProvider
+      telemetry={false}
       publishableKey={clerkPublishableKey}
-      appearance={{ theme: shadcn }}
+      appearance={{ theme: shadcn, elements: { rootBox: "rr-block" } }}
     >
       <QueryClientProvider client={queryClient}>
         {appContent}

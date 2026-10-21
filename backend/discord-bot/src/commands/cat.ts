@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/node";
 import {
   AttachmentBuilder,
   type AutocompleteInteraction,
@@ -53,6 +54,7 @@ export async function handleCatCommand(
 
     await interaction.editReply({ embeds: [embed], files: [attachment] });
   } catch (error) {
+    captureException(error);
     console.error("Error generating cat:", error);
     await interaction.editReply({
       content: "Failed to generate cat. Please try again later.",
@@ -89,6 +91,7 @@ export async function handleCatAutocomplete(
 
     await interaction.respond([]);
   } catch (error) {
+    captureException(error);
     console.error("Autocomplete error:", error);
   }
 }

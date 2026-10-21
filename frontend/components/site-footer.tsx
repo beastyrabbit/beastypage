@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CookieSettings } from "@/components/cookie-settings";
 import { LegalLinks } from "@/components/legal/legal-links";
 
 const FOOTER_LINKS = [
@@ -33,7 +34,10 @@ export function SiteFooter() {
           {"."}
         </p>
         <div className="flex flex-col gap-4">
-          <LegalLinks />
+          <div className="flex flex-wrap items-center gap-4">
+            <LegalLinks />
+            <CookieSettings />
+          </div>
           <div className="flex flex-wrap items-center gap-4">
             {FOOTER_LINKS.map(({ href, label }) => (
               <Link

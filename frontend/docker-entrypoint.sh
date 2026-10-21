@@ -6,8 +6,6 @@ set -e
 # Required because Next.js NEXT_PUBLIC_* vars are embedded at build time
 
 # Placeholders must match the ARG defaults in Dockerfile
-POSTHOG_PLACEHOLDER_KEY="phc_PLACEHOLDER_KEY"
-POSTHOG_PLACEHOLDER_HOST="https://placeholder.posthog.com"
 CLERK_PLACEHOLDER_KEY="pk_placeholder_CLERK_KEY"
 
 # Helper function to replace placeholders in all Next.js build artifacts
@@ -37,19 +35,6 @@ replace_in_files() {
 }
 
 echo "Injecting runtime environment variables..."
-
-# PostHog injection
-if [ -n "$NEXT_PUBLIC_POSTHOG_KEY" ]; then
-  echo "  - NEXT_PUBLIC_POSTHOG_KEY"
-  replace_in_files "$POSTHOG_PLACEHOLDER_KEY" "$NEXT_PUBLIC_POSTHOG_KEY"
-else
-  echo "  - NEXT_PUBLIC_POSTHOG_KEY not set (analytics disabled)"
-fi
-
-if [ -n "$NEXT_PUBLIC_POSTHOG_HOST" ]; then
-  echo "  - NEXT_PUBLIC_POSTHOG_HOST"
-  replace_in_files "$POSTHOG_PLACEHOLDER_HOST" "$NEXT_PUBLIC_POSTHOG_HOST"
-fi
 
 # Clerk publishable key injection
 if [ -n "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then

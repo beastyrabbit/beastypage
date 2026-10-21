@@ -135,6 +135,16 @@ curl -s http://localhost:8001/health | jq
 
 The request body limit is 2 MiB. Batch requests allow at most 256 frames and a 16 million pixel working budget. Batch tile sizes are limited to 1024 pixels. `expandVariants=true` is rejected because callers must send explicit variants.
 
+## Error tracking
+
+Set `GLITCHTIP_DSN` to enable error reporting through the official Sentry SDK. When it is unset or empty, the SDK does not initialize. `GLITCHTIP_ENVIRONMENT` defaults to `development`. The container build argument `APP_VERSION` defaults to `dev` and supplies the runtime value used for release `beastypage@${APP_VERSION}`. A tag such as `v10.0.0` produces release `beastypage@v10.0.0`.
+
+Events carry `service=renderer`. Tracing samples 5% of requests using Sentry transaction envelopes. Profiling is disabled. Error, breadcrumb and transaction filters remove request bodies, cookies, sensitive headers, emails, bearer and Discord tokens, and secret query values. Default PII collection is disabled.
+
+Initialization runs when the renderer package loads, before the app is created. FastAPI and Starlette integrations capture unhandled exceptions and HTTP 5xx errors. The lifespan shutdown hook flushes pending reports.
+
+Tests use fake transports and never contact GlitchTip.
+
 ## Testing
 
 ```sh

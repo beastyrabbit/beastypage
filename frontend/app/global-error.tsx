@@ -1,8 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
+import { telemetryConfig, telemetryEnabled } from "@/lib/telemetry/config";
+
 export default function GlobalError({
+  error,
   retry,
 }: Readonly<{ error: unknown; retry: () => void }>) {
+  useEffect(() => {
+    if (!telemetryEnabled || !telemetryConfig.dsn) return;
+    void import("@/lib/telemetry/sentry-browser")
+      .then(({ initBrowserErrors }) => {
+        initBrowserErrors().captureException(error);
+      })
+      .catch(() => {});
+  }, [error]);
   return (
     <html lang="en">
       <body

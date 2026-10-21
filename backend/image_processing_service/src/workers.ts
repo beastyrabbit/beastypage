@@ -1,4 +1,5 @@
 import { Worker } from "node:worker_threads";
+import { captureException } from "@sentry/node";
 import { HTTPException } from "hono/http-exception";
 import { config } from "./config.ts";
 import { ProcessingError } from "./utils/image.ts";
@@ -24,7 +25,10 @@ export async function runJob(kind: "process" | "detect", request: Parameters<typ
       signal.addEventListener("abort", cancel, { once: true });
       timer = setTimeout(() => reject(new HTTPException(504, { message: "Image processing timed out" })), config.requestTimeout);
       worker!.once("message", message => message.error ? reject(new ProcessingError(message.error)) : resolve(message.result));
-      worker!.once("error", () => reject(new ProcessingError("Image worker failed")));
+      worker!.once("error", (error) => {
+        captureException(error);
+        reject(new ProcessingError("Image worker failed"));
+      });
       worker!.once("exit", () => reject(new ProcessingError("Image worker stopped")));
       if (signal.aborted) cancel();
     });

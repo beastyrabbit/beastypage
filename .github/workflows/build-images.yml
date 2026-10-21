@@ -163,10 +163,17 @@ jobs:
           secret-path: /ci
 
       - name: Verify frontend build settings
+        env:
+          TAG_BUILD: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
-          : "${NEXT_PUBLIC_POSTHOG_KEY:?Missing NEXT_PUBLIC_POSTHOG_KEY from Infisical prod /ci}"
-          : "${NEXT_PUBLIC_POSTHOG_HOST:?Missing NEXT_PUBLIC_POSTHOG_HOST from Infisical prod /ci}"
           : "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY from Infisical prod /ci}"
+          if [ "$TAG_BUILD" = "true" ]; then
+            : "${NEXT_PUBLIC_UMAMI_HOST:?Missing NEXT_PUBLIC_UMAMI_HOST from Infisical prod /ci}"
+            : "${NEXT_PUBLIC_UMAMI_WEBSITE_ID:?Missing NEXT_PUBLIC_UMAMI_WEBSITE_ID from Infisical prod /ci}"
+            : "${NEXT_PUBLIC_UMAMI_DOMAINS:?Missing NEXT_PUBLIC_UMAMI_DOMAINS from Infisical prod /ci}"
+            : "${NEXT_PUBLIC_GLITCHTIP_DSN:?Missing NEXT_PUBLIC_GLITCHTIP_DSN from Infisical prod /ci}"
+            : "${SENTRY_AUTH_TOKEN:?Missing SENTRY_AUTH_TOKEN from Infisical prod /ci}"
+          fi
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
@@ -201,11 +208,16 @@ jobs:
             ${{ steps.meta.outputs.labels }}
             dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
           build-args: |
-            NEXT_PUBLIC_POSTHOG_KEY=${{ env.NEXT_PUBLIC_POSTHOG_KEY }}
-            NEXT_PUBLIC_POSTHOG_HOST=${{ env.NEXT_PUBLIC_POSTHOG_HOST }}
+            NEXT_PUBLIC_UMAMI_HOST=${{ env.NEXT_PUBLIC_UMAMI_HOST }}
+            NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ env.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}
+            NEXT_PUBLIC_UMAMI_DOMAINS=${{ env.NEXT_PUBLIC_UMAMI_DOMAINS }}
+            NEXT_PUBLIC_GLITCHTIP_DSN=${{ env.NEXT_PUBLIC_GLITCHTIP_DSN }}
+            NEXT_PUBLIC_APP_ENV=${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'ci' }}
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
             APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
             CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
+          secrets: |
+            SENTRY_AUTH_TOKEN=${{ startsWith(github.ref, 'refs/tags/v') && env.SENTRY_AUTH_TOKEN || '' }}
 
   build-renderer:
     needs: [changes, cat-system-contract]
@@ -261,6 +273,7 @@ jobs:
             dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
           build-args: |
             CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
+            APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
 
   check-image-processing:
     needs: changes
@@ -325,6 +338,8 @@ jobs:
           file: ./backend/image_processing_service/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
           tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
 
   build-discord-bot:
     needs: [changes, cat-system-contract]
@@ -380,6 +395,7 @@ jobs:
             dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
           build-args: |
             CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
+            APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
 
   check-media:
     needs: changes
@@ -444,3 +460,5 @@ jobs:
           file: ./backend/media_service/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
           tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}

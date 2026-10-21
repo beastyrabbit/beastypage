@@ -3,8 +3,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "node --watch --experimental-strip-types src/index.ts",
-    "start": "node --experimental-strip-types src/index.ts",
+    "dev": "node --watch --experimental-strip-types --import ./src/instrument.ts src/index.ts",
+    "start": "node --experimental-strip-types --import ./src/instrument.ts src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest"
   },
@@ -17,6 +17,7 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@hono/zod-validator": "^0.9.1",
+    "@sentry/node": "^11.8.0",
     "hono": "^4.13.9",
     "sharp": "0.35.5",
     "zod": "^4.5.4"

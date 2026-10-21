@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { captureException } from "@sentry/node";
 import {
   AttachmentBuilder,
   type ChatInputCommandInteraction,
@@ -132,6 +133,7 @@ async function safeReply(
   logMessage: string
 ): Promise<void> {
   await interaction.reply(payload).catch((replyError) => {
+    captureException(replyError);
     console.error(logMessage, {
       interactionId: interaction.id,
       replyError,
@@ -145,6 +147,7 @@ async function safeEditReply(
   logMessage: string
 ): Promise<void> {
   await interaction.editReply(payload).catch((replyError) => {
+    captureException(replyError);
     console.error(logMessage, {
       interactionId: interaction.id,
       replyError,
@@ -205,6 +208,7 @@ export async function handlePaletteCommand(
     const result = await extractPalette(imageUrlValidation.value, colors);
     await interaction.editReply(buildPaletteReply(result));
   } catch (error) {
+    captureException(error);
     console.error("Error extracting palette:", error);
     await safeSendFailure(
       interaction,
@@ -261,6 +265,7 @@ export async function handlePaletteContextMenu(
     const result = await extractPalette(imageUrlValidation.value);
     await interaction.editReply(buildPaletteReply(result));
   } catch (error) {
+    captureException(error);
     console.error("Error extracting palette:", error);
     await safeSendFailure(
       interaction,

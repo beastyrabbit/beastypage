@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/node";
 import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
@@ -44,10 +45,14 @@ async function handleView(
     const embed = buildConfigEmbed(cfg);
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
+    captureException(error);
     console.error("Error fetching config:", error);
     await interaction.editReply({
       content: "Failed to fetch config. Please try again later.",
-    }).catch((e) => console.error("Failed to send error reply:", e));
+    }).catch((e) => {
+      captureException(e);
+      console.error("Failed to send error reply:", e);
+    });
   }
 }
 
@@ -103,10 +108,14 @@ async function handleSet(
       embeds: [embed],
     });
   } catch (error) {
+    captureException(error);
     console.error("Error updating config:", error);
     await interaction.editReply({
       content: "Failed to update config. Please try again later.",
-    }).catch((e) => console.error("Failed to send error reply:", e));
+    }).catch((e) => {
+      captureException(e);
+      console.error("Failed to send error reply:", e);
+    });
   }
 }
 
@@ -126,10 +135,14 @@ async function handlePaletteAdd(
       embeds: [embed],
     });
   } catch (error) {
+    captureException(error);
     console.error("Error adding palette:", error);
     await interaction.editReply({
       content: "Failed to add palette. Please try again later.",
-    }).catch((e) => console.error("Failed to send error reply:", e));
+    }).catch((e) => {
+      captureException(e);
+      console.error("Failed to send error reply:", e);
+    });
   }
 }
 
@@ -149,10 +162,14 @@ async function handlePaletteRemove(
       embeds: [embed],
     });
   } catch (error) {
+    captureException(error);
     console.error("Error removing palette:", error);
     await interaction.editReply({
       content: "Failed to remove palette. Please try again later.",
-    }).catch((e) => console.error("Failed to send error reply:", e));
+    }).catch((e) => {
+      captureException(e);
+      console.error("Failed to send error reply:", e);
+    });
   }
 }
 
@@ -170,10 +187,14 @@ async function handleReset(
       embeds: [embed],
     });
   } catch (error) {
+    captureException(error);
     console.error("Error resetting config:", error);
     await interaction.editReply({
       content: "Failed to reset config. Please try again later.",
-    }).catch((e) => console.error("Failed to send error reply:", e));
+    }).catch((e) => {
+      captureException(e);
+      console.error("Failed to send error reply:", e);
+    });
   }
 }
 
@@ -235,6 +256,7 @@ export async function handleConfigAutocomplete(
       }
     }
   } catch (error) {
+    captureException(error);
     console.error("Config autocomplete error:", error);
     try {
       await interaction.respond([]);

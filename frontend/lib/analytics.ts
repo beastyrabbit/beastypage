@@ -1,4 +1,6 @@
-import posthog from "posthog-js";
+import { telemetryEnabled } from "@/lib/telemetry/config";
+import { hasAnalyticsConsent } from "@/lib/telemetry/consent-state";
+import { scrubEvent } from "@/lib/telemetry/scrub";
 
 // ============================================================================
 // Event Type Definitions
@@ -255,6 +257,13 @@ type ShareLinkViewedProps = {
 // ============================================================================
 
 type AnalyticsEventMap = {
+  auth_signed_in: Record<string, never>;
+  auth_signed_up: Record<string, never>;
+  auth_signed_out: Record<string, never>;
+  outbound_link_clicked: { host: string };
+  core_flow_failed: {
+    flow: "palette_generation" | "dashboard_save" | "dashboard_share";
+  };
   // Cat Generation & Builders
   single_cat_generated: SingleCatGeneratedProps;
   single_cat_mode_changed: SingleCatModeChangedProps;
@@ -367,7 +376,7 @@ type AnalyticsEventMap = {
  * Type-safe analytics tracking function.
  *
  * Call this wherever user interactions occur that we want to measure.
- * See PostHogProvider configuration for environment-specific behavior.
+ * Drops events until analytics consent and the production tracker are ready.
  *
  * @example
  * track("single_cat_generated", { mode: "flashy", accessories: true, ... })
@@ -378,12 +387,22 @@ export function track<K extends keyof AnalyticsEventMap>(
   properties: AnalyticsEventMap[K],
 ): void {
   try {
-    if (typeof posthog?.capture === "function") {
-      posthog.capture(event, properties);
-    }
-  } catch (error) {
-    // Analytics failures should never crash the app, but we need visibility
-    console.warn(`[Analytics] Failed to track "${event}":`, error);
+    if (
+      !telemetryEnabled ||
+      !hasAnalyticsConsent() ||
+      typeof window === "undefined"
+    )
+      return;
+    // Keep existing call sites typed, but never send free-text error messages.
+    const { message: _message, ...safeProperties } = properties as Record<
+      string,
+      unknown
+    >;
+    const result = window.umami?.track(event, scrubEvent(safeProperties));
+    if (result && typeof result.catch === "function")
+      void result.catch(() => {});
+  } catch {
+    /* Analytics must never interrupt a user action. */
   }
 }
 

@@ -12,7 +12,7 @@ pnpm dev:media
 
 The root command injects the development `/media` environment, runs the service with Node's strip-types loader, and puts the app port 8003 behind Portless as `media.beastypage`. The Portless URL is printed by the command. The service health endpoint is `GET /health`.
 
-The container definition is [Dockerfile](Dockerfile). From this directory it installs production dependencies, adds `ffmpeg` and `tini`, exposes port 8003, and starts `node --experimental-strip-types src/index.ts`.
+The container definition is [Dockerfile](Dockerfile). From this directory it installs production dependencies, adds `ffmpeg` and `tini`, exposes port 8003, and starts `node --experimental-strip-types --import ./src/instrument.ts src/index.ts`.
 
 ## Environment
 
@@ -37,6 +37,16 @@ The container definition is [Dockerfile](Dockerfile). From this directory it ins
 | `PROCESSING_TIMEOUT_MS` | Per-job processing timeout |
 
 The dispatch design is documented in [Quick Share processing rollout](../../docs/quick-share-processing-rollout.md). Workers receive a job ID through an authenticated callback, use a short lease, and rely on bounded retries and an infrequent recovery sweep.
+
+## Error tracking
+
+Set `GLITCHTIP_DSN` to enable error reporting through the official Sentry SDK. When it is unset or empty, the SDK does not initialize. `GLITCHTIP_ENVIRONMENT` defaults to `development`. The container build argument `APP_VERSION` defaults to `dev` and supplies the runtime value used for release `beastypage@${APP_VERSION}`. A tag such as `v10.0.0` produces release `beastypage@v10.0.0`.
+
+Events carry `service=media`. Tracing samples 5% of requests using Sentry transaction envelopes. Profiling is disabled. Error, breadcrumb and transaction filters remove request bodies, cookies, sensitive headers, emails, bearer and Discord tokens, and secret query values. Default PII collection is disabled.
+
+The start and dev commands preload `src/instrument.ts` with `--import` before loading the app. The HTTP error handler reports server failures, and shutdown flushes pending reports.
+
+Tests use fake transports and never contact GlitchTip.
 
 ## Checks
 

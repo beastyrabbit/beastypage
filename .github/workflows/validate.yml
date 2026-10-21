@@ -37,6 +37,9 @@ jobs:
         run: |
           pnpm --dir frontend exec playwright install --with-deps chromium
           pnpm --dir frontend exec playwright test
+      - name: Check built-app telemetry with local collectors
+        timeout-minutes: 8
+        run: pnpm --dir frontend run test:telemetry
 
   # PostgreSQL migration foundation (docs/migration/adr-0001-postgresql.md).
   # Ephemeral database; nothing here touches production data.

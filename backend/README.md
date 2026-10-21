@@ -27,3 +27,7 @@ pnpm image-processing:check
 ```
 
 The GitHub Actions container workflow publishes images only after its applicable validation job succeeds. Production deployment requires separate approval.
+
+All four backend runtimes report errors to the shared GlitchTip project through official Sentry SDKs when `GLITCHTIP_DSN` is set and nonempty. `GLITCHTIP_ENVIRONMENT` defaults to `development`; each image bakes in `APP_VERSION`, which defaults to `dev`, for release `beastypage@${APP_VERSION}`. CI passes the raw version tag, including its `v` prefix.
+
+The `service` tag distinguishes `renderer`, `discord-bot`, `image-processing`, and `media`. All services disable default PII collection, scrub errors, breadcrumbs and transactions, sample tracing at 5%, and flush reports on graceful shutdown. No DSN means no SDK initialization. Service tests use fake transports without contacting GlitchTip.
