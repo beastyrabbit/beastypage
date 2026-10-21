@@ -121,8 +121,8 @@ describe.each(pages)(
         ).not.toBeNull();
         expect(discord?.textContent).toContain(
           lang === "de"
-            ? "Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Soweit das Bild andere Personen zeigt, ist Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in der Bereitstellung der angeforderten Palette."
-            : "As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Where the image shows other people, the legal basis is Art. 6(1)(f) GDPR, with the legitimate interest of providing the requested palette.",
+            ? "Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Soweit das Bild oder seine Metadaten andere Personen betreffen, ist Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in der Bereitstellung der angeforderten Palette."
+            : "As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Where the image or its metadata relates to other people, the legal basis is Art. 6(1)(f) GDPR, with the legitimate interest of providing the requested palette.",
         );
         const imageMetadata = Array.from(doc.querySelectorAll("p")).find((p) =>
           p.textContent?.includes("EXIF"),

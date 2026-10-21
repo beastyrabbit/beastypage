@@ -29,7 +29,7 @@ export function AccountSection({ lang, number }: PrivacySectionProps) {
             }
             <LegalEmail kind="privacy" />
             {
-              " anfordern. Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Soweit das Bild andere Personen zeigt, ist Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in der Bereitstellung der angeforderten Palette. Discord betreibt seine Plattform eigenverantwortlich; Anbieter und Datenschutzhinweise stehen in Abschnitt 8."
+              " anfordern. Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Soweit das Bild oder seine Metadaten andere Personen betreffen, ist Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in der Bereitstellung der angeforderten Palette. Discord betreibt seine Plattform eigenverantwortlich; Anbieter und Datenschutzhinweise stehen in Abschnitt 8."
             }
           </p>
           <p>
@@ -97,7 +97,7 @@ export function AccountSection({ lang, number }: PrivacySectionProps) {
             }
             <LegalEmail kind="privacy" />
             {
-              ". As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Where the image shows other people, the legal basis is Art. 6(1)(f) GDPR, with the legitimate interest of providing the requested palette. Discord operates its platform under its own responsibility; provider details and privacy information are in section 8."
+              ". As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Where the image or its metadata relates to other people, the legal basis is Art. 6(1)(f) GDPR, with the legitimate interest of providing the requested palette. Discord operates its platform under its own responsibility; provider details and privacy information are in section 8."
             }
           </p>
           <p>
