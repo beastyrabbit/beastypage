@@ -1,22 +1,28 @@
 import Link from "next/link";
 
+const LEGAL_LINKS = [
+  { href: "/impressum", label: "Impressum", lang: "de" },
+  { href: "/datenschutz", label: "Datenschutz", lang: "de" },
+  { href: "/legal-notice", label: "Legal notice" },
+  { href: "/privacy", label: "Privacy" },
+];
+
 export function LegalLinks() {
   return (
-    <nav aria-label="Legal" className="flex flex-wrap gap-x-4 gap-y-2">
-      <span>
-        <Link href="/impressum" lang="de">
-          Impressum
+    <nav
+      aria-label="Legal"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2"
+    >
+      {LEGAL_LINKS.map(({ href, label, lang }) => (
+        <Link
+          key={href}
+          href={href}
+          lang={lang}
+          className="link-underline hover:text-foreground"
+        >
+          {label}
         </Link>
-        {" · "}
-        <Link href="/datenschutz" lang="de">
-          Datenschutz
-        </Link>
-      </span>
-      <span>
-        <Link href="/legal-notice">Legal notice</Link>
-        {" · "}
-        <Link href="/privacy">Privacy</Link>
-      </span>
+      ))}
     </nav>
   );
 }

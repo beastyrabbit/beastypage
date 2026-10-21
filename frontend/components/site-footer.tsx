@@ -15,7 +15,7 @@ const FOOTER_LINKS = [
 export function SiteFooter() {
   return (
     <footer className="border-t border-border/60 bg-background/80">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 text-sm text-muted-foreground">
         <p>
           &copy; {new Date().getFullYear()} Cat Gacha. Crafted with PostgreSQL,
           Next.js, and{" "}
@@ -33,24 +33,21 @@ export function SiteFooter() {
           </span>
           {"."}
         </p>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <LegalLinks />
-            <CookieSettings />
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {FOOTER_LINKS.map(({ href, label }) => (
-              <Link
-                key={label}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link-underline hover:text-foreground"
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <LegalLinks />
+          <CookieSettings />
+          <span aria-hidden className="h-4 w-px bg-border" />
+          {FOOTER_LINKS.map(({ href, label }) => (
+            <Link
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link-underline hover:text-foreground"
+            >
+              {label}
+            </Link>
+          ))}
         </div>
       </div>
     </footer>
