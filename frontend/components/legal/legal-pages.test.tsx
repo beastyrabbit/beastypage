@@ -119,6 +119,19 @@ describe.each(pages)(
         expect(
           discord?.querySelector(`a[href="mailto:${email}"]`),
         ).not.toBeNull();
+        expect(discord?.textContent).toContain(
+          lang === "de"
+            ? "Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Soweit das Bild andere Personen zeigt, ist Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in der Bereitstellung der angeforderten Palette."
+            : "As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Where the image shows other people, the legal basis is Art. 6(1)(f) GDPR, with the legitimate interest of providing the requested palette.",
+        );
+        const imageMetadata = Array.from(doc.querySelectorAll("p")).find((p) =>
+          p.textContent?.includes("EXIF"),
+        );
+        expect(imageMetadata?.textContent).toContain(
+          lang === "de"
+            ? "Hochgeladene sowie über den Discord-Befehl /palette gespeicherte Bilder werden unverändert einschließlich eingebetteter Metadaten wie EXIF gespeichert."
+            : "Uploaded images and images stored through the Discord /palette command are stored unchanged, including embedded metadata such as EXIF.",
+        );
         const clerk = doc.querySelectorAll("main > section")[6];
         expect(clerk.textContent).not.toMatch(
           /Kontoeinstellungen|account settings/,

@@ -8,12 +8,12 @@ export function LegalPage({
   title,
   counterpart,
   children,
-}: {
+}: Readonly<{
   lang: LegalLanguage;
   title: string;
   counterpart: string;
   children: ReactNode;
-}) {
+}>) {
   return (
     <main
       lang={lang}

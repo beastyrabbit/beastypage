@@ -29,7 +29,7 @@ export function AccountSection({ lang, number }: PrivacySectionProps) {
             }
             <LegalEmail kind="privacy" />
             {
-              " anfordern. Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Discord betreibt seine Plattform eigenverantwortlich; Anbieter und Datenschutzhinweise stehen in Abschnitt 8."
+              " anfordern. Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Soweit das Bild andere Personen zeigt, ist Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in der Bereitstellung der angeforderten Palette. Discord betreibt seine Plattform eigenverantwortlich; Anbieter und Datenschutzhinweise stehen in Abschnitt 8."
             }
           </p>
           <p>
@@ -45,7 +45,7 @@ export function AccountSection({ lang, number }: PrivacySectionProps) {
           </p>
           <p>
             {
-              "Hochgeladene Bilder werden unverändert einschließlich eingebetteter Metadaten wie EXIF gespeichert. Öffentlich ausgelieferte Bilder können von Browsern bis zu einem Jahr zwischengespeichert werden. Nicht mehr referenzierte Bilddateien können nach 24 Stunden bei der täglichen Bereinigung gelöscht werden."
+              "Hochgeladene sowie über den Discord-Befehl /palette gespeicherte Bilder werden unverändert einschließlich eingebetteter Metadaten wie EXIF gespeichert. Öffentlich ausgelieferte Bilder können von Browsern bis zu einem Jahr zwischengespeichert werden. Nicht mehr referenzierte Bilddateien können nach 24 Stunden bei der täglichen Bereinigung gelöscht werden."
             }
           </p>
           <h3>{"Quick Share"}</h3>
@@ -97,7 +97,7 @@ export function AccountSection({ lang, number }: PrivacySectionProps) {
             }
             <LegalEmail kind="privacy" />
             {
-              ". As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Discord operates its platform under its own responsibility; provider details and privacy information are in section 8."
+              ". As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Where the image shows other people, the legal basis is Art. 6(1)(f) GDPR, with the legitimate interest of providing the requested palette. Discord operates its platform under its own responsibility; provider details and privacy information are in section 8."
             }
           </p>
           <p>
@@ -113,7 +113,7 @@ export function AccountSection({ lang, number }: PrivacySectionProps) {
           </p>
           <p>
             {
-              "Uploaded images are stored unchanged, including embedded metadata such as EXIF. Publicly served images may be cached by browsers for up to one year. Unreferenced image files may be deleted after 24 hours during daily cleanup."
+              "Uploaded images and images stored through the Discord /palette command are stored unchanged, including embedded metadata such as EXIF. Publicly served images may be cached by browsers for up to one year. Unreferenced image files may be deleted after 24 hours during daily cleanup."
             }
           </p>
           <h3>{"Quick Share"}</h3>

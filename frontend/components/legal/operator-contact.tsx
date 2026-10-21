@@ -1,6 +1,6 @@
 import { type LegalLanguage, operator } from "@/lib/legal/operator";
 
-export function OperatorAddress({ lang }: { lang: LegalLanguage }) {
+export function OperatorAddress({ lang }: Readonly<{ lang: LegalLanguage }>) {
   return (
     <address className="not-italic">
       {operator.name}
@@ -16,7 +16,9 @@ export function OperatorAddress({ lang }: { lang: LegalLanguage }) {
   );
 }
 
-export function LegalEmail({ kind }: { kind: "privacy" | "impressum" }) {
+export function LegalEmail({
+  kind,
+}: Readonly<{ kind: "privacy" | "impressum" }>) {
   const email =
     kind === "privacy" ? operator.privacyEmail : operator.impressumEmail;
   return <a href={`mailto:${email}`}>{email}</a>;
