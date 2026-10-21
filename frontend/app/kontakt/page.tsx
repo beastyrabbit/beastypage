@@ -10,10 +10,10 @@ export const metadata: Metadata = {
 
 // Kept separate so a later privacy-page change can add a link here.
 const CONTACT_PRIVACY_NOTICE =
-  "Ihre Angaben (Name, E-Mail-Adresse, Nachricht) und der Zeitpunkt werden ausschließlich per E-Mail an den Betreiber (Tobias Heer) gesendet, um Ihre Anfrage zu beantworten, und nicht in einer Datenbank gespeichert. Zum Schutz vor Spam wird Ihre IP-Adresse kurzzeitig (höchstens 10 Minuten) im Arbeitsspeicher gehalten. Die Nachricht wird über den E-Mail-Dienst Resend (USA) an das Postfach des Betreibers bei Fastmail (Australien) gesendet. Fragen zum Datenschutz: datenschutz-beastyrabbit@heerlab.com";
+  "Ihre Angaben (Name, E-Mail-Adresse, Nachricht) und der Zeitpunkt werden ausschließlich per E-Mail an den Betreiber (Tobias Heer) gesendet, um Ihre Anfrage zu beantworten, und nicht in einer Datenbank gespeichert. Zum Schutz vor Spam wird Ihre IP-Adresse bis zu 10 Minuten nach Ihrer letzten Anfrage nur im Arbeitsspeicher gehalten. Die Nachricht wird über den E-Mail-Dienst Resend (USA) an das Postfach des Betreibers bei Fastmail (Australien) gesendet. Fragen zum Datenschutz: datenschutz-beastyrabbit@heerlab.com";
 
 const CONTACT_PRIVACY_NOTICE_EN =
-  "Your details (name, email address, message) and the time of your request are sent only by email to the operator (Tobias Heer) to answer your enquiry and are not stored in a database. To prevent spam, your IP address is held briefly in memory (for no more than 10 minutes). The message is sent via the email service Resend (USA) to the operator's mailbox at Fastmail (Australia). Privacy questions: datenschutz-beastyrabbit@heerlab.com";
+  "Your details (name, email address, message) and the time of your request are sent only by email to the operator (Tobias Heer) to answer your enquiry and are not stored in a database. To prevent spam, your IP address is held only in memory until 10 minutes after your last request. The message is sent via the email service Resend (USA) to the operator's mailbox at Fastmail (Australia). Privacy questions: datenschutz-beastyrabbit@heerlab.com";
 
 export default async function KontaktPage({
   searchParams,

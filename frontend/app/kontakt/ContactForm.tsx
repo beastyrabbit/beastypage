@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import type { ContactSource } from "./source";
 
 type FormState = "idle" | "sending" | "success" | "error";
@@ -13,11 +13,16 @@ const INPUT_CLASS =
 export function ContactForm({ source }: { source?: ContactSource }) {
   const [state, setState] = useState<FormState>("idle");
   const [error, setError] = useState("");
+  const [hydrated, setHydrated] = useState(false);
   const inFlight = useRef(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current) return;
+    if (!hydrated || inFlight.current) return;
     inFlight.current = true;
     const fields = new FormData(event.currentTarget);
     setState("sending");
@@ -70,6 +75,7 @@ export function ContactForm({ source }: { source?: ContactSource }) {
 
   return (
     <form
+      method="post"
       onSubmit={submit}
       className="ph-no-capture ph-mask space-y-5"
       aria-label="Kontaktformular"
@@ -132,7 +138,7 @@ export function ContactForm({ source }: { source?: ContactSource }) {
       ) : null}
       <button
         type="submit"
-        disabled={state === "sending"}
+        disabled={!hydrated || state === "sending"}
         className="min-h-11 w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
       >
         {state === "sending"

@@ -3,6 +3,9 @@ import "server-only";
 import ipaddr from "ipaddr.js";
 
 const WINDOW_MS = 10 * 60 * 1000;
+// Per-pod limits deliberately approximate 3 per IP and 30 globally across 3 replicas.
+const PER_IP_LIMIT = 1;
+const GLOBAL_LIMIT = 10;
 const clients = new Map<string, number[]>();
 let submissions: number[] = [];
 let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
@@ -45,7 +48,8 @@ function scheduleCleanup() {
 export function acceptContactSubmission(ip: string): boolean {
   prune();
   const times = clients.get(ip) ?? [];
-  if (times.length >= 3 || submissions.length >= 30) return false;
+  if (times.length >= PER_IP_LIMIT || submissions.length >= GLOBAL_LIMIT)
+    return false;
   const now = Date.now();
   times.push(now);
   clients.set(ip, times);

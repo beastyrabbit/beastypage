@@ -58,7 +58,7 @@ for (const width of [1280, 390]) {
       ).not.toHaveAttribute("action");
       await expect(
         page.getByRole("form", { name: "Kontaktformular" }),
-      ).not.toHaveAttribute("method");
+      ).toHaveAttribute("method", "post");
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBeLessThanOrEqual(width);
@@ -259,7 +259,54 @@ test("offers the site-specific email address without JavaScript", async ({
       "impressum-beastyrabbit@heerlab.com",
     );
     await expect(page.locator("noscript p")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Nachricht senden / Send message" }),
+    ).toBeDisabled();
   } finally {
     await context.close();
   }
 });
+
+for (const submission of ["submit", "requestSubmit"] as const) {
+  test(`forced native ${submission} without JavaScript keeps fields out of the URL`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    try {
+      const page = await context.newPage();
+      await page.route("**/*", (route) =>
+        new URL(route.request().url()).origin === new URL(baseUrl).origin
+          ? route.continue()
+          : route.abort(),
+      );
+      await page.goto(`${baseUrl}/kontakt`);
+      await expect(
+        page.getByRole("button", { name: "Nachricht senden / Send message" }),
+      ).toBeDisabled();
+      await fillContactForm(page);
+      const navigation = page.waitForResponse(
+        (response) =>
+          response.request().isNavigationRequest() &&
+          response.request().method() === "POST",
+      );
+      await page
+        .getByRole("form", { name: "Kontaktformular" })
+        .evaluate((form: HTMLFormElement, method) => {
+          form[method]();
+        }, submission);
+      const response = await navigation;
+      await response.finished();
+      await page.waitForLoadState("load");
+      expect(response.request().method()).toBe("POST");
+      expect(
+        new URLSearchParams(response.request().postData() ?? "").get("email"),
+      ).toBe("erika@example.org");
+      expect(response.url()).toBe(`${baseUrl}/kontakt`);
+      expect(page.url()).toBe(`${baseUrl}/kontakt`);
+      for (const field of ["name", "email", "message"])
+        expect(new URL(page.url()).searchParams.has(field)).toBe(false);
+    } finally {
+      await context.close();
+    }
+  });
+}

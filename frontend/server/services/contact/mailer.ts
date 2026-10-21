@@ -29,8 +29,8 @@ export async function sendContactMail(input: ContactMessage): Promise<void> {
     },
     signal: AbortSignal.timeout(10_000),
     body: JSON.stringify({
-      from: `BeastyPage Kontaktformular <${process.env.CONTACT_MAIL_FROM ?? "kontakt-formular@heerlab.com"}>`,
-      to: [process.env.CONTACT_MAIL_TO ?? "kontakt@heerlab.com"],
+      from: "BeastyPage Kontaktformular <kontakt-formular@heerlab.com>",
+      to: ["kontakt@heerlab.com"],
       reply_to: input.email,
       subject: `${input.source ? `[${input.source}] ` : ""}Kontaktformular: ${input.name}`,
       text: [

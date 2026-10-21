@@ -44,8 +44,6 @@ beforeEach(async () => {
   vi.resetAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-10-21T12:00:00Z"));
-  vi.stubEnv("CONTACT_MAIL_TO", undefined);
-  vi.stubEnv("CONTACT_MAIL_FROM", undefined);
   vi.stubEnv("CONTACT_RESEND_API_KEY", "test-key");
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockResolvedValue(Response.json({ id: "fixture" }));
@@ -94,17 +92,6 @@ describe("POST /api/kontakt", () => {
     expect(sentMail().text).not.toContain("192.0.2.5");
     expect(sentMail().text).not.toContain("private-test-agent");
     expect(response.headers.get("cache-control")).toBe("no-store");
-  });
-
-  it("uses configured mail addresses", async () => {
-    vi.stubEnv("CONTACT_MAIL_TO", "recipient@example.org");
-    vi.stubEnv("CONTACT_MAIL_FROM", "sender@example.org");
-    expect((await POST(request())).status).toBe(200);
-    expect(sentMail()).toMatchObject({
-      to: ["recipient@example.org"],
-      from: "BeastyPage Kontaktformular <sender@example.org>",
-      reply_to: valid.email,
-    });
   });
 
   it.each(CONTACT_SOURCE_SLUGS)(
@@ -190,11 +177,14 @@ describe("POST /api/kontakt", () => {
     expect(
       (
         await POST(
-          request({
-            ...valid,
-            name: "A".repeat(100),
-            message: "a".repeat(5000),
-          }),
+          request(
+            {
+              ...valid,
+              name: "A".repeat(100),
+              message: "a".repeat(5000),
+            },
+            { "X-Real-IP": "192.0.2.6" },
+          ),
         )
       ).status,
     ).toBe(200);
@@ -258,26 +248,24 @@ describe("POST /api/kontakt", () => {
     );
   });
 
-  it("rejects the fourth concurrent submission from one IP and allows another IP", async () => {
+  it("rejects the second concurrent submission from one IP and allows another IP", async () => {
     const responses = await Promise.all(
-      Array.from({ length: 4 }, () => POST(request())),
+      Array.from({ length: 2 }, () => POST(request())),
     );
-    expect(responses.map((response) => response.status)).toEqual([
-      200, 200, 200, 429,
-    ]);
-    expect(responses[3].headers.get("retry-after")).toBe("600");
-    await expect(responses[3].json()).resolves.toEqual({
+    expect(responses.map((response) => response.status)).toEqual([200, 429]);
+    expect(responses[1].headers.get("retry-after")).toBe("600");
+    await expect(responses[1].json()).resolves.toEqual({
       error:
         "Zu viele Anfragen. Bitte versuchen Sie es in 10 Minuten erneut.\nToo many requests. Please try again in 10 minutes.",
     });
     expect(
       (await POST(request(valid, { "X-Real-IP": "192.0.2.6" }))).status,
     ).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("caps global mail volume at 30 and expires all entries without further traffic", async () => {
-    for (let i = 0; i < 30; i++)
+  it("caps global mail volume at 10 per pod and expires all entries without further traffic", async () => {
+    for (let i = 0; i < 10; i++)
       expect(
         (await POST(request(valid, { "X-Real-IP": `192.0.2.${i + 1}` })))
           .status,
@@ -285,7 +273,7 @@ describe("POST /api/kontakt", () => {
     expect(
       (await POST(request(valid, { "X-Real-IP": "192.0.2.99" }))).status,
     ).toBe(429);
-    expect(fetchMock).toHaveBeenCalledTimes(30);
+    expect(fetchMock).toHaveBeenCalledTimes(10);
     expect(vi.getTimerCount()).toBe(1);
     await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
     expect(vi.getTimerCount()).toBe(0);
@@ -295,14 +283,16 @@ describe("POST /api/kontakt", () => {
   it("uses a rolling window for staggered submissions", async () => {
     await POST(request());
     await vi.advanceTimersByTimeAsync(60_000);
-    await POST(request());
-    await POST(request());
+    const otherClient = () => request(valid, { "X-Real-IP": "192.0.2.6" });
+    expect((await POST(otherClient())).status).toBe(200);
     expect((await POST(request())).status).toBe(429);
+    expect((await POST(otherClient())).status).toBe(429);
     await vi.advanceTimersByTimeAsync(9 * 60_000);
     expect((await POST(request())).status).toBe(200);
     expect((await POST(request())).status).toBe(429);
+    expect((await POST(otherClient())).status).toBe(429);
     await vi.advanceTimersByTimeAsync(60_000);
-    expect((await POST(request())).status).toBe(200);
+    expect((await POST(otherClient())).status).toBe(200);
   });
 
   it("does not spend a quota on validation failures", async () => {
