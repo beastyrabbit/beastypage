@@ -1,5 +1,6 @@
 allowBuilds:
   core-js: false
+  esbuild: false
 ignoredOptionalDependencies:
   - canvas
 overrides:
@@ -8,4 +9,3 @@ overrides:
   shell-quote@<1.11.0: 1.11.0
   image-size@<2.0.3: 2.0.3
   source-map-js@<1.2.2: 1.2.2
-  '@posthog/core': 1.57.4

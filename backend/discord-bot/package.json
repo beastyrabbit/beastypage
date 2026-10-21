@@ -5,12 +5,13 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "test": "tsc && node --test dist/utils/cat-catalog.test.js",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
+    "test": "tsc && node --enable-source-maps --test dist/utils/cat-catalog.test.js dist/monitoring.test.js",
+    "start": "node --enable-source-maps --import ./dist/instrument.js dist/index.js",
+    "dev": "node --enable-source-maps --import tsx --import ./src/instrument.ts src/index.ts",
     "deploy-commands": "tsx src/deploy-commands.ts"
   },
   "dependencies": {
+    "@sentry/node": "^11.8.0",
     "discord.js": "^14.16"
   },
   "devDependencies": {

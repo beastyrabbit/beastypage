@@ -122,6 +122,7 @@ export function PaletteGeneratorClient() {
         });
       } catch (error) {
         console.error("[PaletteGenerator] Generation failed", error);
+        track("core_flow_failed", { flow: "palette_generation" });
         toast.error("Failed to generate palette. Please try again.");
       } finally {
         setGeneratingMode(null);

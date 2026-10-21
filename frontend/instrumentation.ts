@@ -12,6 +12,15 @@ function shouldStartJobs(
 }
 
 export async function register() {
+  if (
+    process.env.NEXT_PUBLIC_APP_ENV === "production" &&
+    process.env.NEXT_PUBLIC_GLITCHTIP_DSN
+  ) {
+    if (process.env.NEXT_RUNTIME === "nodejs")
+      await import("./sentry.server.config");
+    if (process.env.NEXT_RUNTIME === "edge")
+      await import("./sentry.edge.config");
+  }
   // Next replaces this literal at build time, which drops the worker from the
   // Edge instrumentation bundle. Do not move it into shouldStartJobs: the
   // running server has no NEXT_RUNTIME environment variable.
@@ -41,3 +50,15 @@ export async function register() {
 }
 
 export { shouldStartJobs };
+
+export async function onRequestError(
+  ...args: Parameters<typeof import("@sentry/nextjs").captureRequestError>
+) {
+  if (
+    process.env.NEXT_PUBLIC_APP_ENV !== "production" ||
+    !process.env.NEXT_PUBLIC_GLITCHTIP_DSN
+  )
+    return;
+  const { captureRequestError } = await import("@sentry/nextjs");
+  return captureRequestError(...args);
+}

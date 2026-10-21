@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { serve } from "@hono/node-server";
+import { flush } from "@sentry/node";
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 
@@ -22,10 +23,14 @@ async function shutdown() {
 	shuttingDown = true;
 	worker.stop();
 	setTimeout(() => process.exit(1), 10_000).unref();
-	await Promise.all([
-		worker.drain?.(),
-		new Promise<void>((resolve) => server.close(() => resolve())),
-	]);
+	try {
+		await Promise.all([
+			worker.drain?.(),
+			new Promise<void>((resolve) => server.close(() => resolve())),
+		]);
+	} finally {
+		await flush(2000);
+	}
 	process.exit(0);
 }
 

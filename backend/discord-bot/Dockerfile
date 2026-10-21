@@ -13,6 +13,8 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 FROM node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 WORKDIR /app
 ARG CAT_SYSTEM_CATALOG_HASH
 LABEL dev.beastypage.cat-system.catalog-hash=${CAT_SYSTEM_CATALOG_HASH}
@@ -21,4 +23,4 @@ COPY --from=builder /app/dist dist/
 COPY --from=builder /app/node_modules node_modules/
 COPY package.json ./
 USER node
-CMD ["node", "dist/index.js"]
+CMD ["node", "--enable-source-maps", "--import", "./dist/instrument.js", "dist/index.js"]

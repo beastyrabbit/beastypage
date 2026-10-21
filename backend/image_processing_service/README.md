@@ -10,7 +10,7 @@ The service package provides the development command:
 pnpm --dir backend/image_processing_service run dev
 ```
 
-It watches `src/index.ts`, uses Node's strip-types loader, and listens on port 8002 by default. The root `pnpm dev` stack does not start this service. The container definition is [Dockerfile](Dockerfile); it exposes port 8002 and starts `node --experimental-strip-types src/index.ts`.
+It watches `src/index.ts`, uses Node's strip-types loader, and listens on port 8002 by default. The root `pnpm dev` stack does not start this service. The container definition is [Dockerfile](Dockerfile); it exposes port 8002 and starts `node --experimental-strip-types --import ./src/instrument.ts src/index.ts`.
 
 The API exposes `GET /health`, `GET /openapi.json`, `POST /process`, and `POST /detect-grid`.
 
@@ -30,6 +30,16 @@ The API exposes `GET /health`, `GET /openapi.json`, `POST /process`, and `POST /
 | `REQUEST_TIMEOUT` | Worker request timeout in milliseconds |
 
 The defaults are 10,485,760 input bytes, 4,000,000 decoded pixels, two workers, an 8,000-pixel dimension limit, a 1,200-pixel preview dimension, and a 30-second timeout. Each worker has a 256 MiB old-generation heap limit. Pipeline work is capped at 32,000,000 weighted pixels, and a pipeline contains at most 20 steps.
+
+## Error tracking
+
+Set `GLITCHTIP_DSN` to enable error reporting through the official Sentry SDK. When it is unset or empty, the SDK does not initialize. `GLITCHTIP_ENVIRONMENT` defaults to `development`. The container build argument `APP_VERSION` defaults to `dev` and supplies the runtime value used for release `beastypage@${APP_VERSION}`. A tag such as `v10.0.0` produces release `beastypage@v10.0.0`.
+
+Events carry `service=image-processing`. Tracing samples 5% of requests using Sentry transaction envelopes. Profiling is disabled. Error, breadcrumb and transaction filters remove request bodies, cookies, sensitive headers, emails, bearer and Discord tokens, and secret query values. Default PII collection is disabled.
+
+The start and dev commands preload `src/instrument.ts` with `--import` before loading the app. The HTTP error handler reports server failures, and shutdown flushes pending reports.
+
+Tests use fake transports and never contact GlitchTip.
 
 ## Checks
 

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { captureException } from "@sentry/node";
 import { fileTypeFromFile } from "file-type";
 import sharp from "sharp";
 import type { Config } from "./config.ts";
@@ -465,6 +466,7 @@ export class MediaWorker {
 			}
 		} catch (error) {
 			console.error("[quick-share-worker] job failed", error);
+			captureException(error);
 			if (job?.kind === "process" && job.attempts >= 3) {
 				await this.control
 					.call("finishProcess", {

@@ -15,7 +15,9 @@ export const useAuth = () => {
   const params = new URL(location.href).searchParams;
   return {
     isLoaded: true,
-    isSignedIn: params.get("view") !== "host" || params.get("signedIn") === "1",
+    isSignedIn:
+      params.get("signedIn") !== "0" &&
+      (params.get("view") !== "host" || params.get("signedIn") === "1"),
     getToken,
   };
 };

@@ -330,6 +330,7 @@ function SpriteVariants({
               </div>
               <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
                 <Image
+                  data-private
                   src={variant.dataUrl}
                   alt={variant.name}
                   width={PREVIEW_CANVAS_SIZE}
@@ -991,6 +992,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,420px)]">
             <div className="rounded-3xl border border-border/40 bg-background/80 p-6 shadow-inner">
               <canvas
+                data-private
                 ref={canvasRef}
                 width={DISPLAY_CANVAS_SIZE}
                 height={DISPLAY_CANVAS_SIZE}

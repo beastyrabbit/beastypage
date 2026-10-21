@@ -15,17 +15,24 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build-time env vars for Next.js (passed via --build-arg)
-# Use placeholders - replaced at runtime by entrypoint script
-ARG NEXT_PUBLIC_POSTHOG_KEY=phc_PLACEHOLDER_KEY
-ARG NEXT_PUBLIC_POSTHOG_HOST=https://placeholder.posthog.com
+# Only Clerk uses a runtime placeholder. Telemetry is baked into this build.
+ARG NEXT_PUBLIC_UMAMI_HOST
+ARG NEXT_PUBLIC_UMAMI_WEBSITE_ID
+ARG NEXT_PUBLIC_UMAMI_DOMAINS
+ARG NEXT_PUBLIC_GLITCHTIP_DSN
+ARG NEXT_PUBLIC_APP_ENV=ci
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_placeholder_CLERK_KEY
 ARG APP_VERSION=dev
 ARG CAT_SYSTEM_CATALOG_HASH=unknown
 
 ENV APP_VERSION=${APP_VERSION}
 ENV CAT_SYSTEM_CATALOG_HASH=${CAT_SYSTEM_CATALOG_HASH}
-ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
-ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
+ENV NEXT_PUBLIC_UMAMI_HOST=${NEXT_PUBLIC_UMAMI_HOST}
+ENV NEXT_PUBLIC_UMAMI_WEBSITE_ID=${NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+ENV NEXT_PUBLIC_UMAMI_DOMAINS=${NEXT_PUBLIC_UMAMI_DOMAINS}
+ENV NEXT_PUBLIC_GLITCHTIP_DSN=${NEXT_PUBLIC_GLITCHTIP_DSN}
+ENV NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV}
+ENV NEXT_PUBLIC_APP_VERSION=${APP_VERSION}
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
 
 # A CI image may only advertise the contract embedded in this source tree.
@@ -35,7 +42,13 @@ RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
     || test "$(cat public/cat-system/catalog-hash.txt)" = "$CAT_SYSTEM_CATALOG_HASH"
 
 # Build Next.js with standalone output
-RUN pnpm run build
+RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN \
+    if [ "$NEXT_PUBLIC_APP_ENV" = "production" ]; then \
+      test -s /run/secrets/SENTRY_AUTH_TOKEN && \
+      SENTRY_AUTH_TOKEN="$(cat /run/secrets/SENTRY_AUTH_TOKEN)" \
+      SENTRY_URL=https://glitchtip.heerlab.com SENTRY_ORG=beasty-rabbit SENTRY_PROJECT=beastypage \
+      pnpm run build; \
+    else pnpm run build; fi
 
 # Self-contained PostgreSQL migration runner.
 RUN pnpm run db:bundle

@@ -60,7 +60,7 @@ The tag is the deployment: `.github/workflows/build-images.yml` publishes all im
 
 > Replacing/overhauling an existing route (e.g., palette-spinner → palette-generator) is minor, not major.
 
-The CI frontend build takes `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from Infisical `prod` `/ci` and bakes them into the image; change them there, not only in code. PostgreSQL runtime configuration is supplied through the frontend runtime Secret.
+The CI frontend build takes `NEXT_PUBLIC_UMAMI_HOST`, `NEXT_PUBLIC_UMAMI_WEBSITE_ID`, `NEXT_PUBLIC_UMAMI_DOMAINS`, `NEXT_PUBLIC_GLITCHTIP_DSN` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from Infisical `prod` `/ci` and bakes them into the image; change them there, not only in code. Version-tag builds enable production telemetry and pass `SENTRY_AUTH_TOKEN` only as a BuildKit secret for source-map upload. PostgreSQL runtime configuration is supplied through the frontend runtime Secret.
 
 ## Icons
 

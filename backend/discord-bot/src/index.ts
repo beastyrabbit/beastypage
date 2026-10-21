@@ -1,3 +1,5 @@
+import "./unhandled-rejection.js";
+import { captureException, flush } from "@sentry/node";
 import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
@@ -17,13 +19,28 @@ import {
 } from "./commands/config.js";
 import { handleHomepageCommand } from "./commands/homepage.js";
 
-process.on("unhandledRejection", (error) => {
-  console.error("Unhandled rejection:", error);
-});
-
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
+
+client.on(Events.Error, (error) => {
+  captureException(error);
+  console.error("Discord client error:", error);
+});
+
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    await client.destroy();
+  } finally {
+    await flush(2000);
+  }
+  process.exit(0);
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
@@ -69,6 +86,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     }
   } catch (error) {
+    captureException(error);
     console.error("Unhandled interaction error:", error);
     try {
       if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
@@ -83,7 +101,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-await client.login(config.discordBotToken).catch((error) => {
+await client.login(config.discordBotToken).catch(async (error) => {
+  captureException(error);
   console.error("Failed to login to Discord:", error);
+  await flush(2000);
   process.exit(1);
 });

@@ -6,6 +6,8 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 FROM node@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg tini \
@@ -28,4 +30,4 @@ ENV TEMP_DIR=/tmp/quick-share
 EXPOSE 8003
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["node", "--experimental-strip-types", "src/index.ts"]
+CMD ["node", "--experimental-strip-types", "--import", "./src/instrument.ts", "src/index.ts"]

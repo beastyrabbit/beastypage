@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { getConnInfo } from "@hono/node-server/conninfo";
+import { captureException } from "@sentry/node";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -274,10 +275,14 @@ export function createApp(
 				return unavailable();
 			}
 			console.error("[quick-share] object store request failed", error);
+			captureException(error);
 			return c.json({ error: "Quick Share is temporarily unavailable" }, 502);
 		}
 		const status = statusCode(error);
-		if (status >= 500) console.error("[quick-share] request failed", error);
+		if (status >= 500) {
+			captureException(error);
+			console.error("[quick-share] request failed", error);
+		}
 		return c.json(
 			{
 				error:

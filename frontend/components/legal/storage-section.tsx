@@ -1,20 +1,21 @@
+import { CONSENT_RETENTION_DAYS } from "@/lib/telemetry/storage-inventory";
 import { PrivacySection, type PrivacySectionProps } from "./privacy-section";
 
 const storageRows = {
   de: [
     [
-      "__client_uat… (Cookies), __clerk_environment (Browser-Speicher)",
-      "Clerk",
-      "Anmeldung und Kontozugang",
-      "Bis zu etwa 400 Tage",
+      "Clerk-Anmeldecookies (z. B. __client, __client_uat…) und Cloudflare-Bot-Schutz (__cf_bm, _cfuvid) auf clerk.beastyrabbit.com; __clerk_environment (Browser-Speicher)",
+      "Clerk (mit Cloudflare)",
+      "Anmeldung, Kontozugang und Schutz vor Bots",
+      "Sitzung bis etwa 400 Tage",
       "Technisch notwendig, § 25 Abs. 2 Nr. 2 TDDDG",
     ],
     [
-      "ph_… (localStorage und sessionStorage)",
-      "PostHog",
-      "Nutzungsanalyse",
-      "Bis zur Löschung oder zum Schließen des Tabs",
-      "Analyse, siehe Abschnitt 9; einwilligungsbedürftig nach § 25 Abs. 1 TDDDG",
+      "cc_cookie (Cookie)",
+      "BeastyPage",
+      "Speichert Ihre Einwilligungsentscheidung",
+      `${CONSENT_RETENTION_DAYS} Tage`,
+      "Technisch notwendig, § 25 Abs. 2 Nr. 2 TDDDG",
     ],
     [
       "localStorage und sessionStorage",
@@ -26,18 +27,18 @@ const storageRows = {
   ],
   en: [
     [
-      "__client_uat… (cookies), __clerk_environment (browser storage)",
-      "Clerk",
-      "Sign-in and account access",
-      "Up to about 400 days",
+      "Clerk sign-in cookies (e.g. __client, __client_uat…) and Cloudflare bot protection (__cf_bm, _cfuvid) on clerk.beastyrabbit.com; __clerk_environment (browser storage)",
+      "Clerk (with Cloudflare)",
+      "Sign-in, account access and bot protection",
+      "Session to about 400 days",
       "Technically necessary, Section 25(2) no. 2 TDDDG",
     ],
     [
-      "ph_… (localStorage and sessionStorage)",
-      "PostHog",
-      "Usage analytics",
-      "Until deleted or the tab is closed",
-      "Analytics, see section 9; requires consent under Section 25(1) TDDDG",
+      "cc_cookie (cookie)",
+      "BeastyPage",
+      "Stores your consent choice",
+      `${CONSENT_RETENTION_DAYS} days`,
+      "Technically necessary, Section 25(2) no. 2 TDDDG",
     ],
     [
       "localStorage and sessionStorage",
@@ -92,7 +93,7 @@ export function StorageSection({ lang, number }: PrivacySectionProps) {
           <tbody>
             {storageRows[lang].map(
               ([name, provider, purpose, duration, category]) => (
-                <tr key={provider}>
+                <tr key={`${provider}-${name}`}>
                   <td className="max-w-xs break-words">{name}</td>
                   <td>{provider}</td>
                   <td>{purpose}</td>
@@ -106,8 +107,8 @@ export function StorageSection({ lang, number }: PrivacySectionProps) {
       </section>
       <p>
         {de
-          ? "Für PostHog wird derzeit noch keine Einwilligung eingeholt; sie ist mit dem Wechsel zum selbst betriebenen Analysewerkzeug vorgesehen (siehe Abschnitt 9)."
-          : "Consent for PostHog is not collected yet; it is planned with the switch to the self-hosted analytics tool (see section 9)."}
+          ? "Sie können Ihre Analyse-Einwilligung jederzeit über „Cookie settings“ im Footer ändern oder widerrufen (siehe Abschnitt 9)."
+          : 'You can change or withdraw your analytics consent at any time through "Cookie settings" in the footer (see section 9).'}
       </p>
     </PrivacySection>
   );

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const remotePatterns = [];
 
@@ -41,6 +42,12 @@ if (process.env.NEXT_SHOW_CONFIG_LOGS === "1") {
 
 const nextConfig = {
   output: "standalone",
+  productionBrowserSourceMaps: Boolean(process.env.SENTRY_AUTH_TOKEN),
+  experimental: {
+    serverSourceMaps: Boolean(process.env.SENTRY_AUTH_TOKEN),
+    // Turbopack persists build environment values in its filesystem cache.
+    turbopackFileSystemCacheForBuild: !process.env.SENTRY_AUTH_TOKEN,
+  },
   serverExternalPackages: ["@napi-rs/canvas"],
   skipTrailingSlashRedirect: true,
   allowedDevOrigins,
@@ -53,68 +60,56 @@ const nextConfig = {
   turbopack: {
     root: projectRoot,
   },
-  async rewrites() {
-    // Proxy PostHog requests through /bubu to avoid ad-blockers
-    return [
-      {
-        source: "/bubu/static/:path*",
-        destination: "https://eu-assets.i.posthog.com/static/:path*",
-      },
-      {
-        source: "/bubu/:path*",
-        destination: "https://eu.i.posthog.com/:path*",
-      },
-    ];
-  },
   async redirects() {
     return [
       // Stream Canvas moved to the separate ModDrop project.
-      {
-        source: "/stream-canvas",
-        destination: "https://moddrop.live/",
-        permanent: true,
-      },
-      {
-        source: "/stream-canvas/:path*",
-        destination: "https://moddrop.live/:path*",
-        permanent: true,
-      },
-      {
-        source: "/stream-canvas/:path*/",
-        destination: "https://moddrop.live/:path*/",
-        permanent: true,
-      },
+      ["/stream-canvas", "https://moddrop.live/"],
+      ["/stream-canvas/:path*", "https://moddrop.live/:path*"],
+      ["/stream-canvas/:path*/", "https://moddrop.live/:path*/"],
       // Redirect old /gatcha hub to its successor category page
       // (:path* also matches zero segments, covering bare /gatcha;
       // explicit trailing-slash variants needed with skipTrailingSlashRedirect)
-      {
-        source: "/gatcha/testing/collection-focus",
-        destination: "/tests/collection-focus",
-        permanent: true,
-      },
-      {
-        source: "/gatcha/testing/collection-focus/",
-        destination: "/tests/collection-focus",
-        permanent: true,
-      },
-      {
-        source: "/gatcha/:path*",
-        destination: "/projects/gacha",
-        permanent: true,
-      },
-      {
-        source: "/gatcha/:path*/",
-        destination: "/projects/gacha",
-        permanent: true,
-      },
+      ["/gatcha/testing/collection-focus", "/tests/collection-focus"],
+      ["/gatcha/testing/collection-focus/", "/tests/collection-focus"],
+      ["/gatcha/:path*", "/projects/gacha"],
+      ["/gatcha/:path*/", "/projects/gacha"],
       // Redirect /personal to / (home)
-      {
-        source: "/personal",
-        destination: "/",
-        permanent: true,
-      },
-    ];
+      ["/personal", "/"],
+    ].map(([source, destination]) => ({
+      source,
+      destination,
+      permanent: true,
+    }));
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  telemetry: false,
+  silent: !process.env.SENTRY_AUTH_TOKEN,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sentryUrl: process.env.SENTRY_URL,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+    // CLI rewriting leaves a map directive on Next's generated worker bootstrap.
+    // Application worker chunks remain in the upload set.
+    ignore: ["**/turbopack-worker-*.js"],
+    // The SDK defaults to deleting client maps only. Remove server maps too,
+    // before standalone output tracing copies build artifacts into the image.
+    filesToDeleteAfterUpload: [path.join(projectRoot, ".next/**/*.map")],
+  },
+  release: {
+    create: true,
+    finalize: true,
+    name: `beastypage@${process.env.APP_VERSION ?? "dev"}`,
+    setCommits: false,
+    deploy: false,
+  },
+  // The plugin normally logs recoverable upload errors; release builds must fail.
+  errorHandler(error) {
+    throw error;
+  },
+  useRunAfterProductionCompileHook: true,
+  bundleSizeOptimizations: { excludeDebugStatements: true },
+});

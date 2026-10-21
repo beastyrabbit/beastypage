@@ -198,6 +198,7 @@ function SharePreviewMedia({
     return (
       // biome-ignore lint/a11y/useMediaCaption: arbitrary user-supplied media has no caption track available
       <video
+        data-private
         src={item.url}
         controls
         playsInline
@@ -210,6 +211,7 @@ function SharePreviewMedia({
     // The URL intentionally points directly to user media.
     // biome-ignore lint/performance/noImgElement: raw media URLs have unknown dimensions and must not be transformed
     <img
+      data-private
       src={item.url}
       alt=""
       className="mb-4 max-h-80 w-full rounded-md bg-black/30 object-contain"
@@ -1147,6 +1149,7 @@ export function QuickShareClient() {
                   {/* WebKit requires a rich editable target to expose some iOS image pastes. */}
                   {/* biome-ignore lint/a11y/useSemanticElements: an input or textarea cannot receive WebKit's pasted image markup */}
                   <div
+                    data-private
                     ref={clipboardPasteRef}
                     contentEditable={!busy}
                     suppressContentEditableWarning

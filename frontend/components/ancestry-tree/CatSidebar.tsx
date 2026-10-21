@@ -84,6 +84,7 @@ export function CatSidebar({
             <div className="relative overflow-hidden rounded-xl bg-black/30 shadow-xl">
               {previewUrl ? (
                 <Image
+                  data-private
                   src={previewUrl}
                   alt={cat.name.full}
                   width={200}

@@ -74,6 +74,7 @@
       "!out",
       "!build",
       "!test-results",
+      "!tests/telemetry/fixtures",
       "!drizzle/meta",
       "!public/**/*.json",
       "!lib/cat-system/generated",

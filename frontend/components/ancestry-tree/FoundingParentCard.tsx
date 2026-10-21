@@ -46,6 +46,7 @@ export function FoundingParentCard({
   } else if (params && previewUrl) {
     preview = (
       <Image
+        data-private
         src={previewUrl}
         alt={name?.full ?? (gender === "F" ? "Mother" : "Father")}
         width={192}

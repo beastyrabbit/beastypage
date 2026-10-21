@@ -281,6 +281,7 @@ export function AncestryTreeViewClient({
               </h2>
               <div className="w-full overflow-hidden rounded-2xl border border-border/40 bg-background/80">
                 <Image
+                  data-private
                   src={focusedPreview.url}
                   alt={focusedPreview.label}
                   width={1080}
@@ -321,6 +322,7 @@ function CatCard({ cat, onPreview }: Readonly<CatCardProps>) {
         className="relative aspect-square w-full overflow-hidden rounded-lg border border-border/30 bg-background transition hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/40"
       >
         <Image
+          data-private
           src={cat.previewUrl}
           alt={displayName}
           width={200}

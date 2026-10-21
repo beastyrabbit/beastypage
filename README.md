@@ -88,9 +88,20 @@ uv run uvicorn renderer_service.app.main:app --reload --port 8001
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog analytics key (optional) |
-| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog host URL (optional) |
+| `NEXT_PUBLIC_UMAMI_HOST` | Self-hosted Umami base URL |
+| `NEXT_PUBLIC_UMAMI_WEBSITE_ID` | Umami website identifier |
+| `NEXT_PUBLIC_UMAMI_DOMAINS` | Comma-separated allowed analytics hostnames |
+| `NEXT_PUBLIC_GLITCHTIP_DSN` | GlitchTip public ingestion DSN |
+| `NEXT_PUBLIC_APP_ENV` | `production` for version tags, `ci` otherwise; unset locally |
+| `NEXT_PUBLIC_APP_VERSION` | Derived from `APP_VERSION`; release is `beastypage@${APP_VERSION}` |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser key |
+
+Analytics is opt-in through the cookie banner, including masked replay and
+heatmaps. Error tracking uses GlitchTip without browser storage or user identity.
+Both run only in production builds. Tag builds receive `SENTRY_AUTH_TOKEN` only
+through a BuildKit secret for debug-ID artifact-bundle source-map uploads; maps
+are deleted before packaging. See [frontend telemetry documentation](frontend/README.md)
+for settings, privacy placeholders and the isolated `pnpm test:telemetry` check.
 
 ### Quick Share worker
 
