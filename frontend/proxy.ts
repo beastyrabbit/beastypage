@@ -9,10 +9,15 @@ const DEFAULT_REDIRECT = normalizeRoute(process.env.NEXT_ENTRY_REDIRECT);
 const HOST_ROUTE_MAP = parseHostMap(process.env.NEXT_ENTRY_HOST_MAP);
 const RETRY_AFTER_SECONDS = "60";
 
+const isContactApiPath = (pathname: string) =>
+  pathname === "/api/kontakt" || pathname === "/api/kontakt/";
+
 const isMaintenanceWrite = (request: NextRequest): boolean => {
   if (process.env.MAINTENANCE_MODE !== "1") return false;
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return false;
   const { pathname } = request.nextUrl;
+  // Contact mail does not use the database and remains available during maintenance.
+  if (isContactApiPath(pathname)) return false;
   if (!(pathname.startsWith("/api/") || pathname.startsWith("/i/api/"))) {
     return false;
   }
@@ -87,6 +92,8 @@ export function routeRequest(request: NextRequest) {
 const withClerk = clerkMiddleware((_auth, request) => routeRequest(request));
 
 export function proxy(request: NextRequest, event: NextFetchEvent) {
+  // Anonymous contact mail needs neither a Clerk session nor its auth service.
+  if (isContactApiPath(request.nextUrl.pathname)) return routeRequest(request);
   return withClerk(request, event);
 }
 
