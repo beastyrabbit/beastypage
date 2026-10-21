@@ -1,10 +1,27 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
 import * as Sentry from "@sentry/node";
+import { test } from "vitest";
 import { initMonitoring } from "./monitoring.ts";
 import { scrubTelemetry } from "./privacy.ts";
 
 const discordToken = `${"A".repeat(24)}.abcdef.${"B".repeat(32)}`;
+
+test("preserves email and bearer matching, including long invalid addresses", () => {
+  for (const [input, expected] of [
+    ["a+b%tag@sub.example.COM_ending", "[Filtered]_ending"],
+    ["a@b.co@c.de", "[Filtered]@c.de"],
+    ["a@b@c.de", "a@[Filtered]"],
+    ["a@b.c a@.co", "a@b.c a@.co"],
+    ["a@b..co", "[Filtered]"],
+    ["a@b.co.more123", "[Filtered]123"],
+    ["first@site.test, second@other.test", "[Filtered], [Filtered]"],
+    ["BEARER aZ09._~+/=-", "Bearer [Filtered]"],
+    ["a".repeat(50_000), "a".repeat(50_000)],
+    [`a@${"b.".repeat(25_000)}c`, `a@${"b.".repeat(25_000)}c`],
+  ])
+    assert.equal(scrubTelemetry(input), expected);
+});
+
 test("keeps only outbound origins in fake transport envelopes", async () => {
   const envelopes: Array<[unknown, Array<[{ type: string }, unknown]>]> = [];
   initMonitoring(
