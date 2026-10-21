@@ -6,8 +6,16 @@ const sensitiveKey =
 export function scrubUrl(value: string, excludeSearch = false): string {
   try {
     const relative = value.startsWith("/");
-    const url = new URL(value, "https://telemetry.invalid");
+    const siteOrigin = new URL(
+      typeof window === "undefined"
+        ? (process.env.NEXT_PUBLIC_SITE_URL ??
+            process.env.NEXT_PUBLIC_APP_URL ??
+            "https://telemetry.invalid")
+        : window.location.origin,
+    ).origin;
+    const url = new URL(value, siteOrigin);
     if (!["http:", "https:"].includes(url.protocol)) return REDACTED;
+    if (url.origin !== siteOrigin) return `${url.origin}/${REDACTED}`;
     url.username = "";
     url.password = "";
     url.hash = "";

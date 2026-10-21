@@ -1,3 +1,4 @@
+// @vitest-environment-options {"url":"https://site.test/"}
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { track } from "@/lib/analytics";
 import { scrubTelemetry as scrubBot } from "../../../backend/discord-bot/src/privacy";
@@ -39,7 +40,7 @@ describe("consent-gated Umami", () => {
     enabled: true,
     host: "https://analytics.test",
     websiteId: "test",
-    domains: "localhost",
+    domains: "site.test",
   };
   it("loads nothing before consent, loads both scripts after consent, and tears down on withdrawal", () => {
     const reload = vi.fn();
@@ -51,7 +52,7 @@ describe("consent-gated Umami", () => {
     expect(script.src).toBe("https://analytics.test/script.js");
     expect(script.dataset.excludeSearch).toBe("true");
     expect(script.dataset.excludeHash).toBe("true");
-    expect(script.dataset.domains).toBe("localhost");
+    expect(script.dataset.domains).toBe("site.test");
     script.dispatchEvent(new Event("load"));
     expect(document.scripts[1].src).toBe("https://analytics.test/recorder.js");
     update(true);
@@ -318,6 +319,69 @@ describe("typed track", () => {
 });
 
 describe("event scrubber", () => {
+  it("keeps only origins for cross-origin fetch breadcrumbs and client spans", () => {
+    const url =
+      "https://cdn.discordapp.com/attachments/1/2/x.png?ex=a&is=b&hm=c#private-fragment";
+    const filtered = "https://cdn.discordapp.com/[Filtered]";
+    const result = scrubEvent({
+      breadcrumbs: [
+        { category: "fetch", message: `GET ${url}`, data: { url } },
+      ],
+      spans: [
+        {
+          description: `GET ${url}`,
+          data: {
+            url,
+            "url.full": url,
+            "http.url": url,
+            "server.address": url,
+          },
+        },
+      ],
+    });
+    expect(result.breadcrumbs[0].data.url).toBe(filtered);
+    expect(result.breadcrumbs[0].message).toBe(`GET ${filtered}`);
+    expect(result.spans[0].description).toBe(`GET ${filtered}`);
+    expect(Object.values(result.spans[0].data)).toEqual(
+      Array(4).fill(filtered),
+    );
+    expect(scrubUrl("//cdn.discordapp.com/attachments/private?ex=a")).toBe(
+      filtered,
+    );
+    for (const secret of [
+      "/attachments",
+      "ex=a",
+      "is=b",
+      "hm=c",
+      "private-fragment",
+    ])
+      expect(JSON.stringify(result)).not.toContain(secret);
+    expect(scrubUrl("https://site.test/projects?safe=yes")).toBe(
+      "https://site.test/projects?safe=yes",
+    );
+    expect(
+      scrubEvent({ url: "https://site.test/projects?safe=yes#hash" }).url,
+    ).toBe("https://site.test/projects");
+    expect(scrubUrl("/projects?safe=yes")).toBe("/projects?safe=yes");
+  });
+
+  it("uses the configured site origin without a browser", () => {
+    vi.stubGlobal("window", undefined);
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://site.test");
+    try {
+      expect(
+        scrubEvent({ url: "https://site.test/projects?safe=yes" }).url,
+      ).toBe("https://site.test/projects");
+      expect(
+        scrubEvent({
+          url: "https://cdn.discordapp.com/attachments/private?ex=a",
+        }).url,
+      ).toBe("https://cdn.discordapp.com/[Filtered]");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it.each([scrubText, scrubBot, scrubImage, scrubMedia])(
     "preserves email and bearer matching across scrubbers, including long invalid addresses",
     (scrub) => {

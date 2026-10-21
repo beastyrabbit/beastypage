@@ -28,9 +28,19 @@ function scrubEmails(value: string): string {
   return chunks.join("") + value.slice(copiedThrough);
 }
 
+function scrubAbsoluteUrl(value: string): string {
+  try {
+    return `${new URL(value).origin}/${REDACTED}`;
+  } catch {
+    return REDACTED;
+  }
+}
+
 function text(value: string): string {
   return scrubEmails(
     value
+      // Outbound paths and even innocently named query values can be capabilities.
+      .replace(/https?:\/\/[^\s<>"']+/gi, scrubAbsoluteUrl)
       .replace(/(https?:\/\/)[^/@\s]+@/gi, "$1[Filtered]@")
       .replace(/\bBearer\s+[A-Z0-9._~+/=-]+/gi, "Bearer [Filtered]")
       .replace(

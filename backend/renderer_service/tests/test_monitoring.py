@@ -15,7 +15,7 @@ def test_scrubber_removes_request_secrets_and_preserves_input():
     discord_token = f"{'A' * 24}.abcdef.{'B' * 32}"
     event = {
         "request": {
-            "url": "https://example.test/?%74oken=private-token&edit=private-edit&ok=1",
+            "url": "/?%74oken=private-token&edit=private-edit&ok=1",
             "headers": {
                 "Authorization": "private-auth",
                 "Cookie": "private-cookie",
@@ -142,10 +142,25 @@ def test_sdk_reports_exceptions_5xx_and_transactions_through_fake_transport(
                 )
                 assert http.get("/unavailable").status_code == 503
 
+            url = (
+                "https://cdn.discordapp.com/attachments/1/2/x.png"
+                "?ex=a&is=b&hm=c#private-fragment"
+            )
+            filtered = "https://cdn.discordapp.com/[Filtered]"
+            sentry_sdk.add_breadcrumb(
+                category="http", message=f"GET {url}", data={"url": url}
+            )
             with sentry_sdk.start_transaction(
                 name="test /?token=private-token", sampled=True
             ):
-                pass
+                with sentry_sdk.start_span(
+                    op="http.client", description=f"GET {url}"
+                ) as span:
+                    for key in ["url", "url.full", "http.url", "server.address"]:
+                        span.set_data(key, url)
+            sentry_sdk.capture_event(
+                {"message": f"Download {url}", "request": {"url": url}}
+            )
             sentry_sdk.flush(timeout=2)
             events = [
                 item.payload.json
@@ -161,6 +176,25 @@ def test_sdk_reports_exceptions_5xx_and_transactions_through_fake_transport(
             ]
             assert len(events) >= 2
             assert transactions
+            outbound = next(
+                event
+                for event in transactions
+                if event["transaction"].startswith("test ")
+            )
+            span = outbound["spans"][0]
+            assert span["description"] == f"GET {filtered}"
+            for key in ["url", "url.full", "http.url", "server.address"]:
+                assert span["data"][key] == filtered
+            download = next(
+                event
+                for event in events
+                if event.get("message", "").startswith("Download ")
+            )
+            assert download["message"] == f"Download {filtered}"
+            assert download["request"]["url"] == filtered
+            breadcrumb = download["breadcrumbs"]["values"][-1]
+            assert breadcrumb["data"]["url"] == filtered
+            assert breadcrumb["message"] == f"GET {filtered}"
             for event in events + transactions:
                 assert event["release"] == "beastypage@v10.0.0"
                 assert event["environment"] == "production"
@@ -170,6 +204,8 @@ def test_sdk_reports_exceptions_5xx_and_transactions_through_fake_transport(
             )
             assert "person@example.test" not in encoded
             assert "private-" not in encoded
+            for forbidden in ["/attachments", "ex=a", "is=b", "hm=c"]:
+                assert forbidden not in encoded
         finally:
             client.close(timeout=2)
             sentry_sdk.get_global_scope().set_client(previous)

@@ -2,7 +2,7 @@
 
 import re
 from typing import Any
-from urllib.parse import unquote_plus
+from urllib.parse import unquote_plus, urlsplit
 
 _REDACTED = "[Filtered]"
 _SECRET = re.compile(
@@ -40,7 +40,24 @@ def _scrub_emails(value: str) -> str:
     return "".join(chunks) + value[copied_through:]
 
 
+def _scrub_absolute_url(match: re.Match) -> str:
+    try:
+        url = urlsplit(match[0])
+        host = url.hostname
+        if not host:
+            return _REDACTED
+        if ":" in host:
+            host = f"[{host}]"
+        if url.port is not None:
+            host = f"{host}:{url.port}"
+        return f"{url.scheme}://{host}/{_REDACTED}"
+    except ValueError:
+        return _REDACTED
+
+
 def _text(value: str) -> str:
+    # Paths and arbitrary query values can carry replayable capabilities.
+    value = re.sub(r"https?://[^\s<>\"']+", _scrub_absolute_url, value, flags=re.I)
     value = re.sub(r"(https?://)[^/@\s]+@", r"\1[Filtered]@", value, flags=re.I)
     value = re.sub(
         r"\bBearer\s+[A-Z0-9._~+/=-]+", "Bearer [Filtered]", value, flags=re.I

@@ -60,6 +60,11 @@ async function stubServices(page: Page) {
     // Existing OBS themes request optional font CSS; keep this test offline too.
     if (url.hostname === "fonts.googleapis.com")
       return route.fulfill({ contentType: "text/css", body: "" });
+    if (url.hostname === "cdn.discordapp.com")
+      return route.fulfill({
+        body: "offline media fixture",
+        headers: { "access-control-allow-origin": "*" },
+      });
     if (
       url.hostname === "localhost" &&
       url.pathname.includes("/api/1/envelope")
@@ -316,9 +321,12 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
   // SDK is intentionally loaded after hydration. Wait for its own transport
   // by throwing a real asynchronous error; no debug endpoint exists in the app.
   await page.evaluate(() =>
-    setTimeout(() => {
+    setTimeout(async () => {
+      await fetch(
+        "https://cdn.discordapp.com/attachments/1/2/x.png?ex=a&is=b&hm=c",
+      );
       throw new Error(
-        "Telemetry test person@example.com Bearer private-bearer https://site.test/?token=private-token",
+        "Telemetry test person@example.com Bearer private-bearer https://site.test/?token=private-token GET https://cdn.discordapp.com/attachments/1/2/x.png?ex=a&is=b&hm=c",
       );
     }, 1500),
   );
@@ -338,6 +346,9 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
   expect(error).not.toContain("person@example.com");
   expect(error).not.toContain("private-bearer");
   expect(error).not.toContain("private-token");
+  expect(error).toContain("https://cdn.discordapp.com/[Filtered]");
+  for (const fragment of ["/attachments", "ex=a", "is=b", "hm=c"])
+    expect(error).not.toContain(fragment);
   await page.evaluate(() => {
     console.error("Telemetry console fixture person@example.com");
     void Promise.reject(

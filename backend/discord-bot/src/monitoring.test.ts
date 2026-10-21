@@ -6,6 +6,103 @@ import { initMonitoring } from "./monitoring.js";
 import { scrubTelemetry } from "./privacy.js";
 
 const discordToken = `${"A".repeat(24)}.abcdef.${"B".repeat(32)}`;
+test("keeps only outbound origins in fake transport envelopes", async () => {
+  const envelopes: Array<[unknown, Array<[{ type: string }, unknown]>]> = [];
+  initMonitoring(
+    { GLITCHTIP_DSN: "https://public@example.test/1" },
+    Sentry,
+    () => ({
+      send: async (envelope) => {
+        envelopes.push(envelope);
+        return { statusCode: 200 };
+      },
+      flush: async () => true,
+    }),
+  );
+  const client = Sentry.getClient();
+  const urls = [
+    "https://cdn.discordapp.com/attachments/1/2/x.png?ex=a&is=b&hm=c#private-fragment",
+    "https://discord.com/api/webhooks/123/TOKEN",
+  ];
+  try {
+    for (const url of urls) {
+      Sentry.getIsolationScope().clearBreadcrumbs();
+      Sentry.addBreadcrumb({
+        category: "http",
+        message: `GET ${url}`,
+        data: { url },
+      });
+      Sentry.captureEvent({
+        type: "transaction",
+        transaction: "POST /i/api/imports",
+        start_timestamp: 1,
+        timestamp: 2,
+        request: { url },
+        message: `Download ${url}`,
+        contexts: {
+          trace: {
+            trace_id: "11111111111111111111111111111111",
+            span_id: "2222222222222222",
+            op: "http.server",
+          },
+        },
+        spans: [
+          {
+            trace_id: "11111111111111111111111111111111",
+            span_id: "3333333333333333",
+            start_timestamp: 1,
+            timestamp: 2,
+            op: "http.client",
+            status: "ok",
+            description: `GET ${url}`,
+            data: {
+              url,
+              "url.full": url,
+              "http.url": url,
+              "server.address": url,
+            },
+          },
+        ],
+      });
+    }
+    assert.equal(await Sentry.flush(2000), true);
+    const transactions = envelopes
+      .flatMap((envelope) => envelope[1])
+      .filter(([header]) => header.type === "transaction")
+      .map(([, item]) => item as Sentry.Event);
+    assert.equal(transactions.length, urls.length);
+    for (const [index, transaction] of transactions.entries()) {
+      const url = urls[index];
+      assert.ok(url);
+      const filtered = `${new URL(url).origin}/[Filtered]`;
+      assert.equal(transaction.request?.url, filtered);
+      assert.equal(transaction.message, `Download ${filtered}`);
+      assert.equal(transaction.breadcrumbs?.[0]?.data?.url, filtered);
+      assert.equal(transaction.breadcrumbs?.[0]?.message, `GET ${filtered}`);
+      assert.equal(transaction.spans?.[0]?.description, `GET ${filtered}`);
+      assert.deepEqual(transaction.spans?.[0]?.data, {
+        url: filtered,
+        "url.full": filtered,
+        "http.url": filtered,
+        "server.address": filtered,
+      });
+    }
+    const encoded = JSON.stringify(envelopes);
+    for (const forbidden of [
+      "/attachments",
+      "/api/webhooks",
+      "TOKEN",
+      "ex=a",
+      "is=b",
+      "hm=c",
+      "private-fragment",
+    ])
+      assert.ok(!encoded.includes(forbidden), forbidden);
+  } finally {
+    Sentry.getIsolationScope().clearBreadcrumbs();
+    await client?.close(2000);
+  }
+});
 
 test("survives an unhandled rejection without a DSN and logs it once", () => {
   const child = spawnSync(
@@ -75,7 +172,7 @@ test("compiled error stacks resolve to TypeScript sources", () => {
 test("scrubs nested events, breadcrumbs and transaction data without mutation", () => {
   const input = {
     request: {
-      url: "https://example.test/path?%74oken=private-token&edit=private-edit&safe=yes",
+      url: "/path?%74oken=private-token&edit=private-edit&safe=yes",
       headers: {
         Authorization: "private-auth",
         Cookie: "private-cookie",
@@ -158,8 +255,8 @@ test("redacts secret query keys in strings, maps and pairs", () => {
     "imageUrl",
   ]) {
     assert.equal(
-      scrubTelemetry(`https://example.test/?${key}=private-value&ok=1`),
-      `https://example.test/?${key}=[Filtered]&ok=1`,
+      scrubTelemetry(`/?${key}=private-value&ok=1`),
+      `/?${key}=[Filtered]&ok=1`,
     );
     assert.equal(
       scrubTelemetry({
@@ -326,7 +423,7 @@ test("keeps capability URLs out of encoded transaction envelopes", async () => {
       Sentry.addBreadcrumb(breadcrumb);
       assert.equal(
         Sentry.getIsolationScope().getScopeData().breadcrumbs[0]?.data?.url,
-        `${origin}/i/[Filtered]`,
+        origin ? `${origin}/[Filtered]` : "/i/[Filtered]",
       );
       Sentry.captureEvent({
         type: "transaction",
@@ -390,7 +487,7 @@ test("keeps capability URLs out of encoded transaction envelopes", async () => {
     assert.equal(transactions.length, 2);
     for (const [index, transaction] of transactions.entries()) {
       const origin = index === 0 ? "" : "https://example.test";
-      const filtered = `${origin}/i/[Filtered]`;
+      const filtered = origin ? `${origin}/[Filtered]` : "/i/[Filtered]";
       assert.equal(transaction.transaction, "GET /i/[Filtered]");
       assert.equal(transaction.request?.url, filtered);
       assert.equal(transaction.message, `Could not fetch ${filtered}`);
@@ -398,7 +495,10 @@ test("keeps capability URLs out of encoded transaction envelopes", async () => {
       assert.equal(span?.description, `GET ${filtered}`);
       assert.equal(span?.data?.["url.path"], "/i/[Filtered]");
       assert.equal(span?.data?.["safe.path"], "/info");
-      assert.equal(span?.data?.["safe.url"], `${origin}/images`);
+      assert.equal(
+        span?.data?.["safe.url"],
+        origin ? `${origin}/[Filtered]` : "/images",
+      );
       assert.equal(transaction.breadcrumbs?.[0]?.data?.url, filtered);
     }
     const encoded = JSON.stringify(envelopes);

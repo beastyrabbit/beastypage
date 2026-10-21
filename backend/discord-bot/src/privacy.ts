@@ -30,9 +30,19 @@ function scrubEmails(value: string): string {
   return chunks.join("") + value.slice(copiedThrough);
 }
 
+function scrubAbsoluteUrl(value: string): string {
+  try {
+    return `${new URL(value).origin}/${REDACTED}`;
+  } catch {
+    return REDACTED;
+  }
+}
+
 function text(value: string): string {
   return scrubEmails(
     value
+      // Outbound paths and even innocently named query values can be capabilities.
+      .replace(/https?:\/\/[^\s<>"']+/gi, scrubAbsoluteUrl)
       // Include outgoing Discord capability URLs as well as shared frontend links.
       // Each fixed prefix consumes its full suffix without overlapping quantifiers.
       .replace(
