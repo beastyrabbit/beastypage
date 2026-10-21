@@ -7,6 +7,17 @@ import {
 } from "../api";
 import { MODE_OPTIONS } from "../types";
 
+const naming = vi.hoisted(() => ({
+  imported: vi.fn(),
+  fetchColorName: vi.fn(() => {
+    throw new Error("Scheme generation must not resolve unused color names");
+  }),
+}));
+vi.mock("../../color-extraction/color-names", () => {
+  naming.imported();
+  return { fetchColorName: naming.fetchColorName };
+});
+
 describe("local color schemes", () => {
   const fetchSpy = vi.fn(() => {
     throw new Error("Scheme generation must not use the network");
@@ -14,35 +25,52 @@ describe("local color schemes", () => {
   beforeEach(() => vi.stubGlobal("fetch", fetchSpy));
   afterEach(() => {
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(naming.imported).not.toHaveBeenCalled();
+    expect(naming.fetchColorName).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
   it.each(MODE_OPTIONS)(
-    "generates valid, named, deterministic $key palettes at every size",
-    async ({ key }) => {
+    "generates valid, deterministic $key palettes at every size",
+    ({ key }) => {
       for (let count = 1; count <= 12; count++) {
-        const scheme = await generateColorScheme("#D65353", key, count);
+        const scheme = generateColorScheme("#D65353", key, count);
         expect(scheme).toHaveLength(count);
-        expect(scheme).toEqual(await generateColorScheme("d65353", key, count));
-        for (const { hex, name } of scheme) {
+        expect(scheme).toEqual(generateColorScheme("d65353", key, count));
+        for (const hex of scheme) {
           expect(hex).toMatch(/^#[\dA-F]{6}$/);
-          expect(name).not.toBe("Unknown");
-          expect(name.length).toBeGreaterThan(0);
         }
-        if (count > 1)
-          expect(new Set(scheme.map((c) => c.hex)).size).toBe(count);
+        if (count > 1) expect(new Set(scheme).size).toBe(count);
       }
     },
   );
 
-  it.each(["000000", "FFFFFF", "808080"])(
-    "handles achromatic seed %s in every mode",
-    async (seed) => {
+  it.each(["F5F0F0", "0A0505", "FFFFFF", "000000", "808080"])(
+    "produces 12 distinct swatches for seed %s in every mode",
+    (seed) => {
       for (const { key } of MODE_OPTIONS) {
-        const scheme = await generateColorScheme(seed, key, 12);
+        const scheme = generateColorScheme(seed, key, 12);
         expect(scheme).toHaveLength(12);
-        for (const color of scheme) expect(color.hex).toMatch(/^#[\dA-F]{6}$/);
+        expect(new Set(scheme).size, key).toBe(12);
+        for (const hex of scheme) expect(hex).toMatch(/^#[\dA-F]{6}$/);
+      }
+    },
+  );
+
+  it.each(["FFFFFF", "000000", "808080"])(
+    "keeps neutral seed %s achromatic in every mode and size",
+    (seed) => {
+      for (const { key } of MODE_OPTIONS) {
+        for (let count = 1; count <= 12; count++) {
+          const scheme = generateColorScheme(seed, key, count);
+          expect(new Set(scheme).size, `${key}/${count}`).toBe(count);
+          for (const hex of scheme) {
+            const { r, g, b } = hexToRgb(hex);
+            expect(r).toBe(g);
+            expect(g).toBe(b);
+          }
+        }
       }
     },
   );
@@ -53,18 +81,18 @@ describe("local color schemes", () => {
     ["quad", [0, 90, 180, 270]],
     ["analogic", [330, 0, 30]],
     ["analogic-complement", [330, 0, 30, 150, 180, 210]],
-  ] as const)("rotates %s hues by the expected angles", async (mode, hues) => {
-    const scheme = await generateColorScheme("FF0000", mode, hues.length);
-    expect(scheme.map((c) => rgbToHsl(hexToRgb(c.hex)).h)).toEqual(hues);
+  ] as const)("rotates %s hues by the expected angles", (mode, hues) => {
+    const scheme = generateColorScheme("FF0000", mode, hues.length);
+    expect(scheme.map((hex) => rgbToHsl(hexToRgb(hex)).h)).toEqual(hues);
   });
 
-  it("produces darker and lighter monochrome ramps", async () => {
+  it("produces darker and lighter monochrome ramps", () => {
     for (const [mode, side] of [
       ["monochrome-dark", "dark"],
       ["monochrome-light", "light"],
     ] as const) {
-      const scheme = await generateColorScheme("FF0000", mode, 6);
-      const lightness = scheme.map((c) => rgbToHsl(hexToRgb(c.hex)).l);
+      const scheme = generateColorScheme("FF0000", mode, 6);
+      const lightness = scheme.map((hex) => rgbToHsl(hexToRgb(hex)).l);
       expect(lightness).toEqual([...lightness].sort((a, b) => a - b));
       for (const l of lightness) {
         if (side === "dark") expect(l).toBeLessThan(50);
@@ -73,26 +101,26 @@ describe("local color schemes", () => {
     }
   });
 
-  it.each(["square", "tetrad"])("retains the %s alias", async (mode) => {
-    expect(await generateColorScheme("336699", mode, 8)).toEqual(
-      await generateColorScheme("336699", "quad", 8),
+  it.each(["square", "tetrad"])("retains the %s alias", (mode) => {
+    expect(generateColorScheme("336699", mode, 8)).toEqual(
+      generateColorScheme("336699", "quad", 8),
     );
   });
 
   it.each([0, -1, 13, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
     "rejects invalid count %s",
-    async (count) => {
-      await expect(
-        generateColorScheme("336699", "triad", count),
-      ).rejects.toThrow(RangeError);
+    (count) => {
+      expect(() => generateColorScheme("336699", "triad", count)).toThrow(
+        RangeError,
+      );
     },
   );
 
-  it("rejects invalid seeds and unsupported modes", async () => {
-    await expect(generateColorScheme("invalid", "triad", 5)).rejects.toThrow(
+  it("rejects invalid seeds and unsupported modes", () => {
+    expect(() => generateColorScheme("invalid", "triad", 5)).toThrow(
       "Invalid hex",
     );
-    await expect(generateColorScheme("336699", "toString", 5)).rejects.toThrow(
+    expect(() => generateColorScheme("336699", "toString", 5)).toThrow(
       "Unknown harmony",
     );
   });
@@ -106,11 +134,17 @@ describe("local color schemes", () => {
       source: "local",
     });
     expect(palette.colors).toEqual(
-      (await generateColorScheme(palette.seed, "triad", 6)).map((c) => c.hex),
+      generateColorScheme(palette.seed, "triad", 6),
     );
     expect(palette.id).toEqual(expect.any(String));
     expect(palette.timestamp).toEqual(expect.any(Number));
     expect(palette.ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it("generates palettes without importing or calling the naming module", async () => {
+    await fetchPaletteFromAPI("analogic", 12);
+    expect(naming.imported).not.toHaveBeenCalled();
+    expect(naming.fetchColorName).not.toHaveBeenCalled();
   });
 
   it("can generate seeds across the full RGB range", () => {

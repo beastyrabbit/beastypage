@@ -1,4 +1,3 @@
-import { fetchColorName } from "../color-extraction/color-names";
 import {
   hexToRgb,
   hslToRgb,
@@ -21,12 +20,12 @@ const HUE_OFFSETS: Record<string, number[]> = {
   quad: [0, 90, 180, 270],
 };
 
-/** Deterministic local harmonies, with names resolved from the bundled dataset. */
-export async function generateColorScheme(
+/** Deterministic hex-only harmonies; callers can resolve names when displayed. */
+export function generateColorScheme(
   seed: string,
   mode: string,
   count: number,
-): Promise<{ hex: string; name: string }[]> {
+): string[] {
   if (!/^#?[\da-f]{6}$/i.test(seed)) throw new Error("Invalid hex seed");
   if (!Number.isInteger(count) || count < 1 || count > 12) {
     throw new RangeError("Palette size must be an integer between 1 and 12");
@@ -53,29 +52,33 @@ export async function generateColorScheme(
     maxLightness = Math.min(98, base.l + (100 - base.l) * 0.85);
   }
 
-  return Promise.all(
-    Array.from({ length: count }, async (_, index) => {
-      const hsl = { ...base };
-      if (monochrome && count > 1) {
-        hsl.l =
-          minLightness + ((maxLightness - minLightness) * index) / (count - 1);
-      } else if (offsets && count > 1) {
-        hsl.h = (base.h + offsets[index % offsets.length] + 360) % 360;
-        // Repeat each harmony's hue families with different lightness levels.
-        const levels = Math.ceil(count / offsets.length);
-        const shift =
-          levels > 1
-            ? (Math.floor(index / offsets.length) / (levels - 1) - 0.5) * 24
-            : 0;
-        hsl.l = Math.max(5, Math.min(95, base.l + shift));
-      }
-      const hex =
-        count === 1
-          ? `#${seed.replace(/^#/, "").toUpperCase()}`
-          : rgbToHex(hslToRgb(hsl)).toUpperCase();
-      return { hex, name: await fetchColorName(hex) };
-    }),
-  );
+  const levels = offsets ? Math.ceil(count / offsets.length) : 1;
+  const halfSpan = levels > 1 || base.s === 0 ? 12 : 0;
+  // Move the whole lightness range inside 5–95 instead of clipping its steps.
+  const center = Math.max(5 + halfSpan, Math.min(95 - halfSpan, base.l));
+
+  return Array.from({ length: count }, (_, index) => {
+    const hsl = { ...base };
+    if (monochrome && count > 1) {
+      hsl.l =
+        minLightness + ((maxLightness - minLightness) * index) / (count - 1);
+    } else if (base.s === 0 && count > 1) {
+      // Neutral seeds have no hue families. A gray ramp keeps 1–12 swatches
+      // distinct, including black and white, without adding saturation.
+      hsl.l = center - halfSpan + (2 * halfSpan * index) / (count - 1);
+    } else if (offsets && count > 1) {
+      hsl.h = (base.h + offsets[index % offsets.length] + 360) % 360;
+      // Repeat each harmony's hue families with different lightness levels.
+      const shift =
+        levels > 1
+          ? (Math.floor(index / offsets.length) / (levels - 1) - 0.5) * 24
+          : 0;
+      hsl.l = center + shift;
+    }
+    return count === 1
+      ? `#${seed.replace(/^#/, "").toUpperCase()}`
+      : rgbToHex(hslToRgb(hsl)).toUpperCase();
+  });
 }
 
 /** Keep the existing async entry point for the generator UI. */
@@ -85,12 +88,12 @@ export async function fetchPaletteFromAPI(
 ): Promise<GeneratedPalette> {
   const seed = randomHexSeed();
   const started = performance.now();
-  const scheme = await generateColorScheme(seed, mode, count);
+  const colors = generateColorScheme(seed, mode, count);
   return {
     id: crypto.randomUUID(),
     seed,
     mode,
-    colors: scheme.map(({ hex }) => hex),
+    colors,
     ms: Math.round(performance.now() - started),
     source: "local",
     timestamp: Date.now(),
