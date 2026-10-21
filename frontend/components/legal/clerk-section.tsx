@@ -1,3 +1,4 @@
+import { LegalEmail } from "./operator-contact";
 import { PrivacySection, type PrivacySectionProps } from "./privacy-section";
 
 export function ClerkSection({ lang, number }: PrivacySectionProps) {
@@ -20,7 +21,11 @@ export function ClerkSection({ lang, number }: PrivacySectionProps) {
           </p>
           <p>
             {
-              "Kontodaten werden gespeichert, solange das Konto besteht. Sie können das Konto in den Kontoeinstellungen selbst löschen oder die Löschung anfordern. Clerk speichert Protokolle je nach Tarif einen, sieben oder 30 Tage. Cookies und Browser-Speicher sind in Abschnitt 16 beschrieben. Details: "
+              "Kontodaten werden gespeichert, solange das Konto besteht. Sie können die Löschung unter "
+            }
+            <LegalEmail kind="privacy" />
+            {
+              " anfordern. Dann werden sowohl das Clerk-Konto als auch die bei BeastyPage gespeicherten Daten gelöscht. Clerk speichert Protokolle je nach Tarif einen, sieben oder 30 Tage. Cookies und Browser-Speicher sind in Abschnitt 16 beschrieben. Details: "
             }
             <a href="https://clerk.com/legal/privacy">
               {"Datenschutzerklärung von Clerk"}
@@ -51,7 +56,11 @@ export function ClerkSection({ lang, number }: PrivacySectionProps) {
           </p>
           <p>
             {
-              "Account data is stored for as long as the account exists. You can delete your account in account settings or request deletion. Clerk retains logs for one, seven or 30 days depending on the plan. Cookies and browser storage are described in section 16. Details: "
+              "Account data is stored for as long as the account exists. You can request deletion at "
+            }
+            <LegalEmail kind="privacy" />
+            {
+              ". Both the Clerk account and the data stored in BeastyPage are then deleted. Clerk retains logs for one, seven or 30 days depending on the plan. Cookies and browser storage are described in section 16. Details: "
             }
             <a href="https://clerk.com/legal/privacy">
               {"Clerk privacy policy"}

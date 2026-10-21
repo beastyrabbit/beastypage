@@ -77,6 +77,11 @@ export function StorageSection({ lang, number }: PrivacySectionProps) {
   const fallbackDuration = de
     ? "sessionStorage: bis zum Schließen des Tabs; localStorage (Fallback): bis Sie die Browserdaten löschen"
     : "sessionStorage: until the tab is closed; localStorage (fallback): until you delete browser data";
+  const durations = {
+    localStorage: localDuration,
+    "sessionStorage (localStorage fallback)": fallbackDuration,
+    "localStorage / sessionStorage": bothDuration,
+  };
   const posthogPrefix = de ? "ph_<projekt>" : "ph_<project>";
   const rows = [
     [
@@ -112,11 +117,7 @@ export function StorageSection({ lang, number }: PrivacySectionProps) {
       `${name} (${storage})`,
       "BeastyPage",
       de ? purposeDe : purposeEn,
-      storage === "localStorage"
-        ? localDuration
-        : storage === "sessionStorage (localStorage fallback)"
-          ? fallbackDuration
-          : bothDuration,
+      durations[storage],
       necessary,
     ]),
   ];
@@ -133,6 +134,8 @@ export function StorageSection({ lang, number }: PrivacySectionProps) {
           : "The table below describes cookies and browser storage. BeastyPage's own entries are created only when you use the corresponding feature and are necessary for the function you request."}
       </p>
       <section
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to focus this region to scroll the wide table.
+        tabIndex={0}
         aria-label={
           de ? "Cookies und Browser-Speicher" : "Cookies and browser storage"
         }

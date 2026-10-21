@@ -1,17 +1,20 @@
 import type { ReactNode } from "react";
 import type { LegalLanguage } from "@/lib/legal/operator";
 
-export type PrivacySectionProps = { lang: LegalLanguage; number: number };
+export type PrivacySectionProps = Readonly<{
+  lang: LegalLanguage;
+  number: number;
+}>;
 
 export function PrivacySection({
   number,
   title,
   children,
-}: {
+}: Readonly<{
   number: number;
   title: string;
   children: ReactNode;
-}) {
+}>) {
   return (
     <section>
       <h2>

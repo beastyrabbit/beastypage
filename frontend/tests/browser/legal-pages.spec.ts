@@ -1,3 +1,4 @@
+// From frontend/: LEGAL_TEST_BASE_URL=http://localhost:3317 pnpm exec playwright test tests/browser/legal-pages.spec.ts --reporter=line --max-failures=1
 import { expect, test } from "@playwright/test";
 
 // Local production server only. No credentials, live providers, or database needed.
@@ -110,6 +111,7 @@ for (const width of [1280, 390]) {
           await expect(main.locator("h2")).toHaveCount(19);
           await expect(main.locator("table")).toHaveCount(1);
           const tableRegion = main.getByRole("region");
+          await expect(tableRegion).toHaveAttribute("tabindex", "0");
           if (width === 390) {
             expect(
               await tableRegion.evaluate(
@@ -158,26 +160,43 @@ for (const width of [1280, 390]) {
       });
     });
 
-    test("hides footer and legal links in the OBS scene", async ({ page }) => {
-      // A synthetic invalid key mounts the overlay's chrome-hiding effect;
-      // mock the stream endpoint so the test never needs a database or real key.
-      await page.route("**/api/**", (route) =>
-        route.fulfill({
-          status: 401,
-          json: { error: "Test overlay has no session" },
-        }),
-      );
-      await page.goto(
-        `${baseUrl}/single-cat-stream/obs?key=legal-test-no-session`,
-      );
-      await expect(page.locator("footer")).toBeHidden();
-      for (const [label] of routes)
-        await expect(
-          page
-            .locator("footer")
-            .getByRole("link", { name: label, exact: true }),
-        ).toBeHidden();
-    });
+    for (const javaScriptEnabled of [true, false]) {
+      test.describe(`OBS with JavaScript ${javaScriptEnabled}`, () => {
+        test.use({ javaScriptEnabled });
+        test("hides footer and legal links with and without a key", async ({
+          page,
+        }) => {
+          // Mock stream APIs so neither path needs a database or real key.
+          await page.route("**/api/**", (route) => {
+            const path = new URL(route.request().url()).pathname;
+            // A signed-out viewer and absent overlay session are nullable results,
+            // not errors that should trigger the app's error boundary.
+            if (path === "/api/users/viewer" || path === "/api/cat-stream")
+              return route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: "null",
+              });
+            return route.fulfill({
+              status: 401,
+              json: { error: "Test overlay has no session" },
+            });
+          });
+          for (const query of ["", "?key=legal-test-no-session"]) {
+            await page.goto(`${baseUrl}/single-cat-stream/obs${query}`);
+            await expect(page.locator("[data-obs-overlay]")).toHaveCount(1);
+            await expect(page.locator("footer")).toHaveCount(1);
+            await expect(page.locator("footer")).toBeHidden();
+            for (const [label] of routes)
+              await expect(
+                page
+                  .locator("footer")
+                  .getByRole("link", { name: label, exact: true }),
+              ).toBeHidden();
+          }
+        });
+      });
+    }
   });
 }
 

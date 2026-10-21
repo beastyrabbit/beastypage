@@ -1,5 +1,7 @@
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import DatenschutzPage, {
@@ -97,6 +99,36 @@ describe.each(pages)(
         ).toEqual(Array.from({ length: 19 }, (_, i) => i + 1));
         expect(doc.querySelectorAll("h3").length).toBeGreaterThanOrEqual(5);
         expect(doc.querySelectorAll("table tbody tr")).toHaveLength(13);
+        expect(
+          doc.querySelector('section[aria-label][tabindex="0"]'),
+        ).not.toBeNull();
+        const discord = Array.from(doc.querySelectorAll("p")).find((p) =>
+          p.textContent?.includes("/palette"),
+        );
+        expect(discord?.textContent).toContain(
+          lang === "de" ? "Nachrichten-Kontextmenü" : "message context menu",
+        );
+        expect(discord?.textContent).toContain(
+          lang === "de" ? "andere Personen" : "other people",
+        );
+        expect(discord?.textContent).toContain(
+          lang === "de"
+            ? "ohne automatische Ablaufzeit"
+            : "no automatic expiry",
+        );
+        expect(
+          discord?.querySelector(`a[href="mailto:${email}"]`),
+        ).not.toBeNull();
+        const clerk = doc.querySelectorAll("main > section")[6];
+        expect(clerk.textContent).not.toMatch(
+          /Kontoeinstellungen|account settings/,
+        );
+        expect(clerk.textContent).toContain(
+          lang === "de"
+            ? "Dann werden sowohl das Clerk-Konto als auch die bei BeastyPage gespeicherten Daten gelöscht."
+            : "Both the Clerk account and the data stored in BeastyPage are then deleted.",
+        );
+        expect(clerk.querySelector(`a[href="mailto:${email}"]`)).not.toBeNull();
         for (const key of [
           "catdex-upload:client-key",
           "classic-wheel:client-key",
@@ -194,20 +226,47 @@ it("groups all four internal footer links before the external links", () => {
     ["Legal notice", "/legal-notice", null],
     ["Privacy", "/privacy", null],
   ]);
+  for (const link of links.slice(0, 2)) expect(link.lang).toBe("de");
 });
 
 it("keeps the normal error inside the layout and supplies legal links for global errors", () => {
-  const reset = vi.fn();
+  const retry = vi.fn();
   const html = renderToStaticMarkup(
-    <ErrorPage error={new Error("private error")} reset={reset} />,
+    <ErrorPage error={new Error("private error")} retry={retry} />,
   );
   expect(html).toContain("Try again");
   expect(html).not.toMatch(/<html|<body|private error/);
   const globalHtml = renderToStaticMarkup(
-    <GlobalError error={new Error("private error")} reset={reset} />,
+    <GlobalError error={new Error("private error")} retry={retry} />,
   );
   expect(globalHtml).toContain('<html lang="en">');
   expect(globalHtml).not.toContain("private error");
   for (const { route } of pages)
     expect(globalHtml).toContain(`href="${route}"`);
+  const doc = new DOMParser().parseFromString(globalHtml, "text/html");
+  for (const path of ["/impressum", "/datenschutz"])
+    expect(doc.querySelector(`a[href="${path}"]`)?.getAttribute("lang")).toBe(
+      "de",
+    );
 });
+
+it.each([ErrorPage, GlobalError])(
+  "retries when the error button is clicked (%#)",
+  async (Page) => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    // GlobalError owns the document; render each boundary in a fresh document.
+    const doc = document.implementation.createHTMLDocument();
+    const root = createRoot(Page === GlobalError ? doc : doc.body);
+    const retry = vi.fn();
+    try {
+      await act(async () =>
+        root.render(<Page error={new Error("test")} retry={retry} />),
+      );
+      await act(async () => doc.querySelector("button")?.click());
+      expect(retry).toHaveBeenCalledOnce();
+    } finally {
+      await act(async () => root.unmount());
+      vi.unstubAllGlobals();
+    }
+  },
+);

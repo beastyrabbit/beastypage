@@ -25,7 +25,11 @@ export function AccountSection({ lang, number }: PrivacySectionProps) {
           </p>
           <p>
             {
-              "Beim Discord-Bot werden Ihre Discord-Nutzer-ID und Bot-Einstellungen verarbeitet. Über den Bot erzeugte Katzen werden mit Ihrem Discord-Anzeigenamen als öffentlichem Erstellernamen gespeichert. Discord betreibt seine Plattform eigenverantwortlich; Anbieter und Datenschutzhinweise stehen in Abschnitt 8."
+              "Beim Discord-Bot werden Ihre Discord-Nutzer-ID und Bot-Einstellungen verarbeitet. Über den Bot erzeugte Katzen werden mit Ihrem Discord-Anzeigenamen als öffentlichem Erstellernamen gespeichert. Der Befehl /palette, auch über das Nachrichten-Kontextmenü, lädt das ausgewählte Bild von der angegebenen URL oder aus einem Anhang oder eingebetteten Bild der gewählten Nachricht herunter. Das Bild kann andere Personen zeigen. Es wird zusammen mit der extrahierten Farbpalette auf eigener Infrastruktur des Verantwortlichen in Deutschland unter einem öffentlichen Link ohne automatische Ablaufzeit gespeichert. Die Löschung können Sie unter "
+            }
+            <LegalEmail kind="privacy" />
+            {
+              " anfordern. Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Discord betreibt seine Plattform eigenverantwortlich; Anbieter und Datenschutzhinweise stehen in Abschnitt 8."
             }
           </p>
           <p>
@@ -89,7 +93,11 @@ export function AccountSection({ lang, number }: PrivacySectionProps) {
           </p>
           <p>
             {
-              "The Discord bot processes your Discord user ID and bot preferences. Cats generated through the bot are saved with your Discord display name as the public creator name. Discord operates its platform under its own responsibility; provider details and privacy information are in section 8."
+              "The Discord bot processes your Discord user ID and bot preferences. Cats generated through the bot are saved with your Discord display name as the public creator name. The /palette command, including the message context menu, downloads the selected image from the supplied URL or an attachment or embedded image in the selected message. The image may show other people. It is stored together with the extracted palette on the controller's own infrastructure in Germany under a public link with no automatic expiry. You can request deletion at "
+            }
+            <LegalEmail kind="privacy" />
+            {
+              ". As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Discord operates its platform under its own responsibility; provider details and privacy information are in section 8."
             }
           </p>
           <p>
