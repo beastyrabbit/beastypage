@@ -10,6 +10,7 @@ export default function OBSOverlayLayout({
 }>) {
   return (
     <div
+      data-obs-overlay
       className="fixed left-0 top-0 z-[9999] overflow-hidden"
       style={
         {

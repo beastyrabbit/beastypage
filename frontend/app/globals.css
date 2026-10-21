@@ -6,6 +6,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+body:has([data-obs-overlay]) footer {
+  display: none;
+}
+
 /* Motion tokens. Registered in @theme so `motion-safe:` / `group-hover:`
    variants compile (classes in @layer utilities never get variants). */
 @theme {
