@@ -1,6 +1,6 @@
 const REDACTED = "[Filtered]";
 const SECRET =
-	/token|key|secret|password|auth|code|session|signature|sig|edit|email/i;
+	/token|key|secret|password|auth|code|session|signature|sig|edit|email|slug|grant|^q$/i;
 const OMIT =
 	/(^|\.)(authorization|proxy-authorization|cookie|set-cookie|cookies|body|requestbody|postdata|user)$/i;
 
@@ -31,6 +31,9 @@ function scrubEmails(value: string): string {
 function text(value: string): string {
 	return scrubEmails(
 		value
+			// Collapse the whole suffix, including collection items and API IDs.
+			// A fixed prefix and one terminal character class keep the scan linear.
+			.replace(/\/i\/[^\s?#"'<>]+/g, `/i/${REDACTED}`)
 			.replace(/(https?:\/\/)[^/@\s]+@/gi, "$1[Filtered]@")
 			.replace(/\bBearer\s+[A-Z0-9._~+/=-]+/gi, "Bearer [Filtered]")
 			.replace(

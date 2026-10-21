@@ -1,6 +1,6 @@
 const REDACTED = "[Filtered]";
 const SECRET =
-  /token|key|secret|password|auth|code|session|signature|sig|edit|email/i;
+  /token|key|secret|password|auth|code|session|signature|sig|edit|email|slug|share|imageurl/i;
 const IDENTITY =
   /^(discord)?(user(id|name)?|guild(id|name)?|member|interaction(id)?)$/i;
 const OMIT =
@@ -33,6 +33,12 @@ function scrubEmails(value: string): string {
 function text(value: string): string {
   return scrubEmails(
     value
+      // Include outgoing Discord capability URLs as well as shared frontend links.
+      // Each fixed prefix consumes its full suffix without overlapping quantifiers.
+      .replace(
+        /(\/(?:i|view|adoption|ancestry-tree|evolution|webhooks|interactions)\/)[^\s?#"'<>]+/g,
+        `$1${REDACTED}`,
+      )
       .replace(/(https?:\/\/)[^/@\s]+@/gi, "$1[Filtered]@")
       .replace(/\b\d{17,20}\b/g, REDACTED)
       .replace(/\bBearer\s+[A-Z0-9._~+/=-]+/gi, "Bearer [Filtered]")

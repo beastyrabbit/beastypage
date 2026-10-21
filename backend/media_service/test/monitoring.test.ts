@@ -86,6 +86,9 @@ test("redacts secret query keys in strings, maps and pairs", () => {
 		"signature",
 		"sig",
 		"edit",
+		"slug",
+		"grant",
+		"q",
 	]) {
 		assert.equal(
 			scrubTelemetry(`https://example.test/?${key}=private-value&ok=1`),
@@ -96,6 +99,22 @@ test("redacts secret query keys in strings, maps and pairs", () => {
 				request: { query_string: { [key]: "private-value", page: "2" } },
 			}).request.query_string[key],
 			"[Filtered]",
+		);
+	}
+});
+
+test("redacts signed admin URLs and keeps unrelated paths intact", () => {
+	assert.equal(
+		scrubTelemetry(
+			"https://example.test/i/api/admin/uploads/upload-id/preview?grant=private-grant&signature=private-signature",
+		),
+		"https://example.test/i/[Filtered]?grant=[Filtered]&signature=[Filtered]",
+	);
+	for (const path of ["/info", "/images"]) {
+		assert.equal(scrubTelemetry(path), path);
+		assert.equal(
+			scrubTelemetry(`https://example.test${path}`),
+			`https://example.test${path}`,
 		);
 	}
 });
@@ -225,6 +244,107 @@ test("configured SDK sends scrubbed errors and transactions through a fake trans
 		assert.ok(!encoded.includes("private-"));
 		assert.ok(!encoded.includes("person@example.test"));
 	} finally {
+		await client?.close(2000);
+	}
+});
+
+test("keeps capability URLs out of encoded transaction envelopes", async () => {
+	const envelopes: Array<[unknown, Array<[{ type: string }, unknown]>]> = [];
+	initMonitoring(
+		{ GLITCHTIP_DSN: "https://public@example.test/1" },
+		Sentry,
+		() => ({
+			send: async (envelope) => {
+				envelopes.push(envelope);
+				return { statusCode: 200 };
+			},
+			flush: async () => true,
+		}),
+	);
+	const client = Sentry.getClient();
+	const slug = "abcd1234";
+	try {
+		for (const origin of ["", "https://example.test"]) {
+			const path = `/i/${slug}/0`;
+			const url = `${origin}${path}`;
+			Sentry.getIsolationScope().clearBreadcrumbs();
+			const breadcrumb = {
+				message: `GET ${url}`,
+				data: { url },
+			};
+			Sentry.addBreadcrumb(breadcrumb);
+			assert.equal(
+				Sentry.getIsolationScope().getScopeData().breadcrumbs[0]?.data?.url,
+				`${origin}/i/[Filtered]`,
+			);
+			Sentry.captureEvent({
+				type: "transaction",
+				transaction: `GET /i/${slug}`,
+				start_timestamp: 1,
+				timestamp: 2,
+				request: { url },
+				breadcrumbs: [breadcrumb],
+				message: `Could not fetch ${url}`,
+				contexts: {
+					trace: {
+						trace_id: "11111111111111111111111111111111",
+						span_id: "2222222222222222",
+						op: "http.server",
+					},
+				},
+				spans: [
+					{
+						trace_id: "11111111111111111111111111111111",
+						span_id: "3333333333333333",
+						start_timestamp: 1,
+						timestamp: 2,
+						op: "http.client",
+						status: "ok",
+						description: `GET ${url}`,
+						data: {
+							url,
+							"url.full": url,
+							"url.path": path,
+							"http.target": path,
+							"http.url": url,
+							"http.route": path,
+							"safe.path": "/info",
+							"safe.url": `${origin}/images`,
+						},
+					},
+				],
+				sdkProcessingMetadata: {
+					dynamicSamplingContext: {
+						public_key: "public",
+						transaction: `GET ${url}`,
+					},
+				},
+			});
+		}
+		assert.equal(await Sentry.flush(2000), true);
+		const transactions = envelopes
+			.flatMap((envelope) => envelope[1])
+			.filter(([header]) => header.type === "transaction")
+			.map(([, item]) => item as Sentry.Event);
+		assert.equal(transactions.length, 2);
+		for (const [index, transaction] of transactions.entries()) {
+			const origin = index === 0 ? "" : "https://example.test";
+			const filtered = `${origin}/i/[Filtered]`;
+			assert.equal(transaction.transaction, "GET /i/[Filtered]");
+			assert.equal(transaction.request?.url, filtered);
+			assert.equal(transaction.message, `Could not fetch ${filtered}`);
+			const span = transaction.spans?.[0];
+			assert.equal(span?.description, `GET ${filtered}`);
+			assert.equal(span?.data?.["url.path"], "/i/[Filtered]");
+			assert.equal(span?.data?.["safe.path"], "/info");
+			assert.equal(span?.data?.["safe.url"], `${origin}/images`);
+			assert.equal(transaction.breadcrumbs?.[0]?.data?.url, filtered);
+		}
+		const encoded = JSON.stringify(envelopes);
+		assert.ok(encoded.includes("[Filtered]"));
+		assert.ok(!encoded.includes(slug));
+	} finally {
+		Sentry.getIsolationScope().clearBreadcrumbs();
 		await client?.close(2000);
 	}
 });
