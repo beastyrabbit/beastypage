@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LegalLinks } from "@/components/legal/legal-links";
 
 const FOOTER_LINKS = [
   { href: "https://github.com/BeastyTwitch", label: "GitHub" },
@@ -31,18 +32,21 @@ export function SiteFooter() {
           </span>
           {"."}
         </p>
-        <div className="flex flex-wrap items-center gap-4">
-          {FOOTER_LINKS.map(({ href, label }) => (
-            <Link
-              key={label}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link-underline hover:text-foreground"
-            >
-              {label}
-            </Link>
-          ))}
+        <div className="flex flex-col gap-4">
+          <LegalLinks />
+          <div className="flex flex-wrap items-center gap-4">
+            {FOOTER_LINKS.map(({ href, label }) => (
+              <Link
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-underline hover:text-foreground"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </footer>
