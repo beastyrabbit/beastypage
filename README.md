@@ -101,7 +101,8 @@ heatmaps. Error tracking uses GlitchTip without browser storage or user identity
 Both run only in production builds. Tag builds receive `SENTRY_AUTH_TOKEN` only
 through a BuildKit secret for debug-ID artifact-bundle source-map uploads; maps
 are deleted before packaging. See [frontend telemetry documentation](frontend/README.md)
-for settings, privacy placeholders and the isolated `pnpm test:telemetry` check.
+for settings, the cookie and storage inventory and the isolated `pnpm test:telemetry` check.
+The privacy policy lives at `/datenschutz` and `/privacy`.
 
 ### Quick Share worker
 
