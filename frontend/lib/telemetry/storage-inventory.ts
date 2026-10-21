@@ -30,7 +30,7 @@ function featureStorage(
   };
 }
 
-/** Shared by preferences, the privacy policy, and browser storage assertions. */
+/** Detailed declarations for consent preferences and browser storage assertions. */
 export const STORAGE_INVENTORY: StorageDeclaration[] = [
   {
     group: "consent",

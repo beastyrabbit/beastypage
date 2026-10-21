@@ -123,7 +123,7 @@ for (const width of [1280, 390]) {
           main.locator(`a[href="${counterpart}"]`).first(),
         ).toBeVisible();
         await expect(main).not.toContainText(
-          /impressum@heerlab\.com|datenschutz@heerlab\.com|Hetzner/i,
+          /impressum@heerlab\.com|datenschutz@heerlab\.com|Hetzner|PostHog|\[\[/i,
         );
         if (path === "/datenschutz" || path === "/privacy") {
           await expect(main.locator("h2")).toHaveCount(18);
@@ -134,20 +134,32 @@ for (const width of [1280, 390]) {
           ).toHaveText(["Clerk", "BeastyPage", "BeastyPage"]);
           await expect(main.locator("table")).toContainText("cc_cookie");
           await expect(main.locator("table")).toContainText("182");
-          await expect(main.locator("table")).toContainText(
-            "stream-viewer-session:fingerprint",
+          await expect(
+            main.locator("table tbody tr td:first-child"),
+          ).toHaveText(
+            lang === "de"
+              ? [
+                  "__client_uat… (Cookies), __clerk_environment (Browser-Speicher)",
+                  "cc_cookie (Cookie)",
+                  "localStorage und sessionStorage",
+                ]
+              : [
+                  "__client_uat… (cookies), __clerk_environment (browser storage)",
+                  "cc_cookie (cookie)",
+                  "localStorage and sessionStorage",
+                ],
           );
           const telemetry = main.locator(":scope > section").nth(8);
           await expect(telemetry.getByRole("heading")).toContainText("Umami");
           await expect(telemetry).toContainText("GlitchTip");
           await expect(telemetry).toContainText(TELEMETRY_RETENTION[lang]);
           await expect(telemetry).not.toContainText(
-            /OFFEN|PENDING|Standardaufbewahrung|default retention/,
+            /OFFEN|PENDING|Standardaufbewahrung|default retention|PostHog|\d+\s*%|umami\.disabled|sendDefaultPii|Breadcrumbs|IPv[46]|localStorage|sessionStorage|Discord-Bot|Pixelator/i,
           );
           await expect(telemetry).toContainText(
             lang === "de"
-              ? "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip nur in anonymisierter Form mit dem Fehlerbericht gespeichert. Dazu werden bei IPv4 die letzten 8 Bit und bei IPv6 die letzten 64 Bit auf null gesetzt."
-              : "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report only in anonymized form. The last 8 bits of IPv4 addresses and the last 64 bits of IPv6 addresses are set to zero.",
+              ? "Die IP-Adresse wird aus technischen Gründen übertragen und von GlitchTip nur in gekürzter, anonymisierter Form gespeichert."
+              : "The IP address is transmitted for technical reasons, and GlitchTip stores it only in shortened, anonymised form.",
           );
           await telemetry.screenshot({
             path: `../.playwright-mcp/legal-telemetry-${lang}-${width}.png`,

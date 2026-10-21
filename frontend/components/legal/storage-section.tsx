@@ -1,18 +1,10 @@
-import {
-  CONSENT_RETENTION_DAYS,
-  STORAGE_INVENTORY,
-} from "@/lib/telemetry/storage-inventory";
+import { CONSENT_RETENTION_DAYS } from "@/lib/telemetry/storage-inventory";
 import { PrivacySection, type PrivacySectionProps } from "./privacy-section";
-
-const storageNames = (group: "clerk" | "features") =>
-  STORAGE_INVENTORY.filter((item) => item.group === group)
-    .map((item) => item.name)
-    .join("; ");
 
 const storageRows = {
   de: [
     [
-      `${storageNames("clerk")} (Cookies und Browser-Speicher)`,
+      "__client_uat… (Cookies), __clerk_environment (Browser-Speicher)",
       "Clerk",
       "Anmeldung und Kontozugang",
       "Bis zu etwa 400 Tage",
@@ -26,7 +18,7 @@ const storageRows = {
       "Technisch notwendig, § 25 Abs. 2 Nr. 2 TDDDG",
     ],
     [
-      `${storageNames("features")} (localStorage und sessionStorage)`,
+      "localStorage und sessionStorage",
       "BeastyPage",
       "Gespeicherte Einstellungen, Bearbeitungsrechte, Upload-Belege und zufällige Kennungen für Limits; nur bei Nutzung der Funktion",
       "Bis Sie die Browserdaten löschen",
@@ -35,7 +27,7 @@ const storageRows = {
   ],
   en: [
     [
-      `${storageNames("clerk")} (cookies and browser storage)`,
+      "__client_uat… (cookies), __clerk_environment (browser storage)",
       "Clerk",
       "Sign-in and account access",
       "Up to about 400 days",
@@ -49,7 +41,7 @@ const storageRows = {
       "Technically necessary, Section 25(2) no. 2 TDDDG",
     ],
     [
-      `${storageNames("features")} (localStorage and sessionStorage)`,
+      "localStorage and sessionStorage",
       "BeastyPage",
       "Saved settings, edit rights, upload receipts and random IDs for limits; only when you use the feature",
       "Until you delete browser data",
@@ -115,8 +107,8 @@ export function StorageSection({ lang, number }: PrivacySectionProps) {
       </section>
       <p>
         {de
-          ? "Sie können Ihre Analyse-Einwilligung jederzeit über „Cookie settings“ im Footer ändern oder widerrufen (siehe Abschnitt 9). Umami und GlitchTip schreiben keine Cookies und keinen Browser-Speicher."
-          : 'You can change or withdraw your analytics consent at any time through "Cookie settings" in the footer (see section 9). Umami and GlitchTip write no cookies or browser storage.'}
+          ? "Sie können Ihre Analyse-Einwilligung jederzeit über „Cookie settings“ im Footer ändern oder widerrufen (siehe Abschnitt 9)."
+          : 'You can change or withdraw your analytics consent at any time through "Cookie settings" in the footer (see section 9).'}
       </p>
     </PrivacySection>
   );

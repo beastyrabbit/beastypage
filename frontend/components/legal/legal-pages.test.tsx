@@ -18,10 +18,7 @@ import LegalNoticePage, {
 import PrivacyPage, { metadata as privacyMetadata } from "@/app/privacy/page";
 import { TELEMETRY_RETENTION } from "@/components/legal/analytics-section";
 import { SiteFooter } from "@/components/site-footer";
-import {
-  isDeclaredStorageKey,
-  STORAGE_INVENTORY,
-} from "@/lib/telemetry/storage-inventory";
+import { isDeclaredStorageKey } from "@/lib/telemetry/storage-inventory";
 import { config, routeRequest } from "@/proxy";
 
 const pages = [
@@ -92,7 +89,7 @@ describe.each(pages)(
       expect(doc.querySelector(`a[href="${related}"]`)).not.toBeNull();
       expect(metadata.robots).toEqual({ index: false, follow: true });
       expect(html).not.toMatch(
-        /\[\[|<!--|impressum@heerlab\.com|datenschutz@heerlab\.com|Hetzner/i,
+        /\[\[|<!--|impressum@heerlab\.com|datenschutz@heerlab\.com|Hetzner|PostHog/i,
       );
       expect(doc.querySelectorAll("h1")).toHaveLength(1);
       expect(doc.querySelector("h1")?.textContent).not.toBe("");
@@ -183,10 +180,19 @@ describe.each(pages)(
         expect(rows[1].textContent).toContain("cc_cookie");
         expect(rows[1].textContent).toContain("182");
         expect(rows[1].textContent).toContain("TDDDG");
-        for (const entry of STORAGE_INVENTORY) {
-          for (const name of entry.name.split(", "))
-            expect(doc.querySelector("table")?.textContent).toContain(name);
-        }
+        expect(rows.map((row) => row.querySelector("td")?.textContent)).toEqual(
+          lang === "de"
+            ? [
+                "__client_uat… (Cookies), __clerk_environment (Browser-Speicher)",
+                "cc_cookie (Cookie)",
+                "localStorage und sessionStorage",
+              ]
+            : [
+                "__client_uat… (cookies), __clerk_environment (browser storage)",
+                "cc_cookie (cookie)",
+                "localStorage and sessionStorage",
+              ],
+        );
         for (const key of [
           "__clerk_environment",
           "__client_uat_instance",
@@ -210,18 +216,15 @@ describe.each(pages)(
           lang === "de" ? "25 Monaten" : "25 months",
           lang === "de" ? "30 Tagen" : "30 days",
           lang === "de"
-            ? "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip nur in anonymisierter Form mit dem Fehlerbericht gespeichert. Dazu werden bei IPv4 die letzten 8 Bit und bei IPv6 die letzten 64 Bit auf null gesetzt."
-            : "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report only in anonymized form. The last 8 bits of IPv4 addresses and the last 64 bits of IPv6 addresses are set to zero.",
-          "15",
-          "10",
-          "5",
+            ? "Die IP-Adresse wird aus technischen Gründen übertragen und von GlitchTip nur in gekürzter, anonymisierter Form gespeichert."
+            : "The IP address is transmitted for technical reasons, and GlitchTip stores it only in shortened, anonymised form.",
           "90",
           "Art. 21",
           "Cookie settings",
         ])
           expect(telemetry.textContent).toContain(value);
         expect(telemetry.textContent).not.toMatch(
-          /OFFEN|PENDING|Standardaufbewahrung|default retention/,
+          /OFFEN|PENDING|Standardaufbewahrung|default retention|PostHog|\d+\s*%|umami\.disabled|sendDefaultPii|Breadcrumbs|IPv[46]|localStorage|sessionStorage|Discord-Bot|Pixelator/i,
         );
         expect(telemetry.textContent).toContain(
           lang === "de" ? "Abschnitt 15" : "Section 15",
