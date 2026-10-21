@@ -46,15 +46,39 @@ describe("local color schemes", () => {
     },
   );
 
-  it.each(["F5F0F0", "0A0505", "FFFFFF", "000000", "808080"])(
-    "produces 12 distinct swatches for seed %s in every mode",
-    (seed) => {
-      for (const { key } of MODE_OPTIONS) {
-        const scheme = generateColorScheme(seed, key, 12);
-        expect(scheme).toHaveLength(12);
-        expect(new Set(scheme).size, key).toBe(12);
-        for (const hex of scheme) expect(hex).toMatch(/^#[\dA-F]{6}$/);
-      }
+  it.each([
+    "F5F0F0",
+    "0A0505",
+    "FFFFFF",
+    "000000",
+    "808080",
+    "090A0A",
+    "212122",
+    "09090A",
+  ])("produces 12 distinct swatches for seed %s in every mode", (seed) => {
+    for (const { key } of MODE_OPTIONS) {
+      const scheme = generateColorScheme(seed, key, 12);
+      expect(scheme).toHaveLength(12);
+      expect(new Set(scheme).size, key).toBe(12);
+      for (const hex of scheme) expect(hex).toMatch(/^#[\dA-F]{6}$/);
+    }
+  });
+
+  it.each([
+    ["090A0A", "analogic", 3],
+    ["212122", "complement", 2],
+    ["212122", "triad", 3],
+    ["09090A", "analogic-complement", 6],
+  ] as const)(
+    "uses distinct lightness steps when %s %s/%s hues collide",
+    (seed, mode, count) => {
+      const scheme = generateColorScheme(seed, mode, count);
+      expect(scheme).toHaveLength(count);
+      expect(new Set(scheme).size).toBe(count);
+      const lightness = scheme.map((hex) => rgbToHsl(hexToRgb(hex)).l);
+      expect(lightness).toEqual([...lightness].sort((a, b) => a - b));
+      expect(new Set(lightness).size).toBe(count);
+      expect(scheme).toEqual(generateColorScheme(seed, mode, count));
     },
   );
 
@@ -74,6 +98,17 @@ describe("local color schemes", () => {
       }
     },
   );
+
+  it("preserves an already-distinct harmony without rebuilding it as a ramp", () => {
+    expect(generateColorScheme("336699", "triad", 6)).toEqual([
+      "#24476B",
+      "#6B2447",
+      "#476B24",
+      "#4785C2",
+      "#C24785",
+      "#85C247",
+    ]);
+  });
 
   it.each([
     ["complement", [0, 180]],
