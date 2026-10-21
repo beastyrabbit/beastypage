@@ -47,6 +47,25 @@ function respond(body: object, status = 200) {
   });
 }
 
+function deliveryFailureResponse(
+  error: unknown,
+  reservation: Readonly<{ release(): void }>,
+): Response {
+  const unavailable = error instanceof ContactMailUnavailableError;
+  // Network errors and timeouts may occur after acceptance; retain their quota.
+  if (unavailable || error instanceof ContactMailDeliveryError)
+    reservation.release();
+  const deliveryStatus =
+    error instanceof ContactMailDeliveryError ? error.status : "error";
+  // Never log provider errors: their messages can contain mail or credentials.
+  console.error(
+    unavailable
+      ? "Contact mail unavailable (configuration)"
+      : `Contact mail failed (resend_${deliveryStatus})`,
+  );
+  return respond({ error: MAIL_ERROR }, unavailable ? 503 : 500);
+}
+
 export async function POST(request: Request) {
   if (
     request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !==
@@ -106,18 +125,6 @@ export async function POST(request: Request) {
     await sendContactMail(parsed.data);
     return respond({ success: true });
   } catch (error) {
-    const unavailable = error instanceof ContactMailUnavailableError;
-    // Network errors and timeouts may occur after acceptance; retain their quota.
-    if (unavailable || error instanceof ContactMailDeliveryError)
-      reservation.release();
-    const deliveryStatus =
-      error instanceof ContactMailDeliveryError ? error.status : "error";
-    // Never log provider errors: their messages can contain mail or credentials.
-    console.error(
-      unavailable
-        ? "Contact mail unavailable (configuration)"
-        : `Contact mail failed (resend_${deliveryStatus})`,
-    );
-    return respond({ error: MAIL_ERROR }, unavailable ? 503 : 500);
+    return deliveryFailureResponse(error, reservation);
   }
 }
