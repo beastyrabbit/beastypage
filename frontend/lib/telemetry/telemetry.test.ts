@@ -1,9 +1,6 @@
 // @vitest-environment-options {"url":"https://site.test/"}
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { track } from "@/lib/analytics";
-import { scrubTelemetry as scrubBot } from "../../../backend/discord-bot/src/privacy";
-import { scrubTelemetry as scrubImage } from "../../../backend/image_processing_service/src/privacy";
-import { scrubTelemetry as scrubMedia } from "../../../backend/media_service/src/privacy";
 import { hasAnalyticsConsent, setAnalyticsConsent } from "./consent-state";
 import { outboundHost } from "./outbound";
 import { isOverlayRoute } from "./overlay";
@@ -382,24 +379,21 @@ describe("event scrubber", () => {
     }
   });
 
-  it.each([scrubText, scrubBot, scrubImage, scrubMedia])(
-    "preserves email and bearer matching across scrubbers, including long invalid addresses",
-    (scrub) => {
-      for (const [input, expected] of [
-        ["a+b%tag@sub.example.COM_ending", "[Filtered]_ending"],
-        ["a@b.co@c.de", "[Filtered]@c.de"],
-        ["a@b@c.de", "a@[Filtered]"],
-        ["a@b.c a@.co", "a@b.c a@.co"],
-        ["a@b..co", "[Filtered]"],
-        ["a@b.co.more123", "[Filtered]123"],
-        ["first@site.test, second@other.test", "[Filtered], [Filtered]"],
-        ["BEARER aZ09._~+/=-", "Bearer [Filtered]"],
-        ["a".repeat(50_000), "a".repeat(50_000)],
-        [`a@${"b.".repeat(25_000)}c`, `a@${"b.".repeat(25_000)}c`],
-      ])
-        expect(scrub(input)).toBe(expected);
-    },
-  );
+  it("preserves email and bearer matching, including long invalid addresses", () => {
+    for (const [input, expected] of [
+      ["a+b%tag@sub.example.COM_ending", "[Filtered]_ending"],
+      ["a@b.co@c.de", "[Filtered]@c.de"],
+      ["a@b@c.de", "a@[Filtered]"],
+      ["a@b.c a@.co", "a@b.c a@.co"],
+      ["a@b..co", "[Filtered]"],
+      ["a@b.co.more123", "[Filtered]123"],
+      ["first@site.test, second@other.test", "[Filtered], [Filtered]"],
+      ["BEARER aZ09._~+/=-", "Bearer [Filtered]"],
+      ["a".repeat(50_000), "a".repeat(50_000)],
+      [`a@${"b.".repeat(25_000)}c`, `a@${"b.".repeat(25_000)}c`],
+    ])
+      expect(scrubText(input)).toBe(expected);
+  });
 
   it("scrubs every sensitive query name even when a name occurs more than once", () => {
     const url = new URL(

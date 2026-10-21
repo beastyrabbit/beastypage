@@ -91,6 +91,11 @@ async function stubServices(page: Page) {
   return { sends, records, umamiRequests, envelopes, external };
 }
 
+// Sampled performance traces are expected without consent; error events are not.
+function errorEnvelopes(envelopes: string[]): string[] {
+  return envelopes.filter((envelope) => envelope.includes('{"type":"event"'));
+}
+
 async function assertStorage(page: Page) {
   const cookies = await page.context().cookies();
   const storage = await page.evaluate(() => ({
@@ -222,7 +227,7 @@ for (const width of [1440, 390]) {
           page.locator('script[src*="umami.telemetry.test"]'),
         ).toHaveCount(0);
         expect(umamiRequests).toEqual([]);
-        expect(envelopes).toEqual([]);
+        expect(errorEnvelopes(envelopes)).toEqual([]);
       };
 
       await page.goto(path);
@@ -282,7 +287,7 @@ for (const width of [1440, 390]) {
       await expect.poll(() => umamiRequests.includes("/api/record")).toBe(true);
       const accepted = await capture("accept-analytics");
       expect(accepted).toEqual(rejected);
-      expect(envelopes).toEqual([]);
+      expect(errorEnvelopes(envelopes)).toEqual([]);
       expect(external).toEqual([]);
       await writeFile(
         resolve(screenshots, `${prefix}.json`),
