@@ -16,7 +16,11 @@ import { createUmamiLoader } from "@/lib/telemetry/umami";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
 import "./telemetry.css";
 
-export function TelemetryProvider({ children }: { children: ReactNode }) {
+export function TelemetryProvider({
+  children,
+}: {
+  readonly children: ReactNode;
+}) {
   const overlay = isOverlayRoute(usePathname());
   const { isLoaded, isSignedIn, user } = useUser();
   const previousAuth = useRef<boolean | undefined>(undefined);

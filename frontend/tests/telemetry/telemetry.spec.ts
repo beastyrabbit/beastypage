@@ -113,9 +113,9 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
   await expect(
     page.getByRole("heading", { name: "Your privacy, your choice" }),
   ).toBeVisible();
-  expect(
-    await page.locator('script[src*="umami.telemetry.test"]').count(),
-  ).toBe(0);
+  await expect(page.locator('script[src*="umami.telemetry.test"]')).toHaveCount(
+    0,
+  );
   expect(sends).toHaveLength(0);
   expect(umamiRequests).toHaveLength(0);
   const before = await assertStorage(page);
@@ -217,7 +217,7 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
   );
   const countAfterWithdrawal = sends.length;
   await page.getByRole("link", { name: "Personal", exact: true }).click();
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(400); // NOSONAR: Observe the fixture's 300ms pageview debounce after withdrawal to prove navigation sends no request.
   expect(sends).toHaveLength(countAfterWithdrawal);
   await assertStorage(page);
   expect(external).toEqual([]);
@@ -298,7 +298,7 @@ test("OBS sources skip consent and analytics but keep scrubbed error reporting, 
   await expect(page.locator('script[src*="umami.telemetry.test"]')).toHaveCount(
     0,
   );
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(400); // NOSONAR: Observe the fixture's 300ms pageview debounce after OBS reload to prove no delayed analytics requests escape.
   expect(sends).toHaveLength(sendCount);
   expect(records).toHaveLength(recordCount);
   expect(umamiRequests).toHaveLength(requestCount);

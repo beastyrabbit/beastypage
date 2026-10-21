@@ -63,51 +63,23 @@ const nextConfig = {
   async redirects() {
     return [
       // Stream Canvas moved to the separate ModDrop project.
-      {
-        source: "/stream-canvas",
-        destination: "https://moddrop.live/",
-        permanent: true,
-      },
-      {
-        source: "/stream-canvas/:path*",
-        destination: "https://moddrop.live/:path*",
-        permanent: true,
-      },
-      {
-        source: "/stream-canvas/:path*/",
-        destination: "https://moddrop.live/:path*/",
-        permanent: true,
-      },
+      ["/stream-canvas", "https://moddrop.live/"],
+      ["/stream-canvas/:path*", "https://moddrop.live/:path*"],
+      ["/stream-canvas/:path*/", "https://moddrop.live/:path*/"],
       // Redirect old /gatcha hub to its successor category page
       // (:path* also matches zero segments, covering bare /gatcha;
       // explicit trailing-slash variants needed with skipTrailingSlashRedirect)
-      {
-        source: "/gatcha/testing/collection-focus",
-        destination: "/tests/collection-focus",
-        permanent: true,
-      },
-      {
-        source: "/gatcha/testing/collection-focus/",
-        destination: "/tests/collection-focus",
-        permanent: true,
-      },
-      {
-        source: "/gatcha/:path*",
-        destination: "/projects/gacha",
-        permanent: true,
-      },
-      {
-        source: "/gatcha/:path*/",
-        destination: "/projects/gacha",
-        permanent: true,
-      },
+      ["/gatcha/testing/collection-focus", "/tests/collection-focus"],
+      ["/gatcha/testing/collection-focus/", "/tests/collection-focus"],
+      ["/gatcha/:path*", "/projects/gacha"],
+      ["/gatcha/:path*/", "/projects/gacha"],
       // Redirect /personal to / (home)
-      {
-        source: "/personal",
-        destination: "/",
-        permanent: true,
-      },
-    ];
+      ["/personal", "/"],
+    ].map(([source, destination]) => ({
+      source,
+      destination,
+      permanent: true,
+    }));
   },
 };
 

@@ -6,35 +6,60 @@ const IDENTITY =
 const OMIT =
   /(^|\.)(authorization|proxy-authorization|cookie|set-cookie|cookies|body|requestbody|postdata|user)$/i;
 
-// Return a copy so scrubbing never changes application objects or SDK input.
-export function scrubTelemetry<T>(input: T): T {
-  const seen = new WeakSet<object>();
-  function text(value: string): string {
-    return value
+function scrubEmails(value: string): string {
+  const chunks: string[] = [];
+  let copiedThrough = 0;
+  // Bound each scan by an @ separator and anchor the domain match.
+  for (
+    let at = value.indexOf("@");
+    at !== -1;
+    at = value.indexOf("@", at + 1)
+  ) {
+    let start = at;
+    while (
+      start > copiedThrough &&
+      /[A-Z0-9._%+-]/i.test(value.charAt(start - 1))
+    )
+      start--;
+    if (start === at) continue;
+    const domain = /^[A-Z0-9.-]+\.[A-Z]{2,}/i.exec(value.slice(at + 1));
+    if (!domain) continue;
+    chunks.push(value.slice(copiedThrough, start), REDACTED);
+    copiedThrough = at + 1 + domain[0].length;
+  }
+  return chunks.join("") + value.slice(copiedThrough);
+}
+
+function text(value: string): string {
+  return scrubEmails(
+    value
       .replace(/(https?:\/\/)[^/@\s]+@/gi, "$1[Filtered]@")
       .replace(/\b\d{17,20}\b/g, REDACTED)
-      .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [Filtered]")
+      .replace(/\bBearer\s+[A-Z0-9._~+/=-]+/gi, "Bearer [Filtered]")
       .replace(
         /\b(?:mfa\.[\w-]{20,}|[\w-]{23,30}\.[\w-]{6}\.[\w-]{25,110})\b/g,
         REDACTED,
-      )
-      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, REDACTED)
-      .replace(
-        /(^|[?&#;\s])([^=?&#;\s]+)=([^&#;\s"'<>]*)/g,
-        (match, prefix: string, key: string) => {
-          try {
-            if (
-              SECRET.test(decodeURIComponent(key.replace(/\+/g, " "))) ||
-              IDENTITY.test(key.replace(/[_-]/g, ""))
-            )
-              return `${prefix}${key}=${REDACTED}`;
-          } catch {
-            return `${prefix}${key}=${REDACTED}`;
-          }
-          return match;
-        },
-      );
-  }
+      ),
+  ).replace(
+    /(^|[?&#;\s])([^=?&#;\s]+)=([^&#;\s"'<>]*)/g,
+    (match, prefix: string, key: string) => {
+      try {
+        if (
+          SECRET.test(decodeURIComponent(key.replaceAll("+", " "))) ||
+          IDENTITY.test(key.replace(/[_-]/g, ""))
+        )
+          return `${prefix}${key}=${REDACTED}`;
+      } catch {
+        return `${prefix}${key}=${REDACTED}`;
+      }
+      return match;
+    },
+  );
+}
+
+// Return a copy so scrubbing never changes application objects or SDK input.
+export function scrubTelemetry<T>(input: T): T {
+  const seen = new WeakSet<object>();
 
   function visit(value: unknown, field = "", depth = 0): unknown {
     if (depth > 30) return REDACTED;

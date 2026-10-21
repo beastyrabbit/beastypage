@@ -13,7 +13,7 @@ export function scrubUrl(value: string, excludeSearch = false): string {
     url.hash = "";
     if (excludeSearch) url.search = "";
     else {
-      for (const key of [...url.searchParams.keys()]) {
+      for (const key of new Set(url.searchParams.keys())) {
         if (sensitiveKey.test(key)) url.searchParams.set(key, REDACTED);
       }
     }
@@ -27,8 +27,33 @@ export function scrubUrl(value: string, excludeSearch = false): string {
   }
 }
 
+function scrubEmails(value: string): string {
+  const chunks: string[] = [];
+  let copiedThrough = 0;
+  // Scan each local part once and anchor the domain match so failed addresses
+  // cannot retry an unbounded regex at every character in a long message.
+  for (
+    let at = value.indexOf("@");
+    at !== -1;
+    at = value.indexOf("@", at + 1)
+  ) {
+    let start = at;
+    while (
+      start > copiedThrough &&
+      /[A-Z0-9._%+-]/i.test(value.charAt(start - 1))
+    )
+      start--;
+    if (start === at) continue;
+    const domain = /^[A-Z0-9.-]+\.[A-Z]{2,}/i.exec(value.slice(at + 1));
+    if (!domain) continue;
+    chunks.push(value.slice(copiedThrough, start), REDACTED);
+    copiedThrough = at + 1 + domain[0].length;
+  }
+  return chunks.join("") + value.slice(copiedThrough);
+}
+
 export function scrubText(value: string): string {
-  return (
+  return scrubEmails(
     value
       .replace(/https?:\/\/[^\s<>"']+/gi, (url) => scrubUrl(url, true))
       // Relative fetch/EventSource URLs can contain percent-encoded parameter names.
@@ -38,18 +63,17 @@ export function scrubText(value: string): string {
       .replace(
         /(?<![\w:/])\/(?:view|adoption|ancestry-tree|evolution)\/[^\s<>"']+/g,
         (url) => scrubUrl(url, true),
-      )
-      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, REDACTED)
-      .replace(/\bBearer\s+[^\s,;"']+/gi, `Bearer ${REDACTED}`)
-      .replace(
-        /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?\b/g,
-        REDACTED,
-      )
-      .replace(
-        /((?:__session|__client_uat|token|key|secret|password|auth|code|session|signature|sig|edit|share)[\w-]*\s*[=:]\s*)[^\s&;,"'<>]+/gi,
-        `$1${REDACTED}`,
-      )
-  );
+      ),
+  )
+    .replace(/\bBearer\s+[^\s,;"']+/gi, `Bearer ${REDACTED}`)
+    .replace(
+      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?\b/g,
+      REDACTED,
+    )
+    .replace(
+      /((?:__session|__client_uat|token|key|secret|password|auth|code|session|signature|sig|edit|share)[\w-]*\s*[=:]\s*)[^\s&;,"'<>]+/gi,
+      `$1${REDACTED}`,
+    );
 }
 
 /** Pure, bounded traversal. Drops request bodies and identity rather than guessing their schema. */
@@ -63,6 +87,9 @@ export function scrubEvent<T>(event: T, maxDepth = 24): T {
     seen.add(value);
     if (Array.isArray(value))
       return value.map((item) => visit(item, depth + 1));
+    return visitObject(value, depth, field);
+  }
+  function visitObject(value: object, depth: number, field: string): unknown {
     const result: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
       // Scopes and clients are live SDK objects stripped before serialization.
@@ -84,20 +111,24 @@ export function scrubEvent<T>(event: T, maxDepth = 24): T {
       }
       if (key === "user" || key === "cookies" || key === "request_body")
         continue;
-      // Sentry accepts query_string as text, an object, or pairs; drop all forms.
-      if (sensitiveKey.test(key) || /^(query_string|url\.query)$/i.test(key))
-        result[key] = REDACTED;
-      else if (key === "request" && item && typeof item === "object") {
-        const { data: _data, ...request } = item as Record<string, unknown>;
-        result[key] = visit(request, depth + 1);
-      } else if (
-        /^(url|href|referrer|http\.url|url\.full|url\.original)$/i.test(key) &&
-        typeof item === "string"
-      ) {
-        result[key] = scrubText(scrubUrl(item, true));
-      } else result[key] = visit(item, depth + 1, key);
+      result[key] = visitField(key, item, depth);
     }
     return result;
+  }
+  function visitField(key: string, item: unknown, depth: number): unknown {
+    // Sentry accepts query_string as text, an object, or pairs; drop all forms.
+    if (sensitiveKey.test(key) || /^(query_string|url\.query)$/i.test(key))
+      return REDACTED;
+    if (key === "request" && item && typeof item === "object") {
+      const { data: _data, ...request } = item as Record<string, unknown>;
+      return visit(request, depth + 1);
+    }
+    if (
+      /^(url|href|referrer|http\.url|url\.full|url\.original)$/i.test(key) &&
+      typeof item === "string"
+    )
+      return scrubText(scrubUrl(item, true));
+    return visit(item, depth + 1, key);
   }
   return visit(event, 0) as T;
 }

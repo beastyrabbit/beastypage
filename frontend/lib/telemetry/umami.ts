@@ -27,19 +27,17 @@ type TrackerConfig = {
   domains?: string;
 };
 
+function fetchUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
 /** Recorder has no before-send/stop API. Guard only its host's telemetry endpoints. */
 export function installUmamiTransportGuard(host: string): void {
   const base = new URL(host);
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
-    const url = new URL(
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url,
-      window.location.href,
-    );
+    const url = new URL(fetchUrl(input), window.location.href);
     const isUmami =
       url.origin === base.origin &&
       url.pathname.startsWith(`${base.pathname.replace(/\/$/, "")}/api/`);
@@ -96,8 +94,11 @@ export function createUmamiLoader(
     return scrubEvent({
       ...payload,
       title: "BeastyPage",
-      url: scrubUrl(String(payload.url ?? "/"), true),
-      referrer: scrubUrl(String(payload.referrer ?? "/"), true),
+      url: scrubUrl(typeof payload.url === "string" ? payload.url : "/", true),
+      referrer: scrubUrl(
+        typeof payload.referrer === "string" ? payload.referrer : "/",
+        true,
+      ),
     });
   };
   return (accepted: boolean) => {

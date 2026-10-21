@@ -10,6 +10,26 @@ export type StorageDeclaration = {
 
 export const CONSENT_RETENTION_DAYS = 182;
 
+function featureStorage(
+  name: string,
+  purpose: string,
+  pattern: string,
+  {
+    storage = "Local storage",
+    duration = "Until removed or browser storage is cleared",
+  } = {},
+): StorageDeclaration {
+  return {
+    group: "features",
+    name,
+    storage,
+    purpose,
+    duration,
+    category: "necessary",
+    pattern,
+  };
+}
+
 /** Shared by preferences, the privacy policy, and browser storage assertions. */
 export const STORAGE_INVENTORY: StorageDeclaration[] = [
   {
@@ -41,73 +61,51 @@ export const STORAGE_INVENTORY: StorageDeclaration[] = [
     category: "necessary",
     pattern: "^(?:clerk_|__clerk_)",
   },
-  {
-    group: "features",
-    name: "singleCatPlus.variants, pixelator-variants",
-    storage: "Local storage",
-    purpose:
-      "Tool settings and saved variants you choose to keep on this device.",
-    duration: "Until removed or browser storage is cleared",
-    category: "necessary",
-    pattern: "^(?:singleCatPlus\\.variants|pixelator-variants)$",
-  },
-  {
-    group: "features",
-    name: "paletteGenerator.collection",
-    storage: "Local storage",
-    purpose: "Your locally saved palette collection.",
-    duration: "Until removed or browser storage is cleared",
-    category: "necessary",
-    pattern: "^paletteGenerator\\.collection$",
-  },
-  {
-    group: "features",
-    name: "beastyrabbit.quick-share.receipts.v1",
-    storage: "Local storage",
-    purpose:
-      "Receipts for Quick Share uploads so you can manage your submissions.",
-    duration: "Until removed or browser storage is cleared",
-    category: "necessary",
-    pattern: "^beastyrabbit\\.quick-share\\.receipts\\.v1$",
-  },
-  {
-    group: "features",
-    name: "beastypage:mapper-edit-token:*",
-    storage: "Local storage",
-    purpose:
-      "Capability to edit anonymous mapper profiles you created. Treat these tokens as passwords.",
-    duration: "Until browser storage is cleared",
-    category: "necessary",
-    pattern: "^beastypage:mapper-edit-token:",
-  },
-  {
-    group: "features",
-    name: "ancestry-tree-edit:*",
-    storage: "Local / session storage",
-    purpose: "Capability to edit your anonymous ancestry trees.",
-    duration: "Tab session / until browser storage is cleared",
-    category: "necessary",
-    pattern: "^ancestry-tree-edit:",
-  },
-  {
-    group: "features",
-    name: "stream-viewer-session, stream-viewer-session:fingerprint, stream-viewer-session:*",
-    storage: "Local / session storage",
-    purpose:
-      "Keeps your stream participation session and prevents duplicate signups.",
-    duration: "Tab session / until browser storage is cleared",
-    category: "necessary",
-    pattern: "^stream-viewer-session(?::.*)?$",
-  },
-  {
-    group: "features",
-    name: "classic-wheel:client-key, catdex-upload:client-key",
-    storage: "Local storage",
-    purpose: "Maintains your wheel participation and upload progress.",
-    duration: "Until browser storage is cleared",
-    category: "necessary",
-    pattern: "^(?:classic-wheel|catdex-upload):client-key$",
-  },
+  featureStorage(
+    "singleCatPlus.variants, pixelator-variants",
+    "Tool settings and saved variants you choose to keep on this device.",
+    String.raw`^(?:singleCatPlus\.variants|pixelator-variants)$`,
+  ),
+  featureStorage(
+    "paletteGenerator.collection",
+    "Your locally saved palette collection.",
+    String.raw`^paletteGenerator\.collection$`,
+  ),
+  featureStorage(
+    "beastyrabbit.quick-share.receipts.v1",
+    "Receipts for Quick Share uploads so you can manage your submissions.",
+    String.raw`^beastyrabbit\.quick-share\.receipts\.v1$`,
+  ),
+  featureStorage(
+    "beastypage:mapper-edit-token:*",
+    "Capability to edit anonymous mapper profiles you created. Treat these tokens as passwords.",
+    "^beastypage:mapper-edit-token:",
+    { duration: "Until browser storage is cleared" },
+  ),
+  featureStorage(
+    "ancestry-tree-edit:*",
+    "Capability to edit your anonymous ancestry trees.",
+    "^ancestry-tree-edit:",
+    {
+      storage: "Local / session storage",
+      duration: "Tab session / until browser storage is cleared",
+    },
+  ),
+  featureStorage(
+    "stream-viewer-session, stream-viewer-session:fingerprint, stream-viewer-session:*",
+    "Keeps your stream participation session and prevents duplicate signups.",
+    "^stream-viewer-session(?::.*)?$",
+    {
+      storage: "Local / session storage",
+      duration: "Tab session / until browser storage is cleared",
+    },
+  ),
+  featureStorage(
+    "classic-wheel:client-key, catdex-upload:client-key",
+    "Maintains your wheel participation and upload progress.",
+    "^(?:classic-wheel|catdex-upload):client-key$",
+    { duration: "Until browser storage is cleared" },
+  ),
 ];
 
 export function isDeclaredStorageKey(key: string): boolean {

@@ -39,6 +39,6 @@ for (const args of process.argv.includes("--skip-build")
         "playwright.telemetry.config.ts",
       ],
     ]) {
-  const result = spawnSync("pnpm", args, { env, stdio: "inherit" });
+  const result = spawnSync("pnpm", args, { env, stdio: "inherit" }); // NOSONAR: Local test runner must resolve the developer's pnpm installation, including writable version-manager directories.
   if (result.status !== 0) process.exit(result.status ?? 1);
 }

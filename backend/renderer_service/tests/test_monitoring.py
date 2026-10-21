@@ -175,6 +175,26 @@ def test_sdk_reports_exceptions_5xx_and_transactions_through_fake_transport(
             sentry_sdk.get_global_scope().set_client(previous)
 
 
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("a+b%tag@sub.example.COM_ending", "[Filtered]_ending"),
+        ("a@b.co@c.de", "[Filtered]@c.de"),
+        ("a@b@c.de", "a@[Filtered]"),
+        ("a@b.c a@.co", "a@b.c a@.co"),
+        ("a@b..co", "[Filtered]"),
+        ("a@b.co.more123", "[Filtered]123"),
+        ("first@site.test, second@other.test", "[Filtered], [Filtered]"),
+        ("BEARER aZ09._~+/=-", "Bearer [Filtered]"),
+        ("İ@ſ.Kı", "[Filtered]"),
+        ("a" * 50_000, "a" * 50_000),
+        ("a@" + "b." * 25_000 + "c", "a@" + "b." * 25_000 + "c"),
+    ],
+)
+def test_email_and_bearer_matching(message, expected):
+    assert scrub_telemetry(message) == expected
+
+
 def test_environment_and_release_defaults(monkeypatch):
     init = Mock()
     monkeypatch.setattr(sentry_sdk, "init", init)

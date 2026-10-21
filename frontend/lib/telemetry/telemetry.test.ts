@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { track } from "@/lib/analytics";
+import { scrubTelemetry as scrubBot } from "../../../backend/discord-bot/src/privacy";
+import { scrubTelemetry as scrubImage } from "../../../backend/image_processing_service/src/privacy";
+import { scrubTelemetry as scrubMedia } from "../../../backend/media_service/src/privacy";
 import { hasAnalyticsConsent, setAnalyticsConsent } from "./consent-state";
 import { outboundHost } from "./outbound";
 import { isOverlayRoute } from "./overlay";
@@ -58,6 +61,17 @@ describe("consent-gated Umami", () => {
       createUmamiLoader(invalid)(true);
       expect(document.scripts).toHaveLength(0);
     }
+  });
+  it("drops non-string page addresses without invoking object stringification", () => {
+    createUmamiLoader(config)(true);
+    const stringify = vi.fn(() => "private-address");
+    expect(
+      window.beastypageBeforeSend?.("event", {
+        url: { toString: stringify },
+        referrer: ["private-address"],
+      }),
+    ).toMatchObject({ url: "/", referrer: "/" });
+    expect(stringify).not.toHaveBeenCalled();
   });
   it("never loads on browser sources or preview routes, even with consent", () => {
     for (const path of [
@@ -227,6 +241,33 @@ describe("typed track", () => {
 });
 
 describe("event scrubber", () => {
+  it.each([scrubText, scrubBot, scrubImage, scrubMedia])(
+    "preserves email and bearer matching across scrubbers, including long invalid addresses",
+    (scrub) => {
+      for (const [input, expected] of [
+        ["a+b%tag@sub.example.COM_ending", "[Filtered]_ending"],
+        ["a@b.co@c.de", "[Filtered]@c.de"],
+        ["a@b@c.de", "a@[Filtered]"],
+        ["a@b.c a@.co", "a@b.c a@.co"],
+        ["a@b..co", "[Filtered]"],
+        ["a@b.co.more123", "[Filtered]123"],
+        ["first@site.test, second@other.test", "[Filtered], [Filtered]"],
+        ["BEARER aZ09._~+/=-", "Bearer [Filtered]"],
+        ["a".repeat(50_000), "a".repeat(50_000)],
+        [`a@${"b.".repeat(25_000)}c`, `a@${"b.".repeat(25_000)}c`],
+      ])
+        expect(scrub(input)).toBe(expected);
+    },
+  );
+
+  it("scrubs every sensitive query name even when a name occurs more than once", () => {
+    const url = new URL(
+      scrubUrl("https://site.test/?token=a&token=b&secret=c&safe=yes"),
+    );
+    expect(url.searchParams.getAll("token")).toEqual(["[Filtered]"]);
+    expect(url.searchParams.get("secret")).toBe("[Filtered]");
+    expect(url.searchParams.get("safe")).toBe("yes");
+  });
   const overlay = "https://site.test/single-cat-stream/obs?key=sk_live_FAKE123";
   const sse = "/api/live/cat-stream/fixture?key=sk_live_FAKE123";
 
