@@ -109,11 +109,6 @@ export function PaletteGeneratorClient() {
       setGeneratingMode(mode);
       try {
         const palette = await fetchPaletteFromAPI(mode, paletteSize);
-        if (palette.source === "fallback") {
-          toast.warning(
-            "Color API unavailable — showing a placeholder palette",
-          );
-        }
         setCollection((prev) => [palette, ...prev]);
         track("palette_generator_generated", {
           mode,

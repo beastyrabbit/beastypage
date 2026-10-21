@@ -4,7 +4,7 @@ export interface GeneratedPalette {
   seed: string;
   mode: string;
   ms: number;
-  source: "colorapi" | "fallback";
+  source: "local" | "colorapi" | "fallback"; // Legacy sources remain valid in saved collections.
   timestamp: number;
 }
 
@@ -32,9 +32,8 @@ export const MODE_OPTIONS: { key: string; label: string }[] = [
   { key: "quad", label: "Quad" },
 ];
 
-// Curated fallback palettes used when the Color API is unreachable.
+// Legacy curated palettes retained for compatibility with existing imports.
 // Each has 12 colors so any palette size (1–12) is supported without truncation.
-// One is chosen at random and sliced to the requested count.
 export const FALLBACK_PALETTES = [
   [
     "#264653",

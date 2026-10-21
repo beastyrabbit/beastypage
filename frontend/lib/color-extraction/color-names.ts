@@ -1,43 +1,107 @@
 /**
- * Color naming utilities using thecolorapi.com
+ * Local color naming with the MIT-licensed color-name-list short subset.
  */
 
-import type { ExtractedColor } from "./types";
+/*!
+ * color-name-list: MIT License, Copyright (c) 2017 David Aerne
+ * https://github.com/meodai/color-names
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
-interface ColorApiResponse {
-  name: {
-    value: string;
-    closest_named_hex: string;
-    exact_match_name: boolean;
-    distance: number;
+import { hexToRgb } from "./color-utils";
+import type { ExtractedColor, RGB } from "./types";
+
+type Lab = [number, number, number];
+type NamedColor = { name: string; lab: Lab };
+let namedColors: Promise<NamedColor[]> | undefined;
+const nameCache = new Map<string, string>();
+
+// sRGB -> CIE XYZ -> CIE Lab, using the D65 reference white.
+function rgbToLab(rgb: RGB): Lab {
+  const linearize = (channel: number) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   };
+  const r = linearize(rgb.r);
+  const g = linearize(rgb.g);
+  const b = linearize(rgb.b);
+  const transform = (value: number) =>
+    value > (6 / 29) ** 3
+      ? Math.cbrt(value)
+      : value / (3 * (6 / 29) ** 2) + 4 / 29;
+  const x = transform(
+    (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047,
+  );
+  const y = transform(0.2126729 * r + 0.7151522 * g + 0.072175 * b);
+  const z = transform((0.0193339 * r + 0.119192 * g + 0.9503041 * b) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
 }
 
-/**
- * Fetch color name from thecolorapi.com
- */
+function loadNamedColors(): Promise<NamedColor[]> {
+  // The dataset is a separate chunk, loaded only on the first name lookup.
+  namedColors ??= import("color-name-list/short")
+    .then(({ colornames }) =>
+      colornames.map(({ name, hex }) => ({
+        name,
+        lab: rgbToLab(hexToRgb(hex)),
+      })),
+    )
+    .catch((error) => {
+      namedColors = undefined;
+      throw error;
+    });
+  return namedColors;
+}
+
+/** Resolve the nearest name by CIE Lab ΔE76; retain the async caller contract. */
 export async function fetchColorName(hex: string): Promise<string> {
-  // Remove # if present
-  const cleanHex = hex.replace(/^#/, "");
+  let cleanHex = normalizeHex(hex);
+  if (/^[\dA-F]{3}$/.test(cleanHex)) {
+    cleanHex = [...cleanHex].map((channel) => channel.repeat(2)).join("");
+  }
+  if (!/^[\dA-F]{6}$/.test(cleanHex)) return "Unknown";
+  const cached = nameCache.get(cleanHex);
+  if (cached) return cached;
 
   try {
-    const response = await fetch(
-      `https://www.thecolorapi.com/id?hex=${cleanHex}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+    const colors = await loadNamedColors();
+    const lab = rgbToLab(hexToRgb(cleanHex));
+    let nearest = "Unknown";
+    let distance = Number.POSITIVE_INFINITY;
+    for (const color of colors) {
+      // Squared ΔE76 gives the same ordering without a square root per entry.
+      const delta = color.lab.reduce(
+        (sum, channel, index) => sum + (channel - lab[index]) ** 2,
+        0,
+      );
+      if (delta < distance) {
+        distance = delta;
+        nearest = color.name;
+        if (delta === 0) break;
+      }
     }
-
-    const data: ColorApiResponse = await response.json();
-    return data.name.value;
+    if (nameCache.size >= 512) nameCache.clear();
+    nameCache.set(cleanHex, nearest);
+    return nearest;
   } catch (error) {
-    console.error(`Failed to fetch color name for ${hex}:`, error);
+    console.error(`Failed to resolve color name for ${hex}:`, error);
     return "Unknown";
   }
 }
@@ -50,43 +114,20 @@ function normalizeHex(hex: string): string {
 }
 
 /**
- * Batch fetch color names for multiple colors with rate limiting
+ * Resolve names locally, deduplicating normalized hex values.
  * Returns a Map of normalized hex (uppercase, no #) -> name
  */
 export async function fetchColorNames(
   colors: ExtractedColor[],
 ): Promise<Map<string, string>> {
-  const nameMap = new Map<string, string>();
-
   // Dedupe hexes using normalized form
   const uniqueHexes = [...new Set(colors.map((c) => normalizeHex(c.hex)))];
 
-  // Fetch in parallel with a small batch size to avoid rate limiting
-  const BATCH_SIZE = 5;
-
-  for (let i = 0; i < uniqueHexes.length; i += BATCH_SIZE) {
-    const batch = uniqueHexes.slice(i, i + BATCH_SIZE);
-
-    const results = await Promise.all(
-      batch.map(async (hex) => {
-        // hex is already normalized (no #, uppercase)
-        const name = await fetchColorName(hex);
-        return { hex, name };
-      }),
-    );
-
-    for (const { hex, name } of results) {
-      // Store with normalized key
-      nameMap.set(hex, name);
-    }
-
-    // Small delay between batches to be nice to the API
-    if (i + BATCH_SIZE < uniqueHexes.length) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }
-
-  return nameMap;
+  return new Map(
+    await Promise.all(
+      uniqueHexes.map(async (hex) => [hex, await fetchColorName(hex)] as const),
+    ),
+  );
 }
 
 /**

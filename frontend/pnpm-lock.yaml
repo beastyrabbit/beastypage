@@ -55,6 +55,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      color-name-list:
+        specifier: 14.70.0
+        version: 14.70.0
       d3-flextree:
         specifier: ^2.1.2
         version: 2.1.2
@@ -2059,6 +2062,10 @@ packages:
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
+
+  color-name-list@14.70.0:
+    resolution: {integrity: sha512-YK6rGoEGRGFlwVBc4k9HnBN/oYzPwa53y5hqelz7T1C9YhNHQ8rAvLcYPN1ok94ANcwmawdS7FZ0t0xAzNf7VQ==}
+    engines: {node: ^22.14.0 || >=24.10.0, npm: '>=10.2.0'}
 
   commander@13.1.0:
     resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
@@ -4990,6 +4997,8 @@ snapshots:
       wrap-ansi: 9.0.2
 
   clsx@2.1.1: {}
+
+  color-name-list@14.70.0: {}
 
   commander@13.1.0: {}
 

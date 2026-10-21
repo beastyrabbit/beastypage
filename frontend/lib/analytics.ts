@@ -156,7 +156,7 @@ type PaletteCreatorExportedProps = {
 type PaletteGeneratorGeneratedProps = {
   mode: string;
   count: number;
-  source: "colorapi" | "fallback";
+  source: "local" | "colorapi" | "fallback";
 };
 
 type PaletteGeneratorExportedProps = {

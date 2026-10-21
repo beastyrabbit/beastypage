@@ -44,7 +44,7 @@ export interface ExtractedColor {
   hsl: HSL;
   position: { x: number; y: number };
   prevalence: number;
-  name?: string; // Human-readable color name from thecolorapi.com
+  name?: string; // Nearest human-readable name from the local dataset
 }
 
 export interface PaletteState {
