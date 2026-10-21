@@ -23,6 +23,17 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+function replayWithAttributes(attributes: Record<string, unknown>) {
+  return {
+    payload: {
+      events: [
+        { type: 2, data: { node: { type: 2, tagName: "img", attributes } } },
+        { type: 3, data: { source: 0, attributes: [{ id: 1, attributes }] } },
+      ],
+    },
+  };
+}
+
 describe("consent-gated Umami", () => {
   const config = {
     enabled: true,
@@ -176,6 +187,72 @@ describe("consent-gated Umami", () => {
     for (let level = 0; level < 40; level++) result = result.childNodes[0];
     expect(result).toEqual({ type: 3, textContent: "masked leaf" });
   });
+  it.each([
+    ["src", "data:image/png;base64,private-image"],
+    ["poster", "blob:https://site.test/private-blob"],
+    ["href", "DATA:image/svg+xml,private-image"],
+    ["srcset", "/safe.png 1x, data:image/png;base64,private-image 2x"],
+    ["srcset", "blob:https://site.test/private-blob 1x, /safe.png 2x"],
+    ["style", 'background-image: url("data:image/png;base64,private-image")'],
+    [
+      "_cssText",
+      "body { background: url(blob:https://site.test/private-blob) }",
+    ],
+    ["rr_dataURL", "data:image/png;base64,private-image"],
+  ])(
+    "filters %s data/blob URLs in snapshot and mutation attributes",
+    async (attribute, value) => {
+      const transport = vi.mocked(window.fetch);
+      createUmamiLoader(config)(true);
+      const attributes = {
+        [attribute]: value,
+        class: "public-preview",
+        width: 100,
+      };
+      await window.fetch("https://analytics.test/api/record", {
+        method: "POST",
+        body: JSON.stringify(replayWithAttributes(attributes)),
+      });
+      const body = JSON.parse(String(transport.mock.calls[0][1]?.body));
+      const expected = { ...attributes, [attribute]: "[Filtered]" };
+      expect(body.payload.events[0].data.node.attributes).toEqual(expected);
+      expect(body.payload.events[1].data.attributes[0].attributes).toEqual(
+        expected,
+      );
+      expect(JSON.stringify(body)).not.toContain("private-image");
+      expect(JSON.stringify(body)).not.toContain("private-blob");
+    },
+  );
+  it.each(["/i/private-share", "https://site.test/i/private-share/0"])(
+    "scrubs Quick Share capabilities in rrweb attributes: %s",
+    async (path) => {
+      const transport = vi.mocked(window.fetch);
+      createUmamiLoader(config)(true);
+      const attributes = {
+        src: path,
+        srcset: `${path} 1x, /safe.png 2x`,
+        poster: path,
+        href: path,
+        style: `background: url('${path}')`,
+      };
+      await window.fetch("https://analytics.test/api/record", {
+        method: "POST",
+        body: JSON.stringify(replayWithAttributes(attributes)),
+      });
+      const body = JSON.parse(String(transport.mock.calls[0][1]?.body));
+      for (const result of [
+        body.payload.events[0].data.node.attributes,
+        body.payload.events[1].data.attributes[0].attributes,
+      ]) {
+        for (const value of Object.values(result))
+          expect(value).toContain("/i/[Filtered]");
+      }
+      expect(JSON.stringify(body)).not.toContain("private-share");
+      expect(body.payload.events[0].data.node.attributes.srcset).toContain(
+        "/safe.png 2x",
+      );
+    },
+  );
   it("forces strict recorder settings and blocks recorder unload requests after withdrawal", async () => {
     const transport = vi.fn().mockResolvedValue(
       Response.json({
@@ -271,7 +348,7 @@ describe("event scrubber", () => {
   const overlay = "https://site.test/single-cat-stream/obs?key=sk_live_FAKE123";
   const sse = "/api/live/cat-stream/fixture?key=sk_live_FAKE123";
 
-  it.each(["view", "adoption", "ancestry-tree", "evolution"])(
+  it.each(["view", "adoption", "ancestry-tree", "evolution", "i"])(
     "removes queryless %s capabilities from navigation, transaction names and sampling context",
     (route) => {
       const path = `/${route}/private-capability`;
@@ -296,6 +373,9 @@ describe("event scrubber", () => {
       expect(scrubText(`Navigation to ${path} complete`)).toBe(
         `Navigation to /${route}/[Filtered] complete`,
       );
+      expect(scrubUrl(`https://site.test${path}`)).toBe(
+        `https://site.test/${route}/[Filtered]`,
+      );
     },
   );
 
@@ -306,8 +386,24 @@ describe("event scrubber", () => {
       "preview/view/example",
       "app:///view/example.ts",
       "The view is ready.",
+      "/i",
+      "/icons/image.png",
+      "app:///i/example.ts",
+      "The data: and blob: schemes carry media.",
     ])
       expect(scrubText(value)).toBe(value);
+  });
+  it("preserves safe attributes and text mentioning URL schemes", () => {
+    const event = {
+      attributes: {
+        src: "/assets/cat.png",
+        srcset: "/one.png 1x, /two.png 2x",
+        title: "metadata: public",
+        style: "color: red",
+      },
+      textContent: "Use data: or blob: URLs for local previews.",
+    };
+    expect(scrubEvent(event)).toEqual(event);
   });
 
   it("preserves live SDK scopes without reading them and scrubs only sampling metadata", () => {

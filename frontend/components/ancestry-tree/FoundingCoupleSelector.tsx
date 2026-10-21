@@ -239,6 +239,7 @@ export function FoundingCoupleSelector({
             {selectedMother ? (
               <div className="flex items-center gap-2">
                 <Image
+                  data-private
                   src={selectedMother.previewUrl}
                   alt={selectedMother.catName ?? "Mother"}
                   width={48}
@@ -268,6 +269,7 @@ export function FoundingCoupleSelector({
             {selectedFather ? (
               <div className="flex items-center gap-2">
                 <Image
+                  data-private
                   src={selectedFather.previewUrl}
                   alt={selectedFather.catName ?? "Father"}
                   width={48}
@@ -338,6 +340,7 @@ export function FoundingCoupleSelector({
                   )}`}
                 >
                   <Image
+                    data-private
                     src={cat.previewUrl}
                     alt={cat.catName ?? "Cat"}
                     width={48}

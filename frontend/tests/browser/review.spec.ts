@@ -115,6 +115,7 @@ test("Quick Share exposes native upload progress and an accessible clipboard tex
   });
   await expect(clipboard).toBeVisible();
   await expect(clipboard).toHaveAttribute("contenteditable", "true");
+  await expect(clipboard).toHaveAttribute("data-private", "true");
   await clipboard.focus();
   await expect(clipboard).toBeFocused();
   await page.getByRole("tab", { name: "Photo/video", exact: true }).click();
@@ -142,6 +143,63 @@ test("Quick Share exposes native upload progress and an accessible clipboard tex
   expect(errors).toEqual([]);
   await page.goto("about:blank");
 });
+
+for (const mime of ["image/png", "video/mp4"]) {
+  test(`signed-out Quick Share blocks ${mime} previews from replay`, async ({
+    page,
+  }) => {
+    const share = {
+      id: "replay-fixture",
+      slug: "private-replay-share",
+      url: "/i/private-replay-share",
+      state: "ready",
+      originalName: "private-media",
+      originalSize: 100,
+      publicMime: mime,
+      publicExpiresAt: Date.now() + 86_400_000,
+      receipt: "fixture-only",
+    };
+    await page.route("**/i/api/policy", (route) =>
+      route.fulfill({ json: { chunkBytes: 100 } }),
+    );
+    await page.route("**/i/api/imports", (route) =>
+      route.fulfill({ json: share }),
+    );
+    await page.route("**/i/api/uploads/replay-fixture/status", (route) =>
+      route.fulfill({ json: share }),
+    );
+    await page.route("**/i/private-replay-share", (route) =>
+      route.fulfill({ path: resolve("public/sprites/fademask.png") }),
+    );
+    await page.goto(
+      `${process.env.BROWSER_FIXTURE_URL}?view=quick-share&signedIn=0`,
+    );
+    await page.getByRole("tab", { name: "From a link", exact: true }).click();
+    await page
+      .getByRole("textbox", { name: "Media link" })
+      .fill("https://media.example/fixture");
+    await page
+      .getByRole("button", { name: "Create link", exact: true })
+      .click();
+    const media = page.locator(
+      `${mime.startsWith("video/") ? "video" : "img"}[src$="/i/private-replay-share"]`,
+    );
+    await expect(media).toHaveAttribute("data-private", "true");
+    await page.getByRole("tab", { name: "Clipboard", exact: true }).click();
+    const paste = page.getByRole("textbox", {
+      name: "Paste an image from the clipboard",
+    });
+    await expect(paste).toHaveAttribute("data-private", "true");
+    await paste.evaluate((element) => {
+      element.innerHTML =
+        '<img src="data:image/png;base64,private-pasted-bytes">';
+    });
+    await expect(paste.locator("img")).toHaveAttribute(
+      "src",
+      "data:image/png;base64,private-pasted-bytes",
+    );
+  });
+}
 
 test("Catdex cards open with Enter and Space", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1400 });

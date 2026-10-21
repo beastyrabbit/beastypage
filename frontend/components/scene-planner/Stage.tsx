@@ -854,6 +854,7 @@ export function Stage() {
               {overlay?.visible && (
                 // biome-ignore lint/performance/noImgElement: local data URL, stretched over the grid
                 <motion.img
+                  data-private
                   key="subject"
                   src={overlay.src}
                   alt="Foreground overlay"

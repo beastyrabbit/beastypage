@@ -18,7 +18,7 @@ export function scrubUrl(value: string, excludeSearch = false): string {
       }
     }
     url.pathname = url.pathname.replace(
-      /(\/(?:view|adoption|ancestry-tree|evolution)\/)\S+/g,
+      /(\/(?:view|adoption|ancestry-tree|evolution|i)\/)\S+/g,
       "$1[Filtered]",
     );
     return relative ? `${url.pathname}${url.search}` : url.toString();
@@ -61,7 +61,7 @@ export function scrubText(value: string): string {
         scrubUrl(url, true),
       )
       .replace(
-        /(?<![\w:/])\/(?:view|adoption|ancestry-tree|evolution)\/[^\s<>"']+/g,
+        /(?<![\w:/])\/(?:view|adoption|ancestry-tree|evolution|i)\/[^\s<>"']+/g,
         (url) => scrubUrl(url, true),
       ),
   )
@@ -111,11 +111,24 @@ export function scrubEvent<T>(event: T, maxDepth = 24): T {
       }
       if (key === "user" || key === "cookies" || key === "request_body")
         continue;
-      result[key] = visitField(key, item, depth);
+      result[key] = visitField(key, item, depth, field);
     }
     return result;
   }
-  function visitField(key: string, item: unknown, depth: number): unknown {
+  function visitField(
+    key: string,
+    item: unknown,
+    depth: number,
+    field: string,
+  ): unknown {
+    // rrweb stores both snapshot and mutation attributes here, including
+    // srcset, CSS url(...) and inlined image/canvas data. Drop the whole value.
+    if (
+      field === "attributes" &&
+      typeof item === "string" &&
+      /(?:^|[\s("'=,])(?:data|blob):/i.test(item)
+    )
+      return REDACTED;
     // Sentry accepts query_string as text, an object, or pairs; drop all forms.
     if (sensitiveKey.test(key) || /^(query_string|url\.query)$/i.test(key))
       return REDACTED;

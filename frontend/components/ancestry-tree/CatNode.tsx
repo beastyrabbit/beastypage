@@ -59,6 +59,7 @@ export const CatNode = memo(
           style={{ width: pixelSize, height: pixelSize }}
         >
           <Image
+            data-private
             src={previewUrl}
             alt={cat.name.full}
             width={pixelSize}

@@ -108,6 +108,7 @@ export function ImageCanvas({
       >
         {/* Base image */}
         <NextImage
+          data-private
           src={imageDataUrl}
           alt="Uploaded image for color extraction"
           fill

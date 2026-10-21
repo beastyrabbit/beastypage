@@ -62,6 +62,7 @@ export function PreviewCanvas({
           </div>
         )}
         <Image
+          data-private
           ref={imgRef}
           src={displayUrl}
           alt={showOriginal ? "Original image" : "Processed result"}

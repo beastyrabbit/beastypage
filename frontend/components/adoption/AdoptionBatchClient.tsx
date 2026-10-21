@@ -259,6 +259,7 @@ export function AdoptionBatchClient({
                   >
                     {previewSrc ? (
                       <Image
+                        data-private
                         src={previewSrc}
                         alt={displayName}
                         width={480}
@@ -340,6 +341,7 @@ export function AdoptionBatchClient({
               </h2>
               <div className="w-full overflow-hidden rounded-2xl border border-border/40 bg-background/80">
                 <Image
+                  data-private
                   src={focusedPreview.url}
                   alt={focusedPreview.label}
                   width={1080}

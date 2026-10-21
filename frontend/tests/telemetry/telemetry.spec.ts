@@ -169,6 +169,18 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
   const afterError = await assertStorage(page);
   expect(afterError).toEqual(before);
 
+  // Inert DOM attributes exercise the recorder transport without media requests.
+  await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.id = "public-media-probe";
+    probe.setAttribute(
+      "srcset",
+      "/safe.png 1x, data:image/png;base64,private-inline-bytes 2x",
+    );
+    probe.setAttribute("poster", "blob:https://site.test/private-blob");
+    probe.setAttribute("src", "/i/private-probe-share");
+    document.body.append(probe);
+  });
   await page
     .getByRole("button", { name: "Accept analytics", exact: true })
     .click();
@@ -181,6 +193,25 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
     .toBe(1);
   await expect(page.locator('script[src$="/recorder.js"]')).toHaveCount(1);
   await expect.poll(() => records.length).toBeGreaterThan(0);
+  await expect
+    .poll(() => JSON.stringify(records))
+    .toContain("public-media-probe");
+  await page.evaluate(async () => {
+    const probe = document.getElementById("public-media-probe");
+    probe?.setAttribute("data-probe", "mutation-probe");
+    probe?.setAttribute(
+      "srcset",
+      "data:image/png;base64,private-mutation-bytes 1x",
+    );
+    probe?.setAttribute("href", "/i/private-mutation-share/0");
+    await new Promise(requestAnimationFrame);
+    window.dispatchEvent(new Event("pagehide"));
+  });
+  await expect.poll(() => JSON.stringify(records)).toContain("mutation-probe");
+  const recordedBodies = JSON.stringify(records);
+  expect(recordedBodies).not.toContain("data:image");
+  expect(recordedBodies).not.toContain("blob:");
+  expect(recordedBodies).not.toMatch(/\/i\/(?!\[Filtered\])/);
   expect(JSON.stringify(records)).not.toContain("private-query");
   expect(JSON.stringify(records)).not.toContain("private-fragment");
   expect(JSON.stringify(sends)).not.toContain("private-query");

@@ -212,6 +212,7 @@ function StarterCard({
       >
         {cat.previewUrl ? (
           <Image
+            data-private
             src={cat.previewUrl}
             alt={cat.name}
             width={288}
@@ -286,6 +287,7 @@ function TreeCard({
       >
         {cat.previewUrl ? (
           <Image
+            data-private
             src={cat.previewUrl}
             alt={cat.name}
             width={420}
@@ -429,6 +431,7 @@ function CatDetailModal({
             }}
           >
             <Image
+              data-private
               src={cat.previewUrl}
               alt={cat.name}
               width={840}

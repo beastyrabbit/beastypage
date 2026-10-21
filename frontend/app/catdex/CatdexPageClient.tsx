@@ -1443,6 +1443,7 @@ function MassUploadModal({
                   <div className="flex flex-col gap-4 md:flex-row">
                     <div className="relative h-40 w-full md:w-40">
                       <Image
+                        data-private
                         src={entry.previewUrl}
                         alt={entry.defaultFile.name}
                         fill
