@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 
 // Local production server only. No credentials, live providers, or database needed.
 const baseUrl = process.env.LEGAL_TEST_BASE_URL ?? "";
+// CI has no local production server; run this spec locally with LEGAL_TEST_BASE_URL.
 test.skip(
   !baseUrl,
   "Set LEGAL_TEST_BASE_URL to the local Next.js production server.",
@@ -105,11 +106,16 @@ for (const width of [1280, 390]) {
           main.locator(`a[href="${counterpart}"]`).first(),
         ).toBeVisible();
         await expect(main).not.toContainText(
-          /impressum@heerlab\.com|datenschutz@heerlab\.com|Hetzner|thecolorapi/i,
+          /impressum@heerlab\.com|datenschutz@heerlab\.com|Hetzner/i,
         );
         if (path === "/datenschutz" || path === "/privacy") {
-          await expect(main.locator("h2")).toHaveCount(19);
+          await expect(main.locator("h2")).toHaveCount(18);
           await expect(main.locator("table")).toHaveCount(1);
+          await expect(main.locator("table tbody tr")).toHaveCount(3);
+          await expect(main).toContainText("The Color API");
+          await expect(
+            main.locator('a[href="https://www.thecolorapi.com"]'),
+          ).toHaveText("thecolorapi.com");
           const tableRegion = main.getByRole("region");
           await expect(tableRegion).toHaveAttribute("tabindex", "0");
           if (width === 390) {

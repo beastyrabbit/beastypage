@@ -2,10 +2,7 @@ import { PrivacySection, type PrivacySectionProps } from "./privacy-section";
 
 export function NineLivesSection({ lang, number }: PrivacySectionProps) {
   return (
-    <PrivacySection
-      number={number}
-      title={lang === "de" ? "Nine Lives" : "Nine Lives"}
-    >
+    <PrivacySection number={number} title="Nine Lives">
       {lang === "de" ? (
         <p>
           {"Die Seite "}

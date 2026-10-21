@@ -22,7 +22,7 @@ export function HostingSection({ lang, number }: PrivacySectionProps) {
           </p>
           <p>
             {
-              "Die Datenbank von BeastyPage wird regelmäßig gesichert. Die Sicherungskopien werden innerhalb der eigenen Infrastruktur in Deutschland gespeichert und nach spätestens drei Monaten überschrieben. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt im Schutz vor Datenverlust."
+              "Zur Datensicherung werden regelmäßig Sicherungskopien innerhalb der eigenen Infrastruktur erstellt; sie werden nach Ablauf ihrer Aufbewahrungszeit überschrieben."
             }
           </p>
         </>
@@ -40,7 +40,7 @@ export function HostingSection({ lang, number }: PrivacySectionProps) {
           </p>
           <p>
             {
-              "The BeastyPage database is backed up regularly. Backups are stored within the controller's own infrastructure in Germany and overwritten after no more than three months. The legal basis is Art. 6(1)(f) GDPR; the legitimate interest is protection against data loss."
+              "For data protection against loss, backup copies are created regularly within the controller's own infrastructure; they are overwritten once their retention period expires."
             }
           </p>
         </>

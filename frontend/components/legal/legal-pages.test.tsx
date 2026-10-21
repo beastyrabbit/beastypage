@@ -87,52 +87,57 @@ describe.each(pages)(
       expect(doc.querySelector(`a[href="${related}"]`)).not.toBeNull();
       expect(metadata.robots).toEqual({ index: false, follow: true });
       expect(html).not.toMatch(
-        /\[\[|<!--|impressum@heerlab\.com|datenschutz@heerlab\.com|Hetzner|thecolorapi/i,
+        /\[\[|<!--|impressum@heerlab\.com|datenschutz@heerlab\.com|Hetzner/i,
       );
       expect(doc.querySelectorAll("h1")).toHaveLength(1);
       expect(doc.querySelector("h1")?.textContent).not.toBe("");
+
       if (privacy) {
+        const sections = Array.from(doc.querySelectorAll("main > section"));
         expect(
           Array.from(doc.querySelectorAll("h2"), (h) =>
             Number(h.textContent?.split(".")[0]),
           ),
-        ).toEqual(Array.from({ length: 19 }, (_, i) => i + 1));
-        expect(doc.querySelectorAll("h3").length).toBeGreaterThanOrEqual(5);
-        expect(doc.querySelectorAll("table tbody tr")).toHaveLength(13);
+        ).toEqual(Array.from({ length: 18 }, (_, i) => i + 1));
+        expect(sections[2].querySelector("p:last-child")?.textContent).toBe(
+          lang === "de"
+            ? "Zur Datensicherung werden regelmäßig Sicherungskopien innerhalb der eigenen Infrastruktur erstellt; sie werden nach Ablauf ihrer Aufbewahrungszeit überschrieben."
+            : "For data protection against loss, backup copies are created regularly within the controller's own infrastructure; they are overwritten once their retention period expires.",
+        );
+        expect(sections[3].querySelectorAll("p")).toHaveLength(4);
+        expect(sections[3].textContent).toContain(
+          lang === "de"
+            ? "nach 14 Tagen automatisch gelöscht"
+            : "deleted automatically after 14 days",
+        );
+        expect(sections[3].textContent).toContain(
+          lang === "de"
+            ? "normalerweise nach höchstens 30 Tagen"
+            : "normally deleted after no more than 30 days",
+        );
+        const account = sections[5];
+        expect(account.textContent).toContain(
+          lang === "de"
+            ? "bis Sie sie löschen oder die Löschung anfordern, höchstens jedoch bis zu 10 Jahre"
+            : "until you delete it or request deletion, at most up to 10 years",
+        );
+        expect(account.textContent).toContain("1–30");
+        expect(account.textContent).toContain(
+          lang === "de"
+            ? "Dateien und IP-Adressen werden nach 30 Tagen gelöscht."
+            : "Files and IP addresses are deleted after 30 days.",
+        );
+        expect(account.textContent).toContain(
+          lang === "de" ? "Bild oder seine Metadaten" : "image or its metadata",
+        );
+        expect(account.textContent).toContain(
+          lang === "de" ? "Art. 6 Abs. 1 lit. f DSGVO" : "Art. 6(1)(f) GDPR",
+        );
         expect(
-          doc.querySelector('section[aria-label][tabindex="0"]'),
+          account.querySelector(`a[href="mailto:${email}"]`),
         ).not.toBeNull();
-        const discord = Array.from(doc.querySelectorAll("p")).find((p) =>
-          p.textContent?.includes("/palette"),
-        );
-        expect(discord?.textContent).toContain(
-          lang === "de" ? "Nachrichten-Kontextmenü" : "message context menu",
-        );
-        expect(discord?.textContent).toContain(
-          lang === "de" ? "andere Personen" : "other people",
-        );
-        expect(discord?.textContent).toContain(
-          lang === "de"
-            ? "ohne automatische Ablaufzeit"
-            : "no automatic expiry",
-        );
-        expect(
-          discord?.querySelector(`a[href="mailto:${email}"]`),
-        ).not.toBeNull();
-        expect(discord?.textContent).toContain(
-          lang === "de"
-            ? "Rechtsgrundlage ist wie für die anderen Bot-Inhalte Art. 6 Abs. 1 lit. b DSGVO. Soweit das Bild oder seine Metadaten andere Personen betreffen, ist Rechtsgrundlage Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in der Bereitstellung der angeforderten Palette."
-            : "As with other bot content, the legal basis is Art. 6(1)(b) GDPR. Where the image or its metadata relates to other people, the legal basis is Art. 6(1)(f) GDPR, with the legitimate interest of providing the requested palette.",
-        );
-        const imageMetadata = Array.from(doc.querySelectorAll("p")).find((p) =>
-          p.textContent?.includes("EXIF"),
-        );
-        expect(imageMetadata?.textContent).toContain(
-          lang === "de"
-            ? "Hochgeladene sowie über den Discord-Befehl /palette gespeicherte Bilder werden unverändert einschließlich eingebetteter Metadaten wie EXIF gespeichert."
-            : "Uploaded images and images stored through the Discord /palette command are stored unchanged, including embedded metadata such as EXIF.",
-        );
-        const clerk = doc.querySelectorAll("main > section")[6];
+        expect(account.textContent).not.toMatch(/PostgreSQL|EXIF|MiB/);
+        const clerk = sections[6];
         expect(clerk.textContent).not.toMatch(
           /Kontoeinstellungen|account settings/,
         );
@@ -142,28 +147,44 @@ describe.each(pages)(
             : "Both the Clerk account and the data stored in BeastyPage are then deleted.",
         );
         expect(clerk.querySelector(`a[href="mailto:${email}"]`)).not.toBeNull();
-        for (const key of [
-          "catdex-upload:client-key",
-          "classic-wheel:client-key",
-          "stream-viewer-session:fingerprint",
-          "stream-viewer-session:<viewerKey>",
-          "beastyrabbit.quick-share.receipts.v1",
-          "ancestry-tree-edit:<slug>",
-          "beastypage:mapper-edit-token:<slug>",
-          "singleCatPlus.variants",
-          "pixelator-variants",
-          "paletteGenerator.collection",
-          lang === "de" ? "ph_<projekt>_posthog" : "ph_<project>_posthog",
-          lang === "de" ? "ph_<projekt>_window_id" : "ph_<project>_window_id",
-        ])
-          expect(doc.body.textContent).toContain(key);
-        expect(doc.body.textContent).toContain(
+        const optional = sections[9];
+        expect(optional.querySelector("h2")?.textContent).toContain(
           lang === "de"
-            ? "ohne vorherige Einwilligung"
-            : "without prior consent",
+            ? "Optionale Funktionen mit externen Abrufen"
+            : "Optional features with external requests",
         );
-        const contact = doc.querySelectorAll("main > section")[13];
-        const paragraphs = contact.querySelectorAll("p");
+        expect(optional.textContent).toContain("Wikimedia Commons");
+        expect(optional.textContent).toContain("The Color API");
+        expect(
+          optional.querySelector('a[href="https://www.thecolorapi.com"]')
+            ?.textContent,
+        ).toBe("thecolorapi.com");
+        expect(optional.textContent).toContain(
+          lang === "de"
+            ? "Nähere Angaben zum Betreiber und zu Übermittlungsgarantien liegen derzeit nicht vor."
+            : "Further details on the operator and transfer safeguards are not currently available.",
+        );
+        expect(doc.querySelectorAll("table tbody tr")).toHaveLength(3);
+        expect(
+          doc.querySelector('div[role="region"][aria-label][tabindex="0"]'),
+        ).not.toBeNull();
+        const rows = Array.from(doc.querySelectorAll("table tbody tr"));
+        expect(
+          rows.map((row) => row.querySelectorAll("td")[1].textContent),
+        ).toEqual(["Clerk", "PostHog", "BeastyPage"]);
+        expect(rows[0].textContent).toContain("__client_uat…");
+        expect(rows[0].textContent).toContain("__clerk_environment");
+        expect(rows[0].textContent).toContain("400");
+        expect(rows[1].textContent).toContain("ph_…");
+        expect(rows[1].textContent).toContain(
+          lang === "de" ? "Abschnitt 9" : "section 9",
+        );
+        expect(sections[14].textContent).toContain(
+          lang === "de"
+            ? "Für PostHog wird derzeit noch keine Einwilligung eingeholt"
+            : "Consent for PostHog is not collected yet",
+        );
+        const paragraphs = sections[12].querySelectorAll("p");
         expect(paragraphs[0].textContent).toContain(
           lang === "de"
             ? "bis zu 10 Minuten nach Ihrer letzten Anfrage nur im Arbeitsspeicher gehalten."
@@ -174,28 +195,6 @@ describe.each(pages)(
         expect(paragraphs[3].textContent).toContain(
           lang === "de" ? "siehe nächster Abschnitt" : "see next section",
         );
-        for (const row of doc.querySelectorAll("table tbody tr")) {
-          const cells = row.querySelectorAll("td");
-          const name = cells[0].textContent ?? "";
-          if (
-            name.includes("(localStorage)") &&
-            !name.includes("__clerk_environment")
-          ) {
-            expect(cells[3].textContent).toBe(
-              lang === "de"
-                ? "Bis Sie die Browserdaten löschen"
-                : "Until you delete browser data",
-            );
-          }
-        }
-        const posthog = doc.querySelectorAll("table tbody tr")[2];
-        expect(posthog.querySelectorAll("td")[4].textContent).toBe(
-          lang === "de"
-            ? "Einwilligungsbedürftig nach § 25 Abs. 1 TDDDG; derzeit ohne Einwilligung gesetzt (siehe Abschnitt 9)"
-            : "Requires consent under Section 25(1) TDDDG; currently set without consent (see section 9)",
-        );
-        if (lang === "en")
-          expect(posthog.textContent).not.toContain("<projekt>");
       } else {
         const contact = doc.querySelectorAll("main > section")[1];
         expect(contact.querySelector('a[href^="mailto:"] + br')).not.toBeNull();

@@ -10,71 +10,63 @@ export function ClerkSection({ lang, number }: PrivacySectionProps) {
       {lang === "de" ? (
         <>
           <p>
-            {
-              "Für Anmeldung und Kontoverwaltung wird Clerk, Inc., 660 King Street Unit 345, San Francisco, CA 94107, USA, als Auftragsverarbeiter eingesetzt. Clerk wird auf jeder Seite bereits vor der Anmeldung geladen und erhält IP-Adresse und Browserdaten. Bei Registrierung und Anmeldung verarbeitet Clerk Benutzername, Passwort, optionale E-Mail-Adresse, OAuth-Identität sowie Sitzungs- und Sicherheitsdaten."
-            }
+            Clerk, Inc., 660 King Street Unit 345, San Francisco, CA 94107, USA,
+            wird als Auftragsverarbeiter für die technisch notwendige Anmeldung
+            und Kontoverwaltung eingesetzt. Clerk verarbeitet Anmelde-, Konto-
+            und Sicherheitsdaten und erhält bereits beim Laden öffentlicher
+            Seiten IP-Adresse und Browserdaten. Die Verarbeitung erfolgt in den
+            USA; Clerk ist unter dem EU-US Data Privacy Framework zertifiziert,
+            und der Auftragsverarbeitungsvertrag enthält
+            Standardvertragsklauseln. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b
+            DSGVO für Anmeldung und Konto sowie Art. 6 Abs. 1 lit. f DSGVO für
+            die Bereitstellung und Absicherung der Anmeldung.
           </p>
           <p>
-            {
-              "Die Daten werden in den USA gehostet. Clerk ist unter dem EU-US Data Privacy Framework zertifiziert; der Auftragsverarbeitungsvertrag enthält zusätzlich Standardvertragsklauseln der EU-Kommission. Rechtsgrundlage für Anmeldung und Konto ist Art. 6 Abs. 1 lit. b DSGVO. Das Laden auf öffentlichen Seiten beruht auf Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt darin, die Anmeldung auf jeder Seite bereitzustellen und Konten zu schützen."
-            }
-          </p>
-          <p>
-            {
-              "Kontodaten werden gespeichert, solange das Konto besteht. Sie können die Löschung unter "
-            }
-            <LegalEmail kind="privacy" />
-            {
-              " anfordern. Dann werden sowohl das Clerk-Konto als auch die bei BeastyPage gespeicherten Daten gelöscht. Clerk speichert Protokolle je nach Tarif einen, sieben oder 30 Tage. Cookies und Browser-Speicher sind in Abschnitt 16 beschrieben. Details: "
-            }
+            Für die Speicherung von Kontodaten gelten die Fristen in Abschnitt
+            6. Sie können die Löschung unter <LegalEmail kind="privacy" />{" "}
+            anfordern. Dann werden sowohl das Clerk-Konto als auch die bei
+            BeastyPage gespeicherten Daten gelöscht. Details:{" "}
             <a href="https://clerk.com/legal/privacy">
-              {"Datenschutzerklärung von Clerk"}
+              Datenschutzerklärung von Clerk
             </a>
-            {"."}
+            .
           </p>
           <p>
-            {
-              "Bei der Registrierung kann Clerk zum Schutz vor Bots eine Cloudflare-Turnstile-Prüfung anzeigen. Anbieter ist Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107, USA; Cloudflare ist unter dem EU-US Data Privacy Framework zertifiziert. Dabei können IP-Adresse und Browserdaten verarbeitet werden. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse ist der Schutz vor missbräuchlicher Registrierung. Details: "
-            }
+            Bei der Registrierung kann Clerk zur Abwehr von Bots Cloudflare
+            Turnstile einsetzen, wobei IP-Adresse und Browserdaten verarbeitet
+            werden (Art. 6 Abs. 1 lit. f DSGVO;{" "}
             <a href="https://www.cloudflare.com/privacypolicy/">
-              {"Datenschutzerklärung von Cloudflare"}
+              Datenschutzerklärung von Cloudflare
             </a>
-            {"."}
+            ).
           </p>
         </>
       ) : (
         <>
           <p>
-            {
-              "Clerk, Inc., 660 King Street Unit 345, San Francisco, CA 94107, USA, is used as a processor for sign-in and account management. Clerk loads on every page before sign-in and receives your IP address and browser data. During registration and sign-in, Clerk processes username, password, optional e-mail address, OAuth identity, and session and security data."
-            }
+            Clerk, Inc., 660 King Street Unit 345, San Francisco, CA 94107, USA,
+            is used as a processor for technically necessary sign-in and account
+            management. Clerk processes sign-in, account and security data and
+            receives IP addresses and browser data when public pages load.
+            Processing takes place in the USA; Clerk is certified under the
+            EU-US Data Privacy Framework, and its data processing agreement
+            includes Standard Contractual Clauses. The legal basis is Art.
+            6(1)(b) GDPR for sign-in and accounts, and Art. 6(1)(f) GDPR for
+            providing and securing sign-in.
           </p>
           <p>
-            {
-              "Data is hosted in the USA. Clerk is certified under the EU-US Data Privacy Framework; its data processing agreement also includes the European Commission's Standard Contractual Clauses. The legal basis for sign-in and accounts is Art. 6(1)(b) GDPR. Loading on public pages is based on Art. 6(1)(f) GDPR; the legitimate interest is making sign-in available on every page and protecting accounts."
-            }
+            The retention periods in section 6 apply to account data. You can
+            request deletion at <LegalEmail kind="privacy" />. Both the Clerk
+            account and the data stored in BeastyPage are then deleted. Details:{" "}
+            <a href="https://clerk.com/legal/privacy">Clerk privacy policy</a>.
           </p>
           <p>
-            {
-              "Account data is stored for as long as the account exists. You can request deletion at "
-            }
-            <LegalEmail kind="privacy" />
-            {
-              ". Both the Clerk account and the data stored in BeastyPage are then deleted. Clerk retains logs for one, seven or 30 days depending on the plan. Cookies and browser storage are described in section 16. Details: "
-            }
-            <a href="https://clerk.com/legal/privacy">
-              {"Clerk privacy policy"}
-            </a>
-            {"."}
-          </p>
-          <p>
-            {
-              "During registration, Clerk may display a Cloudflare Turnstile challenge for bot protection. The provider is Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107, USA; Cloudflare is certified under the EU-US Data Privacy Framework. IP address and browser data may be processed. The legal basis is Art. 6(1)(f) GDPR; the legitimate interest is preventing abusive registrations. Details: "
-            }
+            During registration, Clerk may use Cloudflare Turnstile to prevent
+            bots, processing IP addresses and browser data (Art. 6(1)(f) GDPR;{" "}
             <a href="https://www.cloudflare.com/privacypolicy/">
-              {"Cloudflare privacy policy"}
+              Cloudflare privacy policy
             </a>
-            {"."}
+            ).
           </p>
         </>
       )}

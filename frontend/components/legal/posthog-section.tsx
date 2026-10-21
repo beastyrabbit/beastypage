@@ -11,61 +11,56 @@ export function PostHogSection({ lang, number }: PrivacySectionProps) {
       {lang === "de" ? (
         <>
           <p>
-            {
-              "BeastyPage verwendet derzeit PostHog zur Nutzungsanalyse. Anbieter und Auftragsverarbeiter ist PostHog, Inc., 2261 Market Street #4008, San Francisco, CA 94114, USA. Anfragen werden über beastyrabbit.com ("
-            }
-            <code>{"/bubu"}</code>
-            {
-              ") an die PostHog EU Cloud in Frankfurt weitergeleitet. PostHog ist unter dem EU-US Data Privacy Framework zertifiziert; der Auftragsverarbeitungsvertrag enthält Standardvertragsklauseln."
-            }
+            BeastyPage verwendet derzeit PostHog zur Nutzungsanalyse.
+            Auftragsverarbeiter ist PostHog, Inc., 2261 Market Street #4008, San
+            Francisco, CA 94114, USA. Die Verarbeitung erfolgt über die PostHog
+            EU Cloud in Frankfurt; PostHog ist unter dem EU-US Data Privacy
+            Framework zertifiziert, und der Auftragsverarbeitungsvertrag enthält
+            Standardvertragsklauseln.
           </p>
           <p>
-            {
-              "Verarbeitet werden Seitenaufrufe, das Verlassen von Seiten, Klicks und Interaktionen (Autocapture), Ereignisse zur Werkzeugnutzung, Web-Vitals, pseudonyme Geräte- und Sitzungskennungen in localStorage/sessionStorage, die über den Proxy übermittelte IP-Adresse und Browserdaten. Sitzungsaufzeichnungen finden nicht statt. PostHog speichert Ereignisdaten je nach Tarif bis zu einem Jahr (kostenloser Tarif) bzw. bis zu sieben Jahre."
-            }
+            Verarbeitet werden Nutzungsereignisse, technische Verbindungsdaten
+            und pseudonyme Kennungen im Browser-Speicher. Sitzungsaufzeichnungen
+            finden nicht statt. Ereignisdaten werden je nach Tarif bis zu einem
+            Jahr oder bis zu sieben Jahre gespeichert. Rechtsgrundlage ist Art.
+            6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt darin, die
+            Nutzung zu verstehen und die Website zu verbessern.
           </p>
           <p>
-            {
-              "Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt darin, die Nutzung zu verstehen und die Website zu verbessern. Der Zugriff auf den Browser-Speicher erfolgt derzeit ohne vorherige Einwilligung; eine Einwilligungsabfrage und die Umstellung auf ein selbst betriebenes Analysewerkzeug sind in Vorbereitung."
-            }
-          </p>
-          <p>
-            {
-              "Sie können nach Art. 21 DSGVO widersprechen und den lokalen Speicher für diese Website im Browser blockieren. Die einwilligungsbedürftigen Speichereinträge sind in Abschnitt 16 aufgeführt. Details: "
-            }
+            Sie können nach Art. 21 DSGVO widersprechen und den Browser-Speicher
+            für diese Website blockieren. Eine Einwilligung wird derzeit nicht
+            eingeholt; sie ist zusammen mit der Umstellung auf ein selbst
+            betriebenes Analysewerkzeug vorgesehen (siehe Abschnitt 15).
+            Details:{" "}
             <a href="https://posthog.com/privacy">
-              {"Datenschutzerklärung von PostHog"}
+              Datenschutzerklärung von PostHog
             </a>
-            {"."}
+            .
           </p>
         </>
       ) : (
         <>
           <p>
-            {
-              "BeastyPage currently uses PostHog for usage analytics. The provider and processor is PostHog, Inc., 2261 Market Street #4008, San Francisco, CA 94114, USA. Requests are proxied through beastyrabbit.com ("
-            }
-            <code>{"/bubu"}</code>
-            {
-              ") to PostHog EU Cloud in Frankfurt. PostHog is certified under the EU-US Data Privacy Framework; its data processing agreement includes Standard Contractual Clauses."
-            }
+            BeastyPage currently uses PostHog for usage analytics. The processor
+            is PostHog, Inc., 2261 Market Street #4008, San Francisco, CA 94114,
+            USA. Processing uses PostHog EU Cloud in Frankfurt; PostHog is
+            certified under the EU-US Data Privacy Framework, and its data
+            processing agreement includes Standard Contractual Clauses.
           </p>
           <p>
-            {
-              "Data includes pageviews, page leaves, clicks and interactions (autocapture), tool usage events, web vitals, pseudonymous device and session IDs in localStorage/sessionStorage, the IP address transmitted through the proxy, and browser data. There is no session recording. PostHog retains event data for up to one year on its free plan or up to seven years depending on the plan."
-            }
+            Data includes usage events, technical connection data and
+            pseudonymous identifiers in browser storage. There is no session
+            recording. Event data is retained for up to one year or up to seven
+            years depending on the plan. The legal basis is Art. 6(1)(f) GDPR;
+            the legitimate interest is understanding usage and improving the
+            website.
           </p>
           <p>
-            {
-              "The legal basis is Art. 6(1)(f) GDPR; the legitimate interest is understanding usage and improving the website. Browser storage is currently accessed without prior consent; a consent prompt and migration to a self-hosted analytics tool are being prepared."
-            }
-          </p>
-          <p>
-            {
-              "You can object under Art. 21 GDPR and block local storage for this website in your browser. Storage entries requiring consent are listed in section 16. Details: "
-            }
-            <a href="https://posthog.com/privacy">{"PostHog privacy policy"}</a>
-            {"."}
+            You can object under Art. 21 GDPR and block browser storage for this
+            website. Consent is not currently collected; it is planned alongside
+            the switch to a self-hosted analytics tool (see section 15).
+            Details:{" "}
+            <a href="https://posthog.com/privacy">PostHog privacy policy</a>.
           </p>
         </>
       )}

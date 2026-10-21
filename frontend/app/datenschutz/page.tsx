@@ -8,17 +8,16 @@ import { CrowdSecSection } from "@/components/legal/crowdsec-section";
 import { EmailSection } from "@/components/legal/email-section";
 import { ExternalLinksSection } from "@/components/legal/external-links-section";
 import { HostingSection } from "@/components/legal/hosting-section";
-import { ImageUrlsSection } from "@/components/legal/image-urls-section";
 import { LegalPage } from "@/components/legal/legal-page";
 import { LogsSection } from "@/components/legal/logs-section";
 import { NineLivesSection } from "@/components/legal/nine-lives-section";
 import { OAuthSection } from "@/components/legal/oauth-section";
 import { ObligationSection } from "@/components/legal/obligation-section";
+import { OptionalRequestsSection } from "@/components/legal/optional-requests-section";
 import { OverviewSection } from "@/components/legal/overview-section";
 import { PostHogSection } from "@/components/legal/posthog-section";
 import { RightsSection } from "@/components/legal/rights-section";
 import { StorageSection } from "@/components/legal/storage-section";
-import { WikimediaSection } from "@/components/legal/wikimedia-section";
 
 export const metadata: Metadata = {
   title: "Datenschutzerklärung | BeastyPage",
@@ -38,16 +37,15 @@ export default function PrivacyPage() {
       <ClerkSection lang="de" number={7} />
       <OAuthSection lang="de" number={8} />
       <PostHogSection lang="de" number={9} />
-      <WikimediaSection lang="de" number={10} />
-      <ImageUrlsSection lang="de" number={11} />
-      <NineLivesSection lang="de" number={12} />
-      <ExternalLinksSection lang="de" number={13} />
-      <ContactSection lang="de" number={14} />
-      <EmailSection lang="de" number={15} />
-      <StorageSection lang="de" number={16} />
-      <RightsSection lang="de" number={17} />
-      <ObligationSection lang="de" number={18} />
-      <ChangesSection lang="de" number={19} />
+      <OptionalRequestsSection lang="de" number={10} />
+      <NineLivesSection lang="de" number={11} />
+      <ExternalLinksSection lang="de" number={12} />
+      <ContactSection lang="de" number={13} />
+      <EmailSection lang="de" number={14} />
+      <StorageSection lang="de" number={15} />
+      <RightsSection lang="de" number={16} />
+      <ObligationSection lang="de" number={17} />
+      <ChangesSection lang="de" number={18} />
     </LegalPage>
   );
 }
