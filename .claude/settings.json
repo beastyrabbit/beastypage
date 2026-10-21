@@ -1,6 +1,8 @@
 {
   "enabledMcpjsonServers": [
     "clerk",
-    "posthog"
+    "glitchtip",
+    "posthog",
+    "umami"
   ]
 }
