@@ -8,7 +8,10 @@ import { track } from "@/lib/analytics";
 import { telemetryConfig, telemetryEnabled } from "@/lib/telemetry/config";
 import { outboundHost } from "@/lib/telemetry/outbound";
 import { isOverlayRoute } from "@/lib/telemetry/overlay";
-import { STORAGE_INVENTORY } from "@/lib/telemetry/storage-inventory";
+import {
+  CONSENT_RETENTION_DAYS,
+  STORAGE_INVENTORY,
+} from "@/lib/telemetry/storage-inventory";
 import { createUmamiLoader } from "@/lib/telemetry/umami";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
 import "./telemetry.css";
@@ -49,7 +52,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       autoShow: true,
       hideFromBots: false,
       disablePageInteraction: false,
-      cookie: { name: "cc_cookie", expiresAfterDays: 182 },
+      cookie: { name: "cc_cookie", expiresAfterDays: CONSENT_RETENTION_DAYS },
       guiOptions: {
         consentModal: {
           layout: "box",

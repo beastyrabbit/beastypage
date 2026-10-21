@@ -1,4 +1,6 @@
 // From frontend/: LEGAL_TEST_BASE_URL=http://localhost:3317 pnpm exec playwright test tests/browser/legal-pages.spec.ts --reporter=line --max-failures=1
+
+import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 
 // Local production server only. No credentials, live providers, or database needed.
@@ -62,6 +64,16 @@ for (const width of [1280, 390]) {
       // Also block same-origin telemetry proxies, which could relay to a third party.
       await page.route("**/*", (route) => {
         const url = new URL(route.request().url());
+        // The telemetry test build uses this synthetic signed-out Clerk client.
+        if (url.hostname === "clerk.telemetry.test")
+          return url.pathname.endsWith(".js")
+            ? route.fulfill({
+                path: resolve("tests/telemetry/fixtures/clerk.js"),
+                contentType: "application/javascript",
+              })
+            : route.fulfill({ json: { response: null } });
+        if (url.pathname.includes("/api/1/envelope"))
+          return route.fulfill({ json: {} });
         return url.origin === new URL(baseUrl).origin &&
           !url.pathname.startsWith("/bubu")
           ? route.continue()
@@ -70,8 +82,13 @@ for (const width of [1280, 390]) {
     });
 
     for (const [label, path, lang, email, counterpart] of routes) {
-      test(`follows ${label} from the home footer`, async ({ page }) => {
-        await page.goto(baseUrl);
+      test(`follows ${label} from the shared site footer`, async ({ page }) => {
+        // The home route runs Clerk middleware. Start on this public route so
+        // the synthetic telemetry build needs no server-side Clerk handshake.
+        await page.goto(`${baseUrl}/projects`);
+        await page
+          .getByRole("button", { name: "Necessary only", exact: true })
+          .click();
         const link = page
           .locator("footer")
           .getByRole("link", { name: label, exact: true });
@@ -112,6 +129,27 @@ for (const width of [1280, 390]) {
           await expect(main.locator("h2")).toHaveCount(18);
           await expect(main.locator("table")).toHaveCount(1);
           await expect(main.locator("table tbody tr")).toHaveCount(3);
+          await expect(
+            main.locator("table tbody tr td:nth-child(2)"),
+          ).toHaveText(["Clerk", "BeastyPage", "BeastyPage"]);
+          await expect(main.locator("table")).toContainText("cc_cookie");
+          await expect(main.locator("table")).toContainText("182");
+          await expect(main.locator("table")).toContainText(
+            "stream-viewer-session:fingerprint",
+          );
+          const telemetry = main.locator(":scope > section").nth(8);
+          await expect(telemetry.getByRole("heading")).toContainText("Umami");
+          await expect(telemetry).toContainText("GlitchTip");
+          await expect(telemetry).toContainText(
+            lang === "de"
+              ? "[OFFEN: Speicherdauer Umami]"
+              : "[PENDING: Umami retention period]",
+          );
+          await expect(telemetry).toContainText("90");
+          await telemetry.screenshot({
+            path: `../.playwright-mcp/legal-telemetry-${lang}-${width}.png`,
+            animations: "disabled",
+          });
           await expect(main).toContainText("The Color API");
           await expect(
             main.locator('a[href="https://www.thecolorapi.com"]'),
@@ -134,6 +172,27 @@ for (const width of [1280, 390]) {
             path: `../.playwright-mcp/legal-storage-${path.slice(1)}-${width}.png`,
             animations: "disabled",
           });
+          const cookieSettings = page
+            .locator("footer")
+            .getByRole("button", { name: "Cookie settings", exact: true });
+          await cookieSettings.scrollIntoViewIfNeeded();
+          await expect(cookieSettings).toBeVisible();
+          await page.screenshot({
+            path: `../.playwright-mcp/legal-footer-${lang}-${width}.png`,
+            animations: "disabled",
+          });
+          await cookieSettings.click();
+          const preferences = page.getByRole("dialog", {
+            name: "Cookie and storage settings",
+          });
+          await expect(preferences).toBeVisible();
+          await page.screenshot({
+            path: `../.playwright-mcp/legal-preferences-${lang}-${width}.png`,
+            animations: "disabled",
+          });
+          await preferences
+            .getByRole("button", { name: "Close settings" })
+            .click();
         }
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth),

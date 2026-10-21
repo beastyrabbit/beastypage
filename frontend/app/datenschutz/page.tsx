@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AccountSection } from "@/components/legal/account-section";
+import { AnalyticsSection } from "@/components/legal/analytics-section";
 import { ChangesSection } from "@/components/legal/changes-section";
 import { ClerkSection } from "@/components/legal/clerk-section";
 import { ContactSection } from "@/components/legal/contact-section";
@@ -15,7 +16,6 @@ import { OAuthSection } from "@/components/legal/oauth-section";
 import { ObligationSection } from "@/components/legal/obligation-section";
 import { OptionalRequestsSection } from "@/components/legal/optional-requests-section";
 import { OverviewSection } from "@/components/legal/overview-section";
-import { PostHogSection } from "@/components/legal/posthog-section";
 import { RightsSection } from "@/components/legal/rights-section";
 import { StorageSection } from "@/components/legal/storage-section";
 
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
       <AccountSection lang="de" number={6} />
       <ClerkSection lang="de" number={7} />
       <OAuthSection lang="de" number={8} />
-      <PostHogSection lang="de" number={9} />
+      <AnalyticsSection lang="de" number={9} />
       <OptionalRequestsSection lang="de" number={10} />
       <NineLivesSection lang="de" number={11} />
       <ExternalLinksSection lang="de" number={12} />

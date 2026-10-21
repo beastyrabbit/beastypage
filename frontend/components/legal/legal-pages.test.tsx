@@ -16,7 +16,12 @@ import LegalNoticePage, {
   metadata as noticeMetadata,
 } from "@/app/legal-notice/page";
 import PrivacyPage, { metadata as privacyMetadata } from "@/app/privacy/page";
+import { UMAMI_RETENTION } from "@/components/legal/analytics-section";
 import { SiteFooter } from "@/components/site-footer";
+import {
+  isDeclaredStorageKey,
+  STORAGE_INVENTORY,
+} from "@/lib/telemetry/storage-inventory";
 import { config, routeRequest } from "@/proxy";
 
 const pages = [
@@ -171,18 +176,53 @@ describe.each(pages)(
         const rows = Array.from(doc.querySelectorAll("table tbody tr"));
         expect(
           rows.map((row) => row.querySelectorAll("td")[1].textContent),
-        ).toEqual(["Clerk", "PostHog", "BeastyPage"]);
-        expect(rows[0].textContent).toContain("__client_uat…");
+        ).toEqual(["Clerk", "BeastyPage", "BeastyPage"]);
+        expect(rows[0].textContent).toContain("__client_uat");
         expect(rows[0].textContent).toContain("__clerk_environment");
         expect(rows[0].textContent).toContain("400");
-        expect(rows[1].textContent).toContain("ph_…");
-        expect(rows[1].textContent).toContain(
+        expect(rows[1].textContent).toContain("cc_cookie");
+        expect(rows[1].textContent).toContain("182");
+        expect(rows[1].textContent).toContain("TDDDG");
+        for (const entry of STORAGE_INVENTORY) {
+          for (const name of entry.name.split(", "))
+            expect(doc.querySelector("table")?.textContent).toContain(name);
+        }
+        for (const key of [
+          "__clerk_environment",
+          "__client_uat_instance",
+          "stream-viewer-session:fingerprint",
+          "catdex-upload:client-key",
+          "classic-wheel:client-key",
+          "paletteGenerator.collection",
+        ])
+          expect(isDeclaredStorageKey(key)).toBe(true);
+        expect(sections[14].textContent).toContain(
           lang === "de" ? "Abschnitt 9" : "section 9",
         );
-        expect(sections[14].textContent).toContain(
-          lang === "de"
-            ? "Für PostHog wird derzeit noch keine Einwilligung eingeholt"
-            : "Consent for PostHog is not collected yet",
+        expect(sections[14].textContent).toContain("Cookie settings");
+        const telemetry = sections[8];
+        for (const value of [
+          "Umami",
+          "GlitchTip",
+          "umami.heerlab.com",
+          "glitchtip.heerlab.com",
+          UMAMI_RETENTION[lang],
+          "15",
+          "10",
+          "5",
+          "90",
+          "Art. 21",
+          "Cookie settings",
+        ])
+          expect(telemetry.textContent).toContain(value);
+        expect(telemetry.textContent).toContain(
+          lang === "de" ? "Abschnitt 15" : "Section 15",
+        );
+        expect(telemetry.textContent).toContain(
+          lang === "de" ? "Art. 6 Abs. 1 lit. a DSGVO" : "Art. 6(1)(a) GDPR",
+        );
+        expect(telemetry.textContent).toContain(
+          lang === "de" ? "Art. 6 Abs. 1 lit. f DSGVO" : "Art. 6(1)(f) GDPR",
         );
         const paragraphs = sections[12].querySelectorAll("p");
         expect(paragraphs[0].textContent).toContain(
@@ -239,6 +279,7 @@ it("groups all four internal footer links before the external links", () => {
     ["Privacy", "/privacy", null],
   ]);
   for (const link of links.slice(0, 2)) expect(link.lang).toBe("de");
+  expect(doc.querySelector("button")?.textContent).toBe("Cookie settings");
 });
 
 it("keeps the normal error inside the layout and supplies legal links for global errors", () => {
