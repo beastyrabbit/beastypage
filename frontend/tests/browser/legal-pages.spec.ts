@@ -146,8 +146,8 @@ for (const width of [1280, 390]) {
           );
           await expect(telemetry).toContainText(
             lang === "de"
-              ? "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip mit dem Fehlerbericht gespeichert; je nach Projekteinstellungen wird sie zuvor anonymisiert."
-              : "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report; depending on the project settings, it is anonymized first.",
+              ? "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip nur in anonymisierter Form mit dem Fehlerbericht gespeichert. Dazu werden bei IPv4 die letzten 8 Bit und bei IPv6 die letzten 64 Bit auf null gesetzt."
+              : "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report only in anonymized form. The last 8 bits of IPv4 addresses and the last 64 bits of IPv6 addresses are set to zero.",
           );
           await telemetry.screenshot({
             path: `../.playwright-mcp/legal-telemetry-${lang}-${width}.png`,

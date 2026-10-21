@@ -23,7 +23,7 @@ const localizedCopy = {
     errorRetention:
       "Sie können der Verarbeitung nach Art. 21 DSGVO über die in Abschnitt 1 genannten Kontaktdaten des Verantwortlichen widersprechen.",
     errorIp:
-      "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip mit dem Fehlerbericht gespeichert; je nach Projekteinstellungen wird sie zuvor anonymisiert.",
+      "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip nur in anonymisierter Form mit dem Fehlerbericht gespeichert. Dazu werden bei IPv4 die letzten 8 Bit und bei IPv6 die letzten 64 Bit auf null gesetzt.",
   },
   en: {
     title: "Umami (analytics) and GlitchTip (error tracking)",
@@ -42,7 +42,7 @@ const localizedCopy = {
     errorRetention:
       "You can object to this processing under Art. 21 GDPR through the controller contact details in section 1.",
     errorIp:
-      "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report; depending on the project settings, it is anonymized first.",
+      "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report only in anonymized form. The last 8 bits of IPv4 addresses and the last 64 bits of IPv6 addresses are set to zero.",
   },
 } as const;
 
