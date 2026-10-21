@@ -3,7 +3,7 @@ import { track } from "@/lib/analytics";
 import { hasAnalyticsConsent, setAnalyticsConsent } from "./consent-state";
 import { outboundHost } from "./outbound";
 import { isOverlayRoute } from "./overlay";
-import { scrubEvent, scrubUrl } from "./scrub";
+import { scrubEvent, scrubText, scrubUrl } from "./scrub";
 import { createUmamiLoader, REPLAY_BLOCK_SELECTOR } from "./umami";
 
 vi.mock("./config", () => ({ telemetryEnabled: true }));
@@ -140,6 +140,28 @@ describe("consent-gated Umami", () => {
     script.dispatchEvent(new Event("load"));
     expect(document.scripts).toHaveLength(0);
   });
+  it("preserves a 40-level rrweb snapshot through the recorder transport", async () => {
+    const transport = vi.mocked(window.fetch);
+    createUmamiLoader(config)(true);
+    type SnapshotNode = {
+      type: number;
+      childNodes?: SnapshotNode[];
+      textContent?: string;
+    };
+    let node: SnapshotNode = { type: 3, textContent: "masked leaf" };
+    for (let level = 0; level < 40; level++)
+      node = { type: 2, childNodes: [node] };
+    await window.fetch("https://analytics.test/api/record", {
+      method: "POST",
+      body: JSON.stringify({
+        payload: { events: [{ type: 2, data: { node } }] },
+      }),
+    });
+    const body = JSON.parse(String(transport.mock.calls[0][1]?.body));
+    let result = body.payload.events[0].data.node;
+    for (let level = 0; level < 40; level++) result = result.childNodes[0];
+    expect(result).toEqual({ type: 3, textContent: "masked leaf" });
+  });
   it("forces strict recorder settings and blocks recorder unload requests after withdrawal", async () => {
     const transport = vi.fn().mockResolvedValue(
       Response.json({
@@ -207,6 +229,73 @@ describe("typed track", () => {
 describe("event scrubber", () => {
   const overlay = "https://site.test/single-cat-stream/obs?key=sk_live_FAKE123";
   const sse = "/api/live/cat-stream/fixture?key=sk_live_FAKE123";
+
+  it.each(["view", "adoption", "ancestry-tree", "evolution"])(
+    "removes queryless %s capabilities from navigation, transaction names and sampling context",
+    (route) => {
+      const path = `/${route}/private-capability`;
+      const result = scrubEvent({
+        breadcrumbs: [
+          { category: "navigation", data: { from: path, to: "/projects" } },
+        ],
+        transaction: `GET ${path}`,
+        sdkProcessingMetadata: {
+          dynamicSamplingContext: {
+            public_key: "public-dsn-key",
+            transaction: path,
+          },
+        },
+      });
+      expect(result.breadcrumbs[0].data.from).toBe(`/${route}/[Filtered]`);
+      expect(result.transaction).toBe(`GET /${route}/[Filtered]`);
+      expect(
+        result.sdkProcessingMetadata.dynamicSamplingContext.transaction,
+      ).toBe(`/${route}/[Filtered]`);
+      expect(JSON.stringify(result)).not.toContain("private-capability");
+      expect(scrubText(`Navigation to ${path} complete`)).toBe(
+        `Navigation to /${route}/[Filtered] complete`,
+      );
+    },
+  );
+
+  it("preserves unrelated paths, stack filenames and ordinary text", () => {
+    for (const value of [
+      "/projects",
+      "/adoption-generator",
+      "preview/view/example",
+      "app:///view/example.ts",
+      "The view is ready.",
+    ])
+      expect(scrubText(value)).toBe(value);
+  });
+
+  it("preserves live SDK scopes without reading them and scrubs only sampling metadata", () => {
+    const scope = Object.defineProperty({}, "client", {
+      enumerable: true,
+      get: () => {
+        throw new Error("Live scope must not be traversed");
+      },
+    });
+    const input = {
+      sdkProcessingMetadata: {
+        capturedSpanScope: scope,
+        dynamicSamplingContext: {
+          public_key: "public-dsn-key",
+          transaction: "/view/private-capability?token=private-token",
+          user: { email: "person@example.test" },
+        },
+      },
+    };
+    const result = scrubEvent(input);
+    expect(result.sdkProcessingMetadata.capturedSpanScope).toBe(scope);
+    expect(result.sdkProcessingMetadata.dynamicSamplingContext).toEqual({
+      public_key: "public-dsn-key",
+      transaction: "/view/[Filtered]",
+    });
+    expect(
+      input.sdkProcessingMetadata.dynamicSamplingContext.transaction,
+    ).toContain("private-capability");
+  });
 
   it("scrubs overlay requests, fetch/xhr/navigation/console breadcrumbs and EventSource errors", () => {
     const breadcrumbs = [
@@ -343,6 +432,10 @@ describe("event scrubber", () => {
     const value: { nested?: unknown } = {};
     value.nested = value;
     expect(scrubEvent(value)).toEqual({ nested: "[Filtered]" });
+    let deep: unknown = "leaf";
+    for (let level = 0; level < 40; level++) deep = { nested: deep };
+    expect(JSON.stringify(scrubEvent(deep))).not.toContain("leaf");
+    expect(JSON.stringify(scrubEvent(deep))).toContain("[Filtered]");
   });
 });
 

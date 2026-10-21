@@ -16,7 +16,7 @@ import LegalNoticePage, {
   metadata as noticeMetadata,
 } from "@/app/legal-notice/page";
 import PrivacyPage, { metadata as privacyMetadata } from "@/app/privacy/page";
-import { UMAMI_RETENTION } from "@/components/legal/analytics-section";
+import { TELEMETRY_RETENTION } from "@/components/legal/analytics-section";
 import { SiteFooter } from "@/components/site-footer";
 import {
   isDeclaredStorageKey,
@@ -206,7 +206,12 @@ describe.each(pages)(
           "GlitchTip",
           "umami.heerlab.com",
           "glitchtip.heerlab.com",
-          UMAMI_RETENTION[lang],
+          TELEMETRY_RETENTION[lang],
+          lang === "de" ? "25 Monaten" : "25 months",
+          lang === "de" ? "30 Tagen" : "30 days",
+          lang === "de"
+            ? "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip mit dem Fehlerbericht gespeichert; je nach Projekteinstellungen wird sie zuvor anonymisiert."
+            : "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report; depending on the project settings, it is anonymized first.",
           "15",
           "10",
           "5",
@@ -215,6 +220,9 @@ describe.each(pages)(
           "Cookie settings",
         ])
           expect(telemetry.textContent).toContain(value);
+        expect(telemetry.textContent).not.toMatch(
+          /OFFEN|PENDING|Standardaufbewahrung|default retention/,
+        );
         expect(telemetry.textContent).toContain(
           lang === "de" ? "Abschnitt 15" : "Section 15",
         );

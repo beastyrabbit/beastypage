@@ -1,6 +1,6 @@
 allowBuilds:
   core-js: false
-  esbuild: set this to true or false
+  esbuild: false
 ignoredOptionalDependencies:
   - canvas
 overrides:

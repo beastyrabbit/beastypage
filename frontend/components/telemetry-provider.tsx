@@ -142,6 +142,10 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     };
   }, [overlay]);
 
-  // Block signed-in content entirely; mask text in anonymous tools too.
-  return <div className={isSignedIn ? "rr-block" : "rr-mask"}>{children}</div>;
+  // Block content until anonymous status is known, and whenever signed in.
+  return (
+    <div className={!isLoaded || isSignedIn ? "rr-block" : "rr-mask"}>
+      {children}
+    </div>
+  );
 }

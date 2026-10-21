@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import * as Sentry from "@sentry/node";
 import { initMonitoring } from "./monitoring.js";
@@ -6,8 +7,69 @@ import { scrubTelemetry } from "./privacy.js";
 
 const discordToken = `${"A".repeat(24)}.abcdef.${"B".repeat(32)}`;
 
+test("survives an unhandled rejection without a DSN and logs it once", () => {
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `
+    import { initMonitoring } from ${JSON.stringify(new URL("./monitoring.js", import.meta.url).href)};
+    import ${JSON.stringify(new URL("./unhandled-rejection.js", import.meta.url).href)};
+    if (initMonitoring()) throw new Error("Monitoring should be disabled");
+    Promise.reject(new Error("rejection survival probe"));
+    setTimeout(() => console.log("still alive"), 25);
+  `,
+    ],
+    {
+      env: { ...process.env, GLITCHTIP_DSN: "" },
+      encoding: "utf8",
+      timeout: 5000,
+    },
+  );
+  assert.equal(child.status, 0, child.stderr);
+  assert.match(child.stdout, /still alive/);
+  assert.equal(child.stderr.match(/Unhandled rejection:/g)?.length, 1);
+});
+
+test("configured monitoring captures an unhandled rejection once without exiting", () => {
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `
+    import * as Sentry from "@sentry/node";
+    import { initMonitoring } from ${JSON.stringify(new URL("./monitoring.js", import.meta.url).href)};
+    import ${JSON.stringify(new URL("./unhandled-rejection.js", import.meta.url).href)};
+    let reports = 0;
+    initMonitoring({ GLITCHTIP_DSN: "https://public@example.test/1" }, Sentry, () => ({
+      send: async (envelope) => { reports += envelope[1].filter(([header]) => header.type === "event").length; return { statusCode: 200 }; },
+      flush: async () => true,
+    }));
+    Promise.reject(new Error("rejection capture probe"));
+    setTimeout(async () => {
+      await Sentry.flush(2000);
+      console.log("reports=" + reports);
+      await Sentry.close(2000);
+    }, 50);
+  `,
+    ],
+    {
+      env: { ...process.env, GLITCHTIP_DSN: "" },
+      encoding: "utf8",
+      timeout: 5000,
+    },
+  );
+  assert.equal(child.status, 0, child.stderr);
+  assert.match(child.stdout, /reports=1/);
+  assert.equal(child.stderr.match(/Unhandled rejection:/g)?.length, 1);
+});
+
 test("compiled error stacks resolve to TypeScript sources", () => {
-  assert.ok(new Error("source map probe").stack?.includes("monitoring.test.ts"));
+  assert.ok(
+    new Error("source map probe").stack?.includes("monitoring.test.ts"),
+  );
 });
 
 test("scrubs nested events, breadcrumbs and transaction data without mutation", () => {

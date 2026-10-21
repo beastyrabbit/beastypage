@@ -1,9 +1,8 @@
 import { PrivacySection, type PrivacySectionProps } from "./privacy-section";
 
-// TODO(legal): fill in once the operator decides the Umami retention period
-export const UMAMI_RETENTION = {
-  de: "[OFFEN: Speicherdauer Umami]",
-  en: "[PENDING: Umami retention period]",
+export const TELEMETRY_RETENTION = {
+  de: "Umami-Analysedaten (Seitenaufrufe und Ereignisse) werden nach 25 Monaten gelöscht. Umami-Sitzungsaufzeichnungen und Heatmap-Aufzeichnungen werden nach 30 Tagen gelöscht. GlitchTip-Fehlerereignisse werden nach 90 Tagen gelöscht.",
+  en: "Umami analytics data (pageviews and events) is deleted after 25 months. Umami session replays and heatmap recordings are deleted after 30 days. GlitchTip error events are deleted after 90 days.",
 } as const;
 
 const localizedCopy = {
@@ -19,11 +18,12 @@ const localizedCopy = {
       "Sitzungsaufzeichnungen und Heatmaps werden nach Einwilligung mit einer Stichprobe von jeweils höchstens 15 % erstellt. Sämtliche Texte und Eingaben werden strikt maskiert. Clerk-Anmeldeoberflächen und als privat markierte Bereiche werden blockiert; bei angemeldeten Personen wird der gesamte Seiteninhalt für die Aufzeichnung blockiert. Auf OBS-Overlay-Routen sind Umami, Sitzungsaufzeichnungen und Heatmaps nicht aktiv. Tracker und Recorder setzen keine Cookies und schreiben weder in localStorage noch in sessionStorage. Ein manuell gesetzter Opt-out-Eintrag „umami.disabled“ wird nur gelesen.",
     consent:
       "Rechtsgrundlagen sind Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TDDDG. Sie können Ihre Einwilligung jederzeit über „Cookie settings“ im Footer mit Wirkung für die Zukunft widerrufen. Beim Widerruf wird die Seite neu geladen, um die Aufzeichnung zu beenden. Cookies und Browser-Speicher sind in Abschnitt 15 beschrieben.",
-    retention: "Speicherdauer der Umami-Daten: ",
     errors:
-      "GlitchTip erfasst technische Fehler auch ohne Einwilligung. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; unser berechtigtes Interesse ist der funktionsfähige und sichere Betrieb der Website. Die Fehlererfassung verwendet keine Cookies und keinen Browser-Speicher. Berichte enthalten Fehler und Stacktrace, Browser und Betriebssystem, die bereinigte URL, die Anwendungsversion und bereinigte Breadcrumbs zum technischen Ablauf. sendDefaultPii ist deaktiviert. Benutzerkennungen, E-Mail-Adressen, Cookies, Request-Bodies und Query-Strings werden nicht übermittelt bzw. vor dem Versand entfernt oder maskiert. Performance-Tracing wird im Browser mit 10 % und auf dem Server mit 5 % abgetastet. Auch die Backend-Dienste Renderer, Bildverarbeitung, Media und Discord-Bot melden Fehler.",
+      "GlitchTip erfasst technische Fehler auch ohne Einwilligung. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; unser berechtigtes Interesse ist der funktionsfähige und sichere Betrieb der Website. Die Fehlererfassung verwendet keine Cookies und keinen Browser-Speicher. Berichte enthalten Fehler und Stacktrace, Browser und Betriebssystem, die bereinigte URL, die Anwendungsversion und bereinigte Breadcrumbs zum technischen Ablauf. Die automatische Erfassung von Benutzerinformationen durch die SDKs ist deaktiviert. Benutzerkennungen, E-Mail-Adressen, Cookies, Request-Bodies und Query-Strings werden nicht übermittelt bzw. vor dem Versand entfernt oder maskiert. Performance-Tracing wird im Browser mit 10 % und auf dem Server mit 5 % abgetastet. Auch die Backend-Dienste Renderer, Bildverarbeitung, Media und Discord-Bot melden Fehler.",
     errorRetention:
-      "Für GlitchTip-Ereignisse gilt die Standardaufbewahrung von 90 Tagen. Sie können der Verarbeitung nach Art. 21 DSGVO über die in Abschnitt 1 genannten Kontaktdaten des Verantwortlichen widersprechen.",
+      "Sie können der Verarbeitung nach Art. 21 DSGVO über die in Abschnitt 1 genannten Kontaktdaten des Verantwortlichen widersprechen.",
+    errorIp:
+      "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip mit dem Fehlerbericht gespeichert; je nach Projekteinstellungen wird sie zuvor anonymisiert.",
   },
   en: {
     title: "Umami (analytics) and GlitchTip (error tracking)",
@@ -37,11 +37,12 @@ const localizedCopy = {
       'After consent, session replay and heatmaps each use a sample of at most 15%. All text and inputs are strictly masked. Clerk sign-in interfaces and areas marked as private are blocked; for signed-in visitors, the entire page content is blocked from recording. Umami, replay and heatmaps are inactive on OBS overlay routes. The tracker and recorder set no cookies and write neither localStorage nor sessionStorage. A manually set "umami.disabled" opt-out entry is only read.',
     consent:
       'The legal bases are Art. 6(1)(a) GDPR and Section 25(1) TDDDG. You can withdraw consent at any time through "Cookie settings" in the footer, with effect for the future. Withdrawal reloads the page to stop recording. Section 15 describes cookies and browser storage.',
-    retention: "Umami data retention period: ",
     errors:
-      "GlitchTip collects technical errors without consent. The legal basis is Art. 6(1)(f) GDPR; our legitimate interest is keeping the website working and secure. Error tracking uses no cookies or browser storage. Reports contain the error and stack trace, browser and operating system, the scrubbed URL, application release and scrubbed breadcrumbs describing the technical sequence. sendDefaultPii is disabled. User IDs, email addresses, cookies, request bodies and query strings are not sent or are removed or masked before sending. Performance tracing samples 10% in the browser and 5% on the server. The renderer, image-processing, media and Discord-bot backend services also report errors.",
+      "GlitchTip collects technical errors without consent. The legal basis is Art. 6(1)(f) GDPR; our legitimate interest is keeping the website working and secure. Error tracking uses no cookies or browser storage. Reports contain the error and stack trace, browser and operating system, the scrubbed URL, application release and scrubbed breadcrumbs describing the technical sequence. Automatic collection of user information by the SDKs is disabled. User IDs, email addresses, cookies, request bodies and query strings are not sent or are removed or masked before sending. Performance tracing samples 10% in the browser and 5% on the server. The renderer, image-processing, media and Discord-bot backend services also report errors.",
     errorRetention:
-      "GlitchTip events use the default retention period of 90 days. You can object to this processing under Art. 21 GDPR through the controller contact details in section 1.",
+      "You can object to this processing under Art. 21 GDPR through the controller contact details in section 1.",
+    errorIp:
+      "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report; depending on the project settings, it is anonymized first.",
   },
 } as const;
 
@@ -54,11 +55,9 @@ export function AnalyticsSection({ lang, number }: PrivacySectionProps) {
       <p>{copy.events}</p>
       <p>{copy.replay}</p>
       <p>{copy.consent}</p>
-      <p>
-        {copy.retention}
-        {UMAMI_RETENTION[lang]}
-      </p>
+      <p>{TELEMETRY_RETENTION[lang]}</p>
       <p>{copy.errors}</p>
+      <p>{copy.errorIp}</p>
       <p>{copy.errorRetention}</p>
     </PrivacySection>
   );

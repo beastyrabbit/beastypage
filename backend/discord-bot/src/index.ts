@@ -1,3 +1,4 @@
+import "./unhandled-rejection.js";
 import { captureException, flush } from "@sentry/node";
 import {
   type AutocompleteInteraction,

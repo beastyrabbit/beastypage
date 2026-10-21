@@ -35,6 +35,10 @@ export function scrubText(value: string): string {
       .replace(/(?<![\w:/])\/[^\s<>"']*\?[^\s<>"']+/g, (url) =>
         scrubUrl(url, true),
       )
+      .replace(
+        /(?<![\w:/])\/(?:view|adoption|ancestry-tree|evolution)\/[^\s<>"']+/g,
+        (url) => scrubUrl(url, true),
+      )
       .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, REDACTED)
       .replace(/\bBearer\s+[^\s,;"']+/gi, `Bearer ${REDACTED}`)
       .replace(
@@ -49,10 +53,10 @@ export function scrubText(value: string): string {
 }
 
 /** Pure, bounded traversal. Drops request bodies and identity rather than guessing their schema. */
-export function scrubEvent<T>(event: T): T {
+export function scrubEvent<T>(event: T, maxDepth = 24): T {
   const seen = new WeakSet<object>();
-  function visit(value: unknown, depth: number): unknown {
-    if (depth > 24) return REDACTED;
+  function visit(value: unknown, depth: number, field = ""): unknown {
+    if (depth > maxDepth) return REDACTED;
     if (typeof value === "string") return scrubText(value);
     if (!value || typeof value !== "object") return value;
     if (seen.has(value)) return REDACTED;
@@ -61,6 +65,23 @@ export function scrubEvent<T>(event: T): T {
       return value.map((item) => visit(item, depth + 1));
     const result: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
+      // Scopes and clients are live SDK objects stripped before serialization.
+      // Only the sampling context reaches the envelope's trace header.
+      if (key === "sdkProcessingMetadata" && item && typeof item === "object") {
+        result[key] = Object.fromEntries(
+          Object.entries(item).map(([name, data]) => [
+            name,
+            name === "dynamicSamplingContext"
+              ? visit(data, depth + 1, name)
+              : data,
+          ]),
+        );
+        continue;
+      }
+      if (field === "dynamicSamplingContext" && key === "public_key") {
+        result[key] = item;
+        continue;
+      }
       if (key === "user" || key === "cookies" || key === "request_body")
         continue;
       // Sentry accepts query_string as text, an object, or pairs; drop all forms.
@@ -74,7 +95,7 @@ export function scrubEvent<T>(event: T): T {
         typeof item === "string"
       ) {
         result[key] = scrubText(scrubUrl(item, true));
-      } else result[key] = visit(item, depth + 1);
+      } else result[key] = visit(item, depth + 1, key);
     }
     return result;
   }

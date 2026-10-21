@@ -2,6 +2,7 @@
 
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
+import { TELEMETRY_RETENTION } from "../../components/legal/analytics-section";
 
 // Local production server only. No credentials, live providers, or database needed.
 const baseUrl = process.env.LEGAL_TEST_BASE_URL ?? "";
@@ -74,8 +75,7 @@ for (const width of [1280, 390]) {
             : route.fulfill({ json: { response: null } });
         if (url.pathname.includes("/api/1/envelope"))
           return route.fulfill({ json: {} });
-        return url.origin === new URL(baseUrl).origin &&
-          !url.pathname.startsWith("/bubu")
+        return url.origin === new URL(baseUrl).origin
           ? route.continue()
           : route.abort();
       });
@@ -140,12 +140,15 @@ for (const width of [1280, 390]) {
           const telemetry = main.locator(":scope > section").nth(8);
           await expect(telemetry.getByRole("heading")).toContainText("Umami");
           await expect(telemetry).toContainText("GlitchTip");
+          await expect(telemetry).toContainText(TELEMETRY_RETENTION[lang]);
+          await expect(telemetry).not.toContainText(
+            /OFFEN|PENDING|Standardaufbewahrung|default retention/,
+          );
           await expect(telemetry).toContainText(
             lang === "de"
-              ? "[OFFEN: Speicherdauer Umami]"
-              : "[PENDING: Umami retention period]",
+              ? "Bei direkten Fehlermeldungen aus Ihrem Browser wird Ihre IP-Adresse technisch übertragen und von GlitchTip mit dem Fehlerbericht gespeichert; je nach Projekteinstellungen wird sie zuvor anonymisiert."
+              : "When your browser sends an error report directly, your IP address is technically transmitted and stored by GlitchTip with the report; depending on the project settings, it is anonymized first.",
           );
-          await expect(telemetry).toContainText("90");
           await telemetry.screenshot({
             path: `../.playwright-mcp/legal-telemetry-${lang}-${width}.png`,
             animations: "disabled",

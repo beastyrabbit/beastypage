@@ -72,7 +72,8 @@ export function installUmamiTransportGuard(host: string): void {
     if (typeof init?.body !== "string")
       return new Response("{}", { status: 200 });
     try {
-      const body = JSON.stringify(scrubEvent(JSON.parse(init.body)));
+      // Parsed JSON cannot contain live SDK graphs. Leave room for deep DOM snapshots.
+      const body = JSON.stringify(scrubEvent(JSON.parse(init.body), 1024));
       // Re-check after serialization; withdrawal must also block recorder unload flushes.
       if (!hasAnalyticsConsent()) return new Response("{}", { status: 200 });
       return originalFetch(input, { ...init, body, credentials: "omit" });

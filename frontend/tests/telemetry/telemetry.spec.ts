@@ -138,6 +138,9 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
     envelopes.find((envelope) => envelope.includes("Telemetry test")) ?? "";
   expect(error).toContain('"release":"beastypage@v0.0.0-telemetry-test"');
   expect(error).toContain('"environment":"production"');
+  expect(error).toContain('"infer_ip":"never"');
+  expect(error).not.toContain('"ip_address"');
+  expect(error).toContain('"public_key":"public"');
   expect(error).not.toContain("person@example.com");
   expect(error).not.toContain("private-bearer");
   expect(error).not.toContain("private-token");
