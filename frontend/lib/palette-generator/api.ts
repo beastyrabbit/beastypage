@@ -7,9 +7,10 @@ import {
 import type { GeneratedPalette } from "./types";
 
 export function randomHexSeed(): string {
-  return Math.floor(Math.random() * 0x1000000)
-    .toString(16)
-    .padStart(6, "0");
+  const bytes = crypto.getRandomValues(new Uint8Array(3));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 const HUE_OFFSETS: Record<string, number[]> = {

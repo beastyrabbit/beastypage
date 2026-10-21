@@ -161,7 +161,9 @@ describe("local color schemes", () => {
   });
 
   it("retains the UI palette shape with a local source", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(crypto, "getRandomValues").mockReturnValue(
+      new Uint8Array([0x80, 0, 0]),
+    );
     const palette = await fetchPaletteFromAPI("triad", 6);
     expect(palette).toMatchObject({
       mode: "triad",
@@ -183,10 +185,12 @@ describe("local color schemes", () => {
   });
 
   it("can generate seeds across the full RGB range", () => {
-    const random = vi.spyOn(Math, "random");
-    random.mockReturnValue(0);
+    const random = vi.spyOn(crypto, "getRandomValues");
+    random.mockReturnValue(new Uint8Array([0, 0, 0]));
     expect(randomHexSeed()).toBe("000000");
-    random.mockReturnValue(1 - Number.EPSILON);
+    random.mockReturnValue(new Uint8Array([0, 0xa5, 0xff]));
+    expect(randomHexSeed()).toBe("00a5ff");
+    random.mockReturnValue(new Uint8Array([0xff, 0xff, 0xff]));
     expect(randomHexSeed()).toBe("ffffff");
   });
 });
