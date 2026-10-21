@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHero } from "@/components/common/PageHero";
 import { ContactForm } from "./ContactForm";
@@ -9,7 +10,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Kept separate so a later privacy-page change can add a link here.
 const CONTACT_PRIVACY_NOTICE =
   "Ihre Angaben (Name, E-Mail-Adresse, Nachricht) und der Zeitpunkt werden ausschließlich per E-Mail an den Betreiber (Tobias Heer) gesendet, um Ihre Anfrage zu beantworten, und nicht in einer Datenbank gespeichert. Zum Schutz vor Spam wird Ihre IP-Adresse bis zu 10 Minuten nach Ihrer letzten Anfrage nur im Arbeitsspeicher gehalten. Die Nachricht wird über den E-Mail-Dienst Resend (USA) an das Postfach des Betreibers bei Fastmail (Australien) gesendet. Fragen zum Datenschutz: datenschutz-beastyrabbit@heerlab.com";
 
@@ -57,13 +57,19 @@ export default async function KontaktPage({
           </p>
         </noscript>
         <p className="mt-8 break-words text-sm leading-relaxed text-muted-foreground">
-          {CONTACT_PRIVACY_NOTICE}
+          {CONTACT_PRIVACY_NOTICE} Weitere Informationen:{" "}
+          <Link href="/datenschutz" className="underline underline-offset-4">
+            Datenschutzerklärung
+          </Link>
         </p>
         <p
           lang="en"
           className="mt-3 break-words text-sm leading-relaxed text-muted-foreground"
         >
-          {CONTACT_PRIVACY_NOTICE_EN}
+          {CONTACT_PRIVACY_NOTICE_EN} More information:{" "}
+          <Link href="/privacy" className="underline underline-offset-4">
+            Privacy policy
+          </Link>
         </p>
       </section>
     </main>
