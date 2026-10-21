@@ -7,8 +7,8 @@ const env = {
   NEXT_PUBLIC_APP_VERSION: "v0.0.0-telemetry-test",
   NEXT_PUBLIC_UMAMI_HOST: "https://umami.telemetry.test",
   NEXT_PUBLIC_UMAMI_WEBSITE_ID: "00000000-0000-4000-8000-000000000001",
-  NEXT_PUBLIC_UMAMI_DOMAINS: "127.0.0.1",
-  NEXT_PUBLIC_GLITCHTIP_DSN: "http://public@127.0.0.1:4319/1",
+  NEXT_PUBLIC_UMAMI_DOMAINS: "localhost",
+  NEXT_PUBLIC_GLITCHTIP_DSN: "http://public@localhost:4319/1",
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: `pk_test_${Buffer.from("clerk.telemetry.test$").toString("base64")}`,
   CLERK_SECRET_KEY: [
     "sk",

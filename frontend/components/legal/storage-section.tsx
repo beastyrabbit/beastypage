@@ -4,10 +4,10 @@ import { PrivacySection, type PrivacySectionProps } from "./privacy-section";
 const storageRows = {
   de: [
     [
-      "__client_uat… (Cookies), __clerk_environment (Browser-Speicher)",
-      "Clerk",
-      "Anmeldung und Kontozugang",
-      "Bis zu etwa 400 Tage",
+      "Clerk-Anmeldecookies (z. B. __client, __client_uat…) und Cloudflare-Bot-Schutz (__cf_bm, _cfuvid) auf clerk.beastyrabbit.com; __clerk_environment (Browser-Speicher)",
+      "Clerk (mit Cloudflare)",
+      "Anmeldung, Kontozugang und Schutz vor Bots",
+      "Sitzung bis etwa 400 Tage",
       "Technisch notwendig, § 25 Abs. 2 Nr. 2 TDDDG",
     ],
     [
@@ -27,10 +27,10 @@ const storageRows = {
   ],
   en: [
     [
-      "__client_uat… (cookies), __clerk_environment (browser storage)",
-      "Clerk",
-      "Sign-in and account access",
-      "Up to about 400 days",
+      "Clerk sign-in cookies (e.g. __client, __client_uat…) and Cloudflare bot protection (__cf_bm, _cfuvid) on clerk.beastyrabbit.com; __clerk_environment (browser storage)",
+      "Clerk (with Cloudflare)",
+      "Sign-in, account access and bot protection",
+      "Session to about 400 days",
       "Technically necessary, Section 25(2) no. 2 TDDDG",
     ],
     [

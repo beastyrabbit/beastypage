@@ -43,13 +43,23 @@ export const STORAGE_INVENTORY: StorageDeclaration[] = [
   },
   {
     group: "clerk",
-    name: "__session, __client_uat, __refresh, __clerk_*",
+    name: "__session, __client, __client_uat, __refresh, __clerk_*",
     storage: "Cookies",
     purpose:
       "Clerk authentication, session refresh, and sign-in security. Clerk may suffix cookie names for the application instance.",
     duration: "Session or Clerk-managed expiry",
     category: "necessary",
-    pattern: "^(?:__session|__client_uat|__refresh)(?:_.*)?$|^__clerk_",
+    pattern:
+      "^(?:__session|__client|__client_uat|__refresh)(?:_.*)?$|^__clerk_",
+  },
+  {
+    group: "clerk",
+    name: "__cf_bm, _cfuvid",
+    storage: "Cookies on clerk.beastyrabbit.com",
+    purpose: "Cloudflare bot protection for Clerk sign-in and account access.",
+    duration: "__cf_bm: about 30 minutes; _cfuvid: session",
+    category: "necessary",
+    pattern: "^(?:__cf_bm|_cfuvid)$",
   },
   {
     group: "clerk",

@@ -1,10 +1,14 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { isDeclaredStorageKey } from "../../lib/telemetry/storage-inventory";
+import {
+  isDeclaredStorageKey,
+  STORAGE_INVENTORY,
+} from "../../lib/telemetry/storage-inventory";
 
 const fixtures = resolve(process.cwd(), "tests/telemetry/fixtures");
 const screenshots = resolve(process.cwd(), "../.playwright-mcp");
+const forbiddenStorageKey = /posthog|ph_|window_id|__ph|bubu|umami|sentry/i;
 
 async function stubServices(page: Page) {
   // Always sample the recorder in this isolated test, including its storage behavior.
@@ -57,23 +61,25 @@ async function stubServices(page: Page) {
     if (url.hostname === "fonts.googleapis.com")
       return route.fulfill({ contentType: "text/css", body: "" });
     if (
-      url.hostname === "127.0.0.1" &&
+      url.hostname === "localhost" &&
       url.pathname.includes("/api/1/envelope")
     ) {
       envelopes.push(route.request().postData() ?? "");
       return route.fulfill({ json: {} });
     }
-    if (url.hostname === "127.0.0.1" && url.pathname === "/api/cat-stream")
+    if (url.hostname === "localhost" && url.pathname === "/api/users/viewer")
+      return route.fulfill({ json: null });
+    if (url.hostname === "localhost" && url.pathname === "/api/cat-stream")
       return route.fulfill({ json: null });
     if (
-      url.hostname === "127.0.0.1" &&
+      url.hostname === "localhost" &&
       url.pathname === "/api/live/cat-stream/fixture"
     )
       return route.fulfill({
         contentType: "text/event-stream",
         body: "data: null\n\n",
       });
-    if (url.hostname === "127.0.0.1") return route.continue();
+    if (url.hostname === "localhost") return route.continue();
     external.push(url.origin);
     return route.abort();
   });
@@ -95,13 +101,201 @@ async function assertStorage(page: Page) {
       isDeclaredStorageKey(key),
       `Undeclared browser storage: ${key}`,
     ).toBe(true);
-  expect(cookies.every((cookie) => !/umami|sentry/i.test(cookie.name))).toBe(
-    true,
-  );
   expect(
-    [...storage.local, ...storage.session].every((key) => !/sentry/i.test(key)),
+    [
+      ...cookies.map((cookie) => cookie.name),
+      ...storage.local,
+      ...storage.session,
+    ].every((key) => !forbiddenStorageKey.test(key)),
   ).toBe(true);
   return { cookies: cookies.map((cookie) => cookie.name), ...storage };
+}
+
+type StorageAuditWindow = Window & { storageWriteKeys: string[] };
+
+async function auditStorage(page: Page, path: string) {
+  const storage = await assertStorage(page);
+  const writes = await page.evaluate(
+    () => (window as unknown as StorageAuditWindow).storageWriteKeys,
+  );
+  const allowed = STORAGE_INVENTORY.filter(
+    (item) =>
+      item.group !== "features" ||
+      (path === "/palette-generator" &&
+        item.name === "paletteGenerator.collection"),
+  );
+  for (const key of [
+    ...storage.cookies,
+    ...storage.local,
+    ...storage.session,
+    ...writes,
+  ]) {
+    expect(
+      allowed.some((item) => new RegExp(item.pattern).test(key)),
+      key,
+    ).toBe(true);
+    expect(key).not.toMatch(forbiddenStorageKey);
+  }
+  return { ...storage, writes: [...new Set(writes)].sort() };
+}
+
+async function assertEqualConsentButtons(page: Page) {
+  const banner = page.getByRole("dialog", {
+    name: "Your privacy, your choice",
+  });
+  const buttons = ["Necessary only", "Accept analytics"].map((name) =>
+    banner.getByRole("button", { name, exact: true }),
+  );
+  const appearances = [];
+  for (const button of buttons) {
+    await expect(button).toBeVisible();
+    await expect(button).toBeInViewport({ ratio: 1 });
+    appearances.push(
+      await button.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          tag: element.tagName,
+          classes: element.className,
+          parent: element.parentElement?.className,
+          width: rect.width,
+          height: rect.height,
+          background: style.backgroundColor,
+          color: style.color,
+          fontSize: style.fontSize,
+          padding: style.padding,
+        };
+      }),
+    );
+  }
+  expect(appearances[0]).toEqual(appearances[1]);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+}
+
+for (const width of [1440, 390]) {
+  for (const path of ["/", "/projects", "/palette-generator"]) {
+    test(`storage consent audit on ${path} at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+      const { umamiRequests, envelopes, external } = await stubServices(page);
+      await page.addInitScript(() => {
+        const keys: string[] = [];
+        (window as unknown as StorageAuditWindow).storageWriteKeys = keys;
+        const original = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) {
+          keys.push(key);
+          return original.call(this, key, value);
+        };
+      });
+      if (path === "/") {
+        // Necessary synthetic marker skips Clerk's server-side dev handshake.
+        // It is not an authentication token, and the fixture stays signed out.
+        await page.context().addCookies([
+          {
+            name: "__clerk_db_jwt",
+            value: "offline-test-browser",
+            url: "http://localhost:4319",
+          },
+        ]);
+      }
+      const prefix = `storage-${path.slice(1) || "home"}-${width}`;
+      await mkdir(screenshots, { recursive: true });
+      const capture = async (state: string, route = path) => {
+        const storage = await auditStorage(page, path);
+        await page.screenshot({
+          path: resolve(screenshots, `${prefix}-${state}.png`),
+          animations: "disabled",
+        });
+        console.log(
+          `[storage-audit] ${JSON.stringify({ path, width, state, route, ...storage })}`,
+        );
+        return storage;
+      };
+      const assertNoTelemetry = async () => {
+        // Observe beyond deferred error SDK initialization and the tracker's 300ms debounce.
+        await page.waitForTimeout(1000); // NOSONAR: Bounded observation window for forbidden asynchronous requests.
+        await expect(
+          page.locator('script[src*="umami.telemetry.test"]'),
+        ).toHaveCount(0);
+        expect(umamiRequests).toEqual([]);
+        expect(envelopes).toEqual([]);
+      };
+
+      await page.goto(path);
+      await assertEqualConsentButtons(page);
+      await assertNoTelemetry();
+      const before = await capture("before-choice");
+      expect([
+        ...before.cookies,
+        ...before.local,
+        ...before.session,
+        ...before.writes,
+      ]).not.toContain("cc_cookie");
+      await page
+        .getByRole("button", { name: "Necessary only", exact: true })
+        .click();
+      await expect(
+        page.getByRole("dialog", { name: "Your privacy, your choice" }),
+      ).toBeHidden();
+      await assertNoTelemetry();
+      const rejected = await capture("necessary-only");
+      expect(rejected).toEqual({
+        ...before,
+        cookies: [...before.cookies, "cc_cookie"],
+      });
+
+      // A document marker proves the link used client navigation rather than a reload.
+      await page.evaluate(() => {
+        document.documentElement.dataset.storageAudit = "same-document";
+      });
+      const destination =
+        path === "/projects" ? "/projects/tools" : "/projects";
+      if (width === 390 && destination === "/projects")
+        await page
+          .getByRole("button", { name: "Open navigation", exact: true })
+          .click();
+      await page.locator(`a[href="${destination}"]:visible`).first().click();
+      await expect(page).toHaveURL(destination);
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-storage-audit",
+        "same-document",
+      );
+      await assertNoTelemetry();
+      const navigated = await capture("necessary-navigation", destination);
+      expect(navigated).toEqual(rejected);
+
+      // Return to the audited route with the rejection still stored, then opt in.
+      await page.goto(path);
+      await page
+        .getByRole("button", { name: "Cookie settings", exact: true })
+        .last()
+        .click();
+      await page
+        .getByRole("dialog", { name: "Cookie and storage settings" })
+        .getByRole("button", { name: "Accept analytics", exact: true })
+        .click();
+      await expect.poll(() => umamiRequests.includes("/api/send")).toBe(true);
+      await expect.poll(() => umamiRequests.includes("/api/record")).toBe(true);
+      const accepted = await capture("accept-analytics");
+      expect(accepted).toEqual(rejected);
+      expect(envelopes).toEqual([]);
+      expect(external).toEqual([]);
+      await writeFile(
+        resolve(screenshots, `${prefix}.json`),
+        JSON.stringify(
+          {
+            path,
+            width,
+            before,
+            rejected,
+            navigated,
+            accepted,
+          },
+          null,
+          2,
+        ),
+      );
+    });
+  }
 }
 
 test("built app enforces consent, tracks SPA pageviews, scrubs errors, and stores only declared keys", async ({

@@ -173,7 +173,11 @@ describe.each(pages)(
         const rows = Array.from(doc.querySelectorAll("table tbody tr"));
         expect(
           rows.map((row) => row.querySelectorAll("td")[1].textContent),
-        ).toEqual(["Clerk", "BeastyPage", "BeastyPage"]);
+        ).toEqual([
+          lang === "de" ? "Clerk (mit Cloudflare)" : "Clerk (with Cloudflare)",
+          "BeastyPage",
+          "BeastyPage",
+        ]);
         expect(rows[0].textContent).toContain("__client_uat");
         expect(rows[0].textContent).toContain("__clerk_environment");
         expect(rows[0].textContent).toContain("400");
@@ -183,17 +187,20 @@ describe.each(pages)(
         expect(rows.map((row) => row.querySelector("td")?.textContent)).toEqual(
           lang === "de"
             ? [
-                "__client_uat… (Cookies), __clerk_environment (Browser-Speicher)",
+                "Clerk-Anmeldecookies (z. B. __client, __client_uat…) und Cloudflare-Bot-Schutz (__cf_bm, _cfuvid) auf clerk.beastyrabbit.com; __clerk_environment (Browser-Speicher)",
                 "cc_cookie (Cookie)",
                 "localStorage und sessionStorage",
               ]
             : [
-                "__client_uat… (cookies), __clerk_environment (browser storage)",
+                "Clerk sign-in cookies (e.g. __client, __client_uat…) and Cloudflare bot protection (__cf_bm, _cfuvid) on clerk.beastyrabbit.com; __clerk_environment (browser storage)",
                 "cc_cookie (cookie)",
                 "localStorage and sessionStorage",
               ],
         );
         for (const key of [
+          "__client",
+          "__cf_bm",
+          "_cfuvid",
           "__clerk_environment",
           "__client_uat_instance",
           "stream-viewer-session:fingerprint",

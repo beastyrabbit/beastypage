@@ -75,6 +75,11 @@ for (const width of [1280, 390]) {
             : route.fulfill({ json: { response: null } });
         if (url.pathname.includes("/api/1/envelope"))
           return route.fulfill({ json: {} });
+        if (
+          url.origin === new URL(baseUrl).origin &&
+          url.pathname === "/api/users/viewer"
+        )
+          return route.fulfill({ json: null });
         return url.origin === new URL(baseUrl).origin
           ? route.continue()
           : route.abort();
@@ -131,7 +136,13 @@ for (const width of [1280, 390]) {
           await expect(main.locator("table tbody tr")).toHaveCount(3);
           await expect(
             main.locator("table tbody tr td:nth-child(2)"),
-          ).toHaveText(["Clerk", "BeastyPage", "BeastyPage"]);
+          ).toHaveText([
+            lang === "de"
+              ? "Clerk (mit Cloudflare)"
+              : "Clerk (with Cloudflare)",
+            "BeastyPage",
+            "BeastyPage",
+          ]);
           await expect(main.locator("table")).toContainText("cc_cookie");
           await expect(main.locator("table")).toContainText("182");
           await expect(
@@ -139,12 +150,12 @@ for (const width of [1280, 390]) {
           ).toHaveText(
             lang === "de"
               ? [
-                  "__client_uat… (Cookies), __clerk_environment (Browser-Speicher)",
+                  "Clerk-Anmeldecookies (z. B. __client, __client_uat…) und Cloudflare-Bot-Schutz (__cf_bm, _cfuvid) auf clerk.beastyrabbit.com; __clerk_environment (Browser-Speicher)",
                   "cc_cookie (Cookie)",
                   "localStorage und sessionStorage",
                 ]
               : [
-                  "__client_uat… (cookies), __clerk_environment (browser storage)",
+                  "Clerk sign-in cookies (e.g. __client, __client_uat…) and Cloudflare bot protection (__cf_bm, _cfuvid) on clerk.beastyrabbit.com; __clerk_environment (browser storage)",
                   "cc_cookie (cookie)",
                   "localStorage and sessionStorage",
                 ],
@@ -201,6 +212,18 @@ for (const width of [1280, 390]) {
             name: "Cookie and storage settings",
           });
           await expect(preferences).toBeVisible();
+          await preferences
+            .getByRole("button", { name: "Necessary storage", exact: true })
+            .click();
+          await expect(
+            preferences.getByText("__cf_bm, _cfuvid", { exact: true }),
+          ).toBeVisible();
+          await expect(preferences).toContainText(
+            "Cookies on clerk.beastyrabbit.com",
+          );
+          await expect(preferences).toContainText(
+            "__cf_bm: about 30 minutes; _cfuvid: session",
+          );
           await page.screenshot({
             path: `../.playwright-mcp/legal-preferences-${lang}-${width}.png`,
             animations: "disabled",
