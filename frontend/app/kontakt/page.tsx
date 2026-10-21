@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { PageHero } from "@/components/common/PageHero";
 import { ContactForm } from "./ContactForm";
 import { contactSource } from "./source";
@@ -20,7 +21,12 @@ export default async function KontaktPage({
 }: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
-  const source = contactSource((await searchParams).from);
+  const query = await searchParams;
+  const source = contactSource(query.from);
+  const queryKeys = Object.keys(query);
+  if (queryKeys.length > 0 && (queryKeys.length !== 1 || !source)) {
+    redirect(source ? `/kontakt?from=${source}` : "/kontakt");
+  }
   return (
     <main
       lang="de"

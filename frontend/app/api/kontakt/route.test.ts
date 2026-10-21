@@ -323,6 +323,35 @@ describe("POST /api/kontakt", () => {
     expect(fetchMock).toHaveBeenCalledTimes(20);
   });
 
+  it.each([
+    new TypeError("network"),
+    new DOMException("abort", "AbortError"),
+    new DOMException("timeout", "TimeoutError"),
+  ])(
+    "retains the global cap after ten ambiguous failures: %s",
+    async (error) => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      fetchMock.mockRejectedValue(error);
+      const responses = await Promise.all(
+        Array.from({ length: 10 }, (_, i) =>
+          POST(request(valid, { "X-Real-IP": `192.0.2.${i + 1}` })),
+        ),
+      );
+      expect(responses.map((response) => response.status)).toEqual(
+        Array(10).fill(500),
+      );
+      fetchMock.mockResolvedValue(Response.json({ id: "fixture" }));
+      expect(
+        (await POST(request(valid, { "X-Real-IP": "192.0.2.99" }))).status,
+      ).toBe(429);
+      expect(fetchMock).toHaveBeenCalledTimes(10);
+      expect(vi.getTimerCount()).toBe(1);
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      expect(vi.getTimerCount()).toBe(0);
+      expect((await POST(request())).status).toBe(200);
+    },
+  );
+
   it("releases only its own reservation when other submissions share its timestamp", async () => {
     const { acceptContactSubmission } = await import(
       "@/server/services/contact/rate-limit"
@@ -433,7 +462,7 @@ describe("POST /api/kontakt", () => {
     },
   );
 
-  it.each(["network", "timeout"])(
+  it.each(["network", "abort", "timeout"] as const)(
     "returns a generic error after a %s failure without logging input",
     async (failure) => {
       const details = JSON.stringify({
@@ -441,11 +470,12 @@ describe("POST /api/kontakt", () => {
         key: "test-key",
         ip: "192.0.2.5",
       });
-      fetchMock.mockRejectedValueOnce(
-        failure === "timeout"
-          ? new DOMException(details, "TimeoutError")
-          : new Error(details),
-      );
+      const failures = {
+        network: new TypeError(details),
+        abort: new DOMException(details, "AbortError"),
+        timeout: new DOMException(details, "TimeoutError"),
+      };
+      fetchMock.mockRejectedValueOnce(failures[failure]);
       const log = vi.spyOn(console, "error").mockImplementation(() => {});
       const response = await POST(request());
       expect(response.status).toBe(500);
@@ -463,10 +493,13 @@ describe("POST /api/kontakt", () => {
         "test-key",
       ])
         expect(output).not.toContain(value);
+      expect(vi.getTimerCount()).toBe(1);
+      expect((await POST(request())).status).toBe(429);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
       expect(vi.getTimerCount()).toBe(0);
       expect((await POST(request())).status).toBe(200);
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect((await POST(request())).status).toBe(429);
     },
   );
 

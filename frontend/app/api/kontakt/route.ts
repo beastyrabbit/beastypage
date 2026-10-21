@@ -106,8 +106,10 @@ export async function POST(request: Request) {
     await sendContactMail(parsed.data);
     return respond({ success: true });
   } catch (error) {
-    reservation.release();
     const unavailable = error instanceof ContactMailUnavailableError;
+    // Network errors and timeouts may occur after acceptance; retain their quota.
+    if (unavailable || error instanceof ContactMailDeliveryError)
+      reservation.release();
     const deliveryStatus =
       error instanceof ContactMailDeliveryError ? error.status : "error";
     // Never log provider errors: their messages can contain mail or credentials.

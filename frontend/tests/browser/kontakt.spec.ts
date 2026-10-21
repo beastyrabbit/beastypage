@@ -205,8 +205,13 @@ for (const width of [1280, 390]) {
 
     for (const [query, source] of [
       ["from=moddrop", "moddrop"],
+      ["from=moddrop&x=1", "moddrop"],
       ["from=evil", undefined],
+      ["from=fixture%40example.org", undefined],
+      ["from=", undefined],
+      ["x=1", undefined],
       ["from=MODDROP", undefined],
+      ["from=moddrop&from=moddrop", undefined],
       ["from=moddrop&from=evil", undefined],
       ["from=moddrop%0D%0ABcc%3A%20x", undefined],
     ] as const) {
@@ -215,6 +220,10 @@ for (const width of [1280, 390]) {
           void page.route("**/api/kontakt", resolve);
         });
         await page.goto(`${baseUrl}/kontakt?${query}`);
+        const canonicalUrl = source
+          ? `${baseUrl}/kontakt?from=${source}`
+          : `${baseUrl}/kontakt`;
+        await expect(page).toHaveURL(canonicalUrl);
         await fillContactForm(page);
         await page
           .getByRole("button", { name: "Nachricht senden / Send message" })
