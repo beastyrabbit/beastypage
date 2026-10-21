@@ -91,7 +91,8 @@ export async function POST(request: Request) {
   }
   if (parsed.data.website) return respond({ success: true });
 
-  if (!acceptContactSubmission(contactClientIp(request.headers))) {
+  const reservation = acceptContactSubmission(contactClientIp(request.headers));
+  if (!reservation) {
     return respond(
       {
         error:
@@ -105,6 +106,7 @@ export async function POST(request: Request) {
     await sendContactMail(parsed.data);
     return respond({ success: true });
   } catch (error) {
+    reservation.release();
     const unavailable = error instanceof ContactMailUnavailableError;
     const deliveryStatus =
       error instanceof ContactMailDeliveryError ? error.status : "error";

@@ -6,8 +6,9 @@ const WINDOW_MS = 10 * 60 * 1000;
 // Per-pod limits deliberately approximate 3 per IP and 30 globally across 3 replicas.
 const PER_IP_LIMIT = 1;
 const GLOBAL_LIMIT = 10;
-const clients = new Map<string, number[]>();
-let submissions: number[] = [];
+type Submission = { readonly timestamp: number };
+const clients = new Map<string, Submission[]>();
+let submissions: Submission[] = [];
 let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
 
 export function contactClientIp(headers: Headers): string {
@@ -23,9 +24,9 @@ export function contactClientIp(headers: Headers): string {
 
 function prune() {
   const cutoff = Date.now() - WINDOW_MS;
-  submissions = submissions.filter((time) => time > cutoff);
+  submissions = submissions.filter((entry) => entry.timestamp > cutoff);
   for (const [ip, times] of clients) {
-    const active = times.filter((time) => time > cutoff);
+    const active = times.filter((entry) => entry.timestamp > cutoff);
     if (active.length) clients.set(ip, active);
     else clients.delete(ip);
   }
@@ -40,20 +41,33 @@ function scheduleCleanup() {
       prune();
       scheduleCleanup();
     },
-    Math.max(1, submissions[0] + WINDOW_MS - Date.now()),
+    Math.max(1, submissions[0].timestamp + WINDOW_MS - Date.now()),
   );
   cleanupTimer.unref?.();
 }
 
-export function acceptContactSubmission(ip: string): boolean {
+export function acceptContactSubmission(
+  ip: string,
+): Readonly<{ release(): void }> | null {
   prune();
   const times = clients.get(ip) ?? [];
   if (times.length >= PER_IP_LIMIT || submissions.length >= GLOBAL_LIMIT)
-    return false;
-  const now = Date.now();
-  times.push(now);
+    return null;
+  // Object identity distinguishes reservations made within the same millisecond.
+  const submission = { timestamp: Date.now() };
+  times.push(submission);
   clients.set(ip, times);
-  submissions.push(now);
+  submissions.push(submission);
   scheduleCleanup();
-  return true;
+  return {
+    release() {
+      const active = clients.get(ip)?.filter((entry) => entry !== submission);
+      if (active?.length) clients.set(ip, active);
+      else clients.delete(ip);
+      submissions = submissions.filter((entry) => entry !== submission);
+      if (cleanupTimer) clearTimeout(cleanupTimer);
+      cleanupTimer = undefined;
+      scheduleCleanup();
+    },
+  };
 }

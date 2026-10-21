@@ -30,12 +30,14 @@ function sentMail() {
 }
 
 function expectedMail(source?: string) {
+  const prefix = source ? `[${source}] ` : "";
+  const sourceLine = source ? `Quelle: ${source}\n` : "";
   return {
     from: "BeastyPage Kontaktformular <kontakt-formular@heerlab.com>",
     to: ["kontakt@heerlab.com"],
     reply_to: valid.email,
-    subject: `${source ? `[${source}] ` : ""}Kontaktformular: ${valid.name}`,
-    text: `Name: ${valid.name}\nE-Mail: ${valid.email}\n${source ? `Quelle: ${source}\n` : ""}Zeitpunkt: 2026-10-21T12:00:00.000Z\n\nNachricht:\n${valid.message}`,
+    subject: `${prefix}Kontaktformular: ${valid.name}`,
+    text: `Name: ${valid.name}\nE-Mail: ${valid.email}\n${sourceLine}Zeitpunkt: 2026-10-21T12:00:00.000Z\n\nNachricht:\n${valid.message}`,
   };
 }
 
@@ -295,6 +297,73 @@ describe("POST /api/kontakt", () => {
     expect((await POST(otherClient())).status).toBe(200);
   });
 
+  it("does not exhaust the global cap after ten concurrent delivery failures", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockImplementation(
+      async () => new Response(null, { status: 500 }),
+    );
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        POST(request(valid, { "X-Real-IP": `192.0.2.${i + 1}` })),
+      ),
+    );
+    expect(responses.map((response) => response.status)).toEqual(
+      Array(10).fill(500),
+    );
+    expect(vi.getTimerCount()).toBe(0);
+    fetchMock.mockResolvedValue(Response.json({ id: "fixture" }));
+    for (let i = 0; i < 10; i++)
+      expect(
+        (await POST(request(valid, { "X-Real-IP": `192.0.2.${i + 1}` })))
+          .status,
+      ).toBe(200);
+    expect(
+      (await POST(request(valid, { "X-Real-IP": "192.0.2.99" }))).status,
+    ).toBe(429);
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+  });
+
+  it("releases only its own reservation when other submissions share its timestamp", async () => {
+    const { acceptContactSubmission } = await import(
+      "@/server/services/contact/rate-limit"
+    );
+    const reservation = acceptContactSubmission("192.0.2.1");
+    expect(reservation).not.toBeNull();
+    expect(acceptContactSubmission("192.0.2.2")).not.toBeNull();
+    reservation?.release();
+    reservation?.release();
+    expect(acceptContactSubmission("192.0.2.2")).toBeNull();
+    expect(acceptContactSubmission("192.0.2.1")).not.toBeNull();
+    // Releasing an old handle again must preserve the new reservation for that IP.
+    reservation?.release();
+    expect(acceptContactSubmission("192.0.2.1")).toBeNull();
+    for (let i = 3; i <= 10; i++)
+      expect(acceptContactSubmission(`192.0.2.${i}`)).not.toBeNull();
+    expect(acceptContactSubmission("192.0.2.11")).toBeNull();
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(acceptContactSubmission("192.0.2.2")).not.toBeNull();
+  });
+
+  it("reschedules expiry for the remaining reservation after releasing the earliest", async () => {
+    const { acceptContactSubmission } = await import(
+      "@/server/services/contact/rate-limit"
+    );
+    const reservation = acceptContactSubmission("192.0.2.1");
+    expect(reservation).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(acceptContactSubmission("192.0.2.2")).not.toBeNull();
+    reservation?.release();
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(9 * 60_000);
+    expect(acceptContactSubmission("192.0.2.2")).toBeNull();
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(acceptContactSubmission("192.0.2.2")).not.toBeNull();
+  });
+
   it("does not spend a quota on validation failures", async () => {
     for (let i = 0; i < 4; i++)
       await POST(request({ ...valid, message: "short" }));
@@ -315,6 +384,11 @@ describe("POST /api/kontakt", () => {
         "Contact mail unavailable (configuration)",
       );
       expect(fetchMock).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      vi.stubEnv("CONTACT_RESEND_API_KEY", "test-key");
+      expect((await POST(request())).status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect((await POST(request())).status).toBe(429);
     },
   );
 
@@ -327,7 +401,7 @@ describe("POST /api/kontakt", () => {
       );
       const readText = vi.spyOn(providerResponse, "text");
       const readJson = vi.spyOn(providerResponse, "json");
-      fetchMock.mockResolvedValue(providerResponse);
+      fetchMock.mockResolvedValueOnce(providerResponse);
       const log = vi.spyOn(console, "error").mockImplementation(() => {});
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const info = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -352,6 +426,10 @@ describe("POST /api/kontakt", () => {
         "test-key",
       ])
         expect(output).not.toContain(value);
+      expect(vi.getTimerCount()).toBe(0);
+      expect((await POST(request())).status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect((await POST(request())).status).toBe(429);
     },
   );
 
@@ -363,7 +441,7 @@ describe("POST /api/kontakt", () => {
         key: "test-key",
         ip: "192.0.2.5",
       });
-      fetchMock.mockRejectedValue(
+      fetchMock.mockRejectedValueOnce(
         failure === "timeout"
           ? new DOMException(details, "TimeoutError")
           : new Error(details),
@@ -385,6 +463,10 @@ describe("POST /api/kontakt", () => {
         "test-key",
       ])
         expect(output).not.toContain(value);
+      expect(vi.getTimerCount()).toBe(0);
+      expect((await POST(request())).status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect((await POST(request())).status).toBe(429);
     },
   );
 
