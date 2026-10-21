@@ -2,6 +2,8 @@
   "enabledMcpjsonServers": [
     "clerk",
     "glitchtip",
+    "kubernetes",
+    "talos",
     "umami"
   ]
 }
