@@ -66,9 +66,7 @@ export function StorageSection({ lang, number }: PrivacySectionProps) {
           ? "Die folgende Tabelle fasst Cookies und Browser-Speicher nach ihrem Zweck zusammen."
           : "The following table groups cookies and browser storage by purpose."}
       </p>
-      {/* biome-ignore lint/a11y/useSemanticElements: Explicit region wrapper keeps the wide table keyboard-scrollable. */}
-      <div
-        role="region"
+      <section
         aria-label={
           de ? "Cookies und Browser-Speicher" : "Cookies and browser storage"
         }
@@ -105,7 +103,7 @@ export function StorageSection({ lang, number }: PrivacySectionProps) {
             )}
           </tbody>
         </table>
-      </div>
+      </section>
       <p>
         {de
           ? "Für PostHog wird derzeit noch keine Einwilligung eingeholt; sie ist mit dem Wechsel zum selbst betriebenen Analysewerkzeug vorgesehen (siehe Abschnitt 9)."

@@ -166,7 +166,7 @@ describe.each(pages)(
         );
         expect(doc.querySelectorAll("table tbody tr")).toHaveLength(3);
         expect(
-          doc.querySelector('div[role="region"][aria-label][tabindex="0"]'),
+          doc.querySelector('section[aria-label][tabindex="0"]'),
         ).not.toBeNull();
         const rows = Array.from(doc.querySelectorAll("table tbody tr"));
         expect(

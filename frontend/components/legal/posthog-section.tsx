@@ -35,7 +35,7 @@ export function PostHogSection({ lang, number }: PrivacySectionProps) {
             <a href="https://posthog.com/privacy">
               Datenschutzerklärung von PostHog
             </a>
-            .
+            {"."}
           </p>
         </>
       ) : (
@@ -60,7 +60,8 @@ export function PostHogSection({ lang, number }: PrivacySectionProps) {
             website. Consent is not currently collected; it is planned alongside
             the switch to a self-hosted analytics tool (see section 15).
             Details:{" "}
-            <a href="https://posthog.com/privacy">PostHog privacy policy</a>.
+            <a href="https://posthog.com/privacy">PostHog privacy policy</a>
+            {"."}
           </p>
         </>
       )}

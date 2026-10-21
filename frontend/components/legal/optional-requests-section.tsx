@@ -24,7 +24,7 @@ export function OptionalRequestsSection({ lang, number }: PrivacySectionProps) {
             <a href="https://foundation.wikimedia.org/wiki/Policy:Privacy_policy/en">
               Datenschutzerklärung von Wikimedia
             </a>
-            .
+            {"."}
           </p>
           <h3>Bilder von eingegebenen Adressen</h3>
           <p>
@@ -37,8 +37,9 @@ export function OptionalRequestsSection({ lang, number }: PrivacySectionProps) {
           <h3>The Color API</h3>
           <p>
             Der Palettengenerator und der Farbpaletten-Ersteller senden
-            Farbwerte (Hex-Codes) aus Ihrem Browser an The Color API (
-            <a href="https://www.thecolorapi.com">thecolorapi.com</a>), um
+            Farbwerte (Hex-Codes) aus Ihrem Browser an The Color API{" ("}
+            <a href="https://www.thecolorapi.com">thecolorapi.com</a>
+            {"), um "}
             Farbnamen und Farbschemata abzufragen. Ihre IP-Adresse und
             Browserdaten gelangen dabei an den Anbieter. Nähere Angaben zum
             Betreiber und zu Übermittlungsgarantien liegen derzeit nicht vor.
@@ -62,7 +63,7 @@ export function OptionalRequestsSection({ lang, number }: PrivacySectionProps) {
             <a href="https://foundation.wikimedia.org/wiki/Policy:Privacy_policy/en">
               Wikimedia privacy policy
             </a>
-            .
+            {"."}
           </p>
           <h3>Images from addresses you enter</h3>
           <p>
@@ -74,8 +75,9 @@ export function OptionalRequestsSection({ lang, number }: PrivacySectionProps) {
           <h3>The Color API</h3>
           <p>
             The palette generator and the colour-palette creator send colour
-            values (hex codes) from your browser to The Color API (
-            <a href="https://www.thecolorapi.com">thecolorapi.com</a>) to look
+            values (hex codes) from your browser to The Color API{" ("}
+            <a href="https://www.thecolorapi.com">thecolorapi.com</a>
+            {") to look "}
             up colour names and schemes. Your IP address and browser data reach
             the provider. Further details on the operator and transfer
             safeguards are not currently available.

@@ -29,7 +29,7 @@ export function ClerkSection({ lang, number }: PrivacySectionProps) {
             <a href="https://clerk.com/legal/privacy">
               Datenschutzerklärung von Clerk
             </a>
-            .
+            {"."}
           </p>
           <p>
             Bei der Registrierung kann Clerk zur Abwehr von Bots Cloudflare
@@ -38,7 +38,7 @@ export function ClerkSection({ lang, number }: PrivacySectionProps) {
             <a href="https://www.cloudflare.com/privacypolicy/">
               Datenschutzerklärung von Cloudflare
             </a>
-            ).
+            {")."}
           </p>
         </>
       ) : (
@@ -58,7 +58,8 @@ export function ClerkSection({ lang, number }: PrivacySectionProps) {
             The retention periods in section 6 apply to account data. You can
             request deletion at <LegalEmail kind="privacy" />. Both the Clerk
             account and the data stored in BeastyPage are then deleted. Details:{" "}
-            <a href="https://clerk.com/legal/privacy">Clerk privacy policy</a>.
+            <a href="https://clerk.com/legal/privacy">Clerk privacy policy</a>
+            {"."}
           </p>
           <p>
             During registration, Clerk may use Cloudflare Turnstile to prevent
@@ -66,7 +67,7 @@ export function ClerkSection({ lang, number }: PrivacySectionProps) {
             <a href="https://www.cloudflare.com/privacypolicy/">
               Cloudflare privacy policy
             </a>
-            ).
+            {")."}
           </p>
         </>
       )}
