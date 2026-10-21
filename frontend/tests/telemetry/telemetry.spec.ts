@@ -12,7 +12,7 @@ async function stubServices(page: Page) {
     Math.random = () => 0;
   });
   const sends: { type: string; payload: Record<string, unknown> }[] = [];
-  const records: unknown[] = [];
+  const records: { payload: { events: { type: number }[] } }[] = [];
   const umamiRequests: string[] = [];
   const envelopes: string[] = [];
   const external: string[] = [];
@@ -53,6 +53,9 @@ async function stubServices(page: Page) {
         });
       return route.fulfill({ json: { response: null } });
     }
+    // Existing OBS themes request optional font CSS; keep this test offline too.
+    if (url.hostname === "fonts.googleapis.com")
+      return route.fulfill({ contentType: "text/css", body: "" });
     if (
       url.hostname === "127.0.0.1" &&
       url.pathname.includes("/api/1/envelope")
@@ -60,6 +63,16 @@ async function stubServices(page: Page) {
       envelopes.push(route.request().postData() ?? "");
       return route.fulfill({ json: {} });
     }
+    if (url.hostname === "127.0.0.1" && url.pathname === "/api/cat-stream")
+      return route.fulfill({ json: null });
+    if (
+      url.hostname === "127.0.0.1" &&
+      url.pathname === "/api/live/cat-stream/fixture"
+    )
+      return route.fulfill({
+        contentType: "text/event-stream",
+        body: "data: null\n\n",
+      });
     if (url.hostname === "127.0.0.1") return route.continue();
     external.push(url.origin);
     return route.abort();
@@ -186,10 +199,13 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
   await expect(
     page.getByRole("dialog", { name: "Cookie and storage settings" }),
   ).toBeVisible();
-  await page
-    .getByRole("dialog", { name: "Cookie and storage settings" })
-    .getByRole("button", { name: "Necessary only", exact: true })
-    .click();
+  await Promise.all([
+    page.waitForEvent("load"),
+    page
+      .getByRole("dialog", { name: "Cookie and storage settings" })
+      .getByRole("button", { name: "Necessary only", exact: true })
+      .click(),
+  ]);
   await expect(
     page.getByRole("button", { name: "Cookie settings", exact: true }).last(),
   ).toBeVisible();
@@ -201,6 +217,89 @@ test("built app enforces consent, tracks SPA pageviews, scrubs errors, and store
   await page.waitForTimeout(1200);
   expect(sends).toHaveLength(countAfterWithdrawal);
   await assertStorage(page);
+  expect(external).toEqual([]);
+});
+
+test("OBS sources skip consent and analytics but keep scrubbed error reporting, including after client navigation", async ({
+  page,
+}) => {
+  const { sends, records, umamiRequests, envelopes, external } =
+    await stubServices(page);
+  await page.goto("/single-cat-stream/obs?key=FAKE");
+  // Throw after deferred SDK initialization, exercising actual fetch/XHR and
+  // EventSource breadcrumbs/resource spans as well as the overlay request URL.
+  await page.evaluate(() =>
+    setTimeout(async () => {
+      await fetch("/api/cat-stream?key=FAKE");
+      await new Promise<void>((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = () => resolve();
+        xhr.open("GET", "/api/cat-stream?key=FAKE");
+        xhr.send();
+      });
+      const source = new EventSource("/api/live/cat-stream/fixture?key=FAKE");
+      source.addEventListener("message", () => {
+        source.close();
+        console.log("OBS EventSource /api/live/cat-stream/fixture?key=FAKE");
+        throw new Error(
+          "OBS telemetry fixture /single-cat-stream/obs?key=FAKE /api/live/cat-stream/fixture?key=FAKE",
+        );
+      });
+    }, 1500),
+  );
+  await expect
+    .poll(
+      () => envelopes.some((body) => body.includes("OBS telemetry fixture")),
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+  const error =
+    envelopes.find((body) => body.includes("OBS telemetry fixture")) ?? "";
+  expect(error).toContain('"release":"beastypage@v0.0.0-telemetry-test"');
+  expect(error).toContain('"environment":"production"');
+  expect(envelopes.join("\n")).not.toContain("FAKE");
+  await expect(page.locator("#cc-main")).toHaveCount(0);
+  await expect(page.locator('script[src*="umami.telemetry.test"]')).toHaveCount(
+    0,
+  );
+  expect(umamiRequests).toHaveLength(0);
+  await assertStorage(page);
+
+  await page.goto("/projects");
+  await page
+    .getByRole("button", { name: "Accept analytics", exact: true })
+    .click();
+  await expect.poll(() => sends.length).toBeGreaterThan(0);
+  // The recorder sends metadata before its asynchronous initial snapshot.
+  // Let both requests finish before measuring sends across the route change.
+  await expect
+    .poll(() =>
+      records.some((record) =>
+        record.payload.events.some((event) => event.type === 2),
+      ),
+    )
+    .toBe(true);
+  const sendCount = sends.length;
+  const recordCount = records.length;
+  const requestCount = umamiRequests.length;
+  // Next's supported native History API updates usePathname without a full load.
+  // The provider must then reload to remove the already-running recorder.
+  await Promise.all([
+    page.waitForEvent("load"),
+    page.evaluate(() =>
+      window.history.pushState(null, "", "/single-cat-stream/obs?key=FAKE"),
+    ),
+  ]);
+  await expect(page).toHaveURL(/\/single-cat-stream\/obs\?key=FAKE$/);
+  await expect(page.locator("#cc-main")).toHaveCount(0);
+  await expect(page.locator('script[src*="umami.telemetry.test"]')).toHaveCount(
+    0,
+  );
+  await page.waitForTimeout(1200);
+  expect(sends).toHaveLength(sendCount);
+  expect(records).toHaveLength(recordCount);
+  expect(umamiRequests).toHaveLength(requestCount);
+  expect(envelopes.join("\n")).not.toContain("FAKE");
   expect(external).toEqual([]);
 });
 

@@ -1,6 +1,6 @@
 const REDACTED = "[Filtered]";
 const sensitiveKey =
-  /(?:token|secret|password|authorization|cookie|email|username|session|signature|^sig$|^key$|^auth$|^code$|^edit$|^share$)/i;
+  /(?:token|secret|password|authorization|cookie|email|username|session|signature|^sig$|key$|^auth$|^code$|^edit$|^share$)/i;
 
 /** Shared by error reporting and analytics. Capability paths are never reported. */
 export function scrubUrl(value: string, excludeSearch = false): string {
@@ -28,18 +28,24 @@ export function scrubUrl(value: string, excludeSearch = false): string {
 }
 
 export function scrubText(value: string): string {
-  return value
-    .replace(/https?:\/\/[^\s<>"']+/gi, (url) => scrubUrl(url, true))
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, REDACTED)
-    .replace(/\bBearer\s+[^\s,;"']+/gi, `Bearer ${REDACTED}`)
-    .replace(
-      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?\b/g,
-      REDACTED,
-    )
-    .replace(
-      /((?:__session|__client_uat|token|key|secret|password|auth|code|session|signature|sig|edit|share)[\w-]*\s*[=:]\s*)[^\s&;,"'<>]+/gi,
-      `$1${REDACTED}`,
-    );
+  return (
+    value
+      .replace(/https?:\/\/[^\s<>"']+/gi, (url) => scrubUrl(url, true))
+      // Relative fetch/EventSource URLs can contain percent-encoded parameter names.
+      .replace(/(?<![\w:/])\/[^\s<>"']*\?[^\s<>"']+/g, (url) =>
+        scrubUrl(url, true),
+      )
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, REDACTED)
+      .replace(/\bBearer\s+[^\s,;"']+/gi, `Bearer ${REDACTED}`)
+      .replace(
+        /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?\b/g,
+        REDACTED,
+      )
+      .replace(
+        /((?:__session|__client_uat|token|key|secret|password|auth|code|session|signature|sig|edit|share)[\w-]*\s*[=:]\s*)[^\s&;,"'<>]+/gi,
+        `$1${REDACTED}`,
+      )
+  );
 }
 
 /** Pure, bounded traversal. Drops request bodies and identity rather than guessing their schema. */
@@ -57,12 +63,14 @@ export function scrubEvent<T>(event: T): T {
     for (const [key, item] of Object.entries(value)) {
       if (key === "user" || key === "cookies" || key === "request_body")
         continue;
-      if (sensitiveKey.test(key)) result[key] = REDACTED;
+      // Sentry accepts query_string as text, an object, or pairs; drop all forms.
+      if (sensitiveKey.test(key) || /^(query_string|url\.query)$/i.test(key))
+        result[key] = REDACTED;
       else if (key === "request" && item && typeof item === "object") {
         const { data: _data, ...request } = item as Record<string, unknown>;
         result[key] = visit(request, depth + 1);
       } else if (
-        /^(url|href|referrer)$/i.test(key) &&
+        /^(url|href|referrer|http\.url|url\.full|url\.original)$/i.test(key) &&
         typeof item === "string"
       ) {
         result[key] = scrubText(scrubUrl(item, true));

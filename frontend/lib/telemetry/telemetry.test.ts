@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { track } from "@/lib/analytics";
 import { hasAnalyticsConsent, setAnalyticsConsent } from "./consent-state";
 import { outboundHost } from "./outbound";
+import { isOverlayRoute } from "./overlay";
 import { scrubEvent, scrubUrl } from "./scrub";
 import { createUmamiLoader, REPLAY_BLOCK_SELECTOR } from "./umami";
 
 vi.mock("./config", () => ({ telemetryEnabled: true }));
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   setAnalyticsConsent(false);
   delete window.umami;
   document.head.innerHTML = "";
@@ -56,6 +58,79 @@ describe("consent-gated Umami", () => {
       createUmamiLoader(invalid)(true);
       expect(document.scripts).toHaveLength(0);
     }
+  });
+  it("never loads on browser sources or preview routes, even with consent", () => {
+    for (const path of [
+      "/single-cat-stream/obs",
+      "/single-cat-stream/obs/",
+      "/dev/obs-theme-preview",
+      "/dev/obs-batch-preview",
+      "/dev/obs-look-preview",
+    ]) {
+      expect(isOverlayRoute(path)).toBe(true);
+      window.history.replaceState(null, "", `${path}?key=sk_live_FAKE123`);
+      createUmamiLoader(config)(true);
+      expect(document.scripts).toHaveLength(0);
+      expect(window.beastypageBeforeSend?.("event", {})).toBe(false);
+    }
+    expect(isOverlayRoute("/single-cat-stream")).toBe(false);
+    expect(isOverlayRoute("/single-cat-stream/observer")).toBe(false);
+    expect(isOverlayRoute("/projects")).toBe(false);
+  });
+  it("blocks loaded trackers, product events and recorder transport immediately on overlay navigation", async () => {
+    const transport = vi.mocked(window.fetch);
+    const reload = vi.fn();
+    const update = createUmamiLoader(config, reload);
+    update(true);
+    const tracker = document.scripts[0];
+    tracker.dispatchEvent(new Event("load"));
+    const send = vi.fn();
+    window.umami = { track: send };
+    window.history.pushState(
+      null,
+      "",
+      "/single-cat-stream/obs?key=sk_live_FAKE123",
+    );
+    expect(
+      window.beastypageBeforeSend?.("event", { url: window.location.href }),
+    ).toBe(false);
+    track("wheel_spin_started", {});
+    expect(send).not.toHaveBeenCalled();
+    await window.fetch("https://analytics.test/api/record", {
+      method: "POST",
+      body: JSON.stringify({ url: window.location.href }),
+    });
+    expect(transport).not.toHaveBeenCalled();
+    update(false);
+    expect(document.scripts).toHaveLength(0);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+  it("scrubs overlay and SSE capabilities from before-send and recorder payloads", async () => {
+    const transport = vi.mocked(window.fetch);
+    createUmamiLoader(config)(true);
+    const url = "/single-cat-stream/obs?key=sk_live_FAKE123";
+    const sse = "/api/live/cat-stream/fixture?key=sk_live_FAKE123";
+    const event = window.beastypageBeforeSend?.("event", {
+      url,
+      data: { source: sse },
+    });
+    expect(JSON.stringify(event)).not.toContain("sk_live_FAKE123");
+    expect(event).toMatchObject({ url: "/single-cat-stream/obs" });
+    await window.fetch("https://analytics.test/api/record", {
+      method: "POST",
+      body: JSON.stringify({
+        events: [
+          { type: 4, data: { href: url } },
+          {
+            type: 3,
+            data: { attributes: { src: sse }, textContent: `SSE ${sse}` },
+          },
+        ],
+      }),
+    });
+    const options = transport.mock.calls[0][1];
+    expect(options?.body).not.toContain("sk_live_FAKE123");
+    expect(options?.body).toContain("/api/live/cat-stream/fixture");
   });
   it("does not start the recorder if consent is withdrawn before the tracker loads", () => {
     const update = createUmamiLoader(config, vi.fn());
@@ -130,6 +205,81 @@ describe("typed track", () => {
 });
 
 describe("event scrubber", () => {
+  const overlay = "https://site.test/single-cat-stream/obs?key=sk_live_FAKE123";
+  const sse = "/api/live/cat-stream/fixture?key=sk_live_FAKE123";
+
+  it("scrubs overlay requests, fetch/xhr/navigation/console breadcrumbs and EventSource errors", () => {
+    const breadcrumbs = [
+      { category: "fetch", data: { url: sse, method: "GET" } },
+      { category: "xhr", data: { url: sse, method: "GET" } },
+      { category: "navigation", data: { from: "/projects", to: overlay } },
+      {
+        category: "console",
+        message: `EventSource ${sse}`,
+        data: { arguments: [sse] },
+      },
+    ];
+    for (const breadcrumb of breadcrumbs)
+      expect(JSON.stringify(scrubEvent(breadcrumb))).not.toContain(
+        "sk_live_FAKE123",
+      );
+    const result = scrubEvent({
+      request: { url: overlay, query_string: "key=sk_live_FAKE123" },
+      breadcrumbs,
+      exception: {
+        values: [
+          { type: "Error", value: `EventSource connection failed: ${sse}` },
+        ],
+      },
+      extra: { event: { target: { url: sse } } },
+    });
+    expect(JSON.stringify(result)).not.toContain("sk_live_FAKE123");
+    expect(result.request.query_string).toBe("[Filtered]");
+    expect(result.request.url).toBe("https://site.test/single-cat-stream/obs");
+  });
+
+  it("scrubs transaction/span URLs, descriptions and every query_string representation", () => {
+    const result = scrubEvent({
+      type: "transaction",
+      transaction: `GET ${overlay}`,
+      request: { url: overlay, query_string: [["key", "sk_live_FAKE123"]] },
+      contexts: {
+        trace: { data: { "http.url": overlay, "url.full": overlay } },
+      },
+      spans: [
+        {
+          op: "resource.other",
+          description: `EventSource ${sse}`,
+          data: {
+            "http.url": sse,
+            "url.full": overlay,
+            "url.query": "key=sk_live_FAKE123",
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain("sk_live_FAKE123");
+    expect(result.spans[0].data["http.url"]).toBe(
+      "/api/live/cat-stream/fixture",
+    );
+    expect(
+      JSON.stringify(
+        scrubEvent({ request: { query_string: { key: "sk_live_FAKE123" } } }),
+      ),
+    ).not.toContain("sk_live_FAKE123");
+    for (const key of ["key", "%6b%65%79", "apiKey", "viewerKey"])
+      expect(
+        JSON.stringify(
+          scrubEvent({
+            message: `/single-cat-stream/obs?${key}=sk_live_FAKE123`,
+            description: `/api/live/cat-stream/fixture?${key}=sk_live_FAKE123`,
+          }),
+        ),
+      ).not.toContain("sk_live_FAKE123");
+    expect(
+      scrubUrl("/api/live/cat-stream/fixture?viewerKey=sk_live_FAKE123"),
+    ).not.toContain("sk_live_FAKE123");
+  });
   it("removes identity, bodies, email, bearer/JWT credentials, cookies and nested secrets", () => {
     const original = {
       user: { id: "private-id" },

@@ -87,6 +87,7 @@ export function createUmamiLoader(
   reload = () => window.location.reload(),
 ) {
   let loaded = false;
+  let consented = false;
   let guarded = false;
   const scripts: HTMLScriptElement[] = [];
   window.beastypageBeforeSend = (_type, payload) => {
@@ -99,7 +100,8 @@ export function createUmamiLoader(
     });
   };
   return (accepted: boolean) => {
-    const withdrawing = hasAnalyticsConsent() && !accepted;
+    const withdrawing = consented && !accepted;
+    consented = accepted;
     setAnalyticsConsent(accepted);
     if (!accepted) {
       for (const script of scripts) script.remove();
@@ -108,6 +110,7 @@ export function createUmamiLoader(
     }
     if (
       loaded ||
+      !hasAnalyticsConsent() ||
       !config.enabled ||
       !config.host ||
       !config.websiteId ||

@@ -1,17 +1,20 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
+import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef } from "react";
 import * as CookieConsent from "vanilla-cookieconsent";
 import { track } from "@/lib/analytics";
 import { telemetryConfig, telemetryEnabled } from "@/lib/telemetry/config";
 import { outboundHost } from "@/lib/telemetry/outbound";
+import { isOverlayRoute } from "@/lib/telemetry/overlay";
 import { STORAGE_INVENTORY } from "@/lib/telemetry/storage-inventory";
 import { createUmamiLoader } from "@/lib/telemetry/umami";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
 import "./telemetry.css";
 
 export function TelemetryProvider({ children }: { children: ReactNode }) {
+  const overlay = isOverlayRoute(usePathname());
   const { isLoaded, isSignedIn, user } = useUser();
   const previousAuth = useRef<boolean | undefined>(undefined);
 
@@ -30,14 +33,17 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   }, [isLoaded, isSignedIn, user]);
 
   useEffect(() => {
+    if (overlay) return;
+    let active = true;
     const updateConsent = createUmamiLoader({
       enabled: telemetryEnabled,
       host: telemetryConfig.umamiHost,
       websiteId: telemetryConfig.websiteId,
       domains: telemetryConfig.domains,
     });
-    const sync = () =>
-      updateConsent(CookieConsent.acceptedCategory("analytics"));
+    const sync = () => {
+      if (active) updateConsent(CookieConsent.acceptedCategory("analytics"));
+    };
     void CookieConsent.run({
       root: "body",
       autoShow: true,
@@ -123,8 +129,15 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       if (host) track("outbound_link_clicked", { host });
     };
     document.addEventListener("click", click, true);
-    return () => document.removeEventListener("click", click, true);
-  }, []);
+    return () => {
+      active = false;
+      document.removeEventListener("click", click, true);
+      CookieConsent.reset(false);
+      // Entering a browser source removes the recorder with a reload if loaded.
+      // The URL guard already blocks sends before this effect runs.
+      updateConsent(false);
+    };
+  }, [overlay]);
 
   // Block signed-in content entirely; mask text in anonymous tools too.
   return <div className={isSignedIn ? "rr-block" : "rr-mask"}>{children}</div>;

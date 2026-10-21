@@ -58,6 +58,12 @@ selector. Signed-in content is blocked; anonymous text and all inputs are masked
 The server must enable replay/heatmaps for this website. On withdrawal, the guard
 blocks sends immediately, including unload flushes, then reloads the page.
 
+OBS browser sources (`/single-cat-stream/obs`) and `/dev/obs-*` preview scenes
+skip consent UI and Umami entirely. Entering a scene after analytics loaded
+blocks sends immediately and reloads to remove the recorder. GlitchTip remains
+enabled, with query strings removed from URLs and redacted from request data,
+breadcrumbs, and transaction spans, including account keys used by EventSource.
+
 The shared cookie/storage inventory is `lib/telemetry/storage-inventory.ts`.
 The preferences modal uses this list. The legal-pages work owns `/privacy`;
 the consent banner and preferences modal keep their links to that route.
