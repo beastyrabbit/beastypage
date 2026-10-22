@@ -155,7 +155,9 @@ Additional operational notes:
 
 ## Container Images
 
-GitHub Actions builds and publishes GHCR images from `.github/workflows/build-images.yml`. Version-tag pushes such as `v8.1.0` receive `X.Y.Z` and `X.Y` semver tags, main pushes receive `latest` and a commit SHA tag, and manual runs can receive a smoke tag. Publication jobs require their applicable validation checks to succeed. Pull requests run validation only.
+GitHub Actions builds and publishes GHCR images from `.github/workflows/build-images.yml`. Version-tag pushes such as `v8.1.0` receive `X.Y.Z`, `X.Y` and commit SHA tags. Pushes to `main` build nothing, because Flux deploys semver tags only. Manual runs build the selected images and publish them under a smoke tag only when `publish_images` is set.
+
+Source checks run once, in `validate.yml` on the pull request. A tag does not repeat them; its `release-gate` job proves instead that they passed for the exact tagged tree. The newest `validate.yml` run of the tag commit's pull request must have passed both `applications` and `database` and must have recorded the same Git tree, or a manual `validate.yml` run on the tag commit must have passed. Every image build, including manual publishing, needs that gate. After all five images are built, `deploy-smoke` waits for `https://beastyrabbit.com/api/version` to report the tag, then checks the home page and the database and renderer health routes. [Release verification](docs/release-verification.md) describes what to do when either job fails.
 
 The published image names are:
 
