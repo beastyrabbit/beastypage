@@ -75,6 +75,8 @@ REPO = "beastyrabbit/beastypage"
 SHA = "c" * 40
 TREE = "a" * 40
 PR_HEAD = "b" * 40
+PR_BRANCH = "t3/improve-bottom-bar"
+PR_REPO_ID = 1085623232
 
 
 def workflow_run(run_id, status="completed", conclusion="success"):
@@ -83,6 +85,9 @@ def workflow_run(run_id, status="completed", conclusion="success"):
         "run_number": run_id,
         "status": status,
         "conclusion": conclusion,
+        "head_sha": PR_HEAD,
+        "head_branch": PR_BRANCH,
+        "head_repository": {"id": PR_REPO_ID},
         "html_url": f"https://github.com/{REPO}/actions/runs/{run_id}",
     }
 
@@ -92,7 +97,18 @@ class FakeGitHub:
 
     def __init__(self, pr_runs=(), manual_runs=(), pulls=None):
         self.pulls = (
-            [{"number": 176, "head": {"sha": PR_HEAD}}] if pulls is None else pulls
+            [
+                {
+                    "number": 176,
+                    "head": {
+                        "sha": PR_HEAD,
+                        "ref": PR_BRANCH,
+                        "repo": {"id": PR_REPO_ID},
+                    },
+                }
+            ]
+            if pulls is None
+            else pulls
         )
         self.pr_runs = list(pr_runs)
         self.manual_runs = list(manual_runs)
@@ -160,6 +176,37 @@ def test_gate_accepts_a_pr_run_that_tested_the_tagged_tree():
     code, output = gate(FakeGitHub(pr_runs=[workflow_run(199)]))
     assert code == 0
     assert f"https://github.com/{REPO}/actions/runs/199" in output
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("head_repository", {"id": PR_REPO_ID + 1}),
+        ("head_branch", "duplicate-pr"),
+        ("head_repository", None),
+        ("head_repository", {}),
+    ],
+    ids=["another-repository", "another-branch", "null-repository", "missing-id"],
+)
+def test_gate_ignores_a_newer_unrelated_run_with_the_same_sha(field, value):
+    unrelated_run = workflow_run(200, conclusion="failure")
+    unrelated_run[field] = value
+    api = FakeGitHub(pr_runs=[workflow_run(199), unrelated_run])
+    code, output = gate(api)
+    assert code == 0
+    assert "runs/199" in output
+
+
+@pytest.mark.parametrize("missing", [False, True], ids=["null", "missing"])
+def test_gate_rejects_a_pr_with_a_deleted_repository(missing):
+    api = FakeGitHub(pr_runs=[workflow_run(199)])
+    if missing:
+        del api.pulls[0]["head"]["repo"]
+    else:
+        api.pulls[0]["head"]["repo"] = None
+    code, output = gate(api)
+    assert code == 1
+    assert "PR #176 has no validate.yml run" in output
 
 
 def test_gate_rejects_a_pr_run_that_tested_another_tree():

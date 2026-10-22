@@ -92,7 +92,15 @@ def evaluate(api, repo, sha, tree):
             f"/repos/{repo}/actions/workflows/{WORKFLOW}/runs"
             f"?event=pull_request&head_sha={pr['head']['sha']}&per_page=100"
         )["workflow_runs"]
-        run = newest(runs)
+        head = pr["head"]
+        head_repo = head.get("repo") or {}
+        run = newest(
+            run
+            for run in runs
+            if head_repo.get("id") is not None
+            and run.get("head_branch") == head.get("ref")
+            and (run.get("head_repository") or {}).get("id") == head_repo["id"]
+        )
         if run is None:
             outcomes.append((FAIL, f"PR #{pr['number']} has no {WORKFLOW} run"))
         else:
