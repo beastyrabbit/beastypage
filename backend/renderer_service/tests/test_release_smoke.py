@@ -116,6 +116,15 @@ def test_smoke_reports_a_newer_version_as_superseded(site):
     assert "v11.3.0" in output
 
 
+@pytest.mark.parametrize("version", [None, 123, [11, 2, 0], {"tag": "v11.2.0"}])
+def test_smoke_retries_malformed_versions_until_the_release_arrives(site, version):
+    site.versions = [version, "v11.2.0"]
+    code, output = run_smoke(site)
+    assert code == 0, output
+    assert "unexpected body:" in output
+    assert "health checks passed" in output
+
+
 def test_smoke_fails_when_the_release_never_arrives(site):
     site.versions = ["v11.1.2"]
     code, output = run_smoke(site, timeout=60)

@@ -67,6 +67,7 @@ def test_validation_records_the_tested_tree_and_can_run_manually():
         gate_script.TREE_ARTIFACT_PREFIX + "${{ steps.tree.outputs.tree }}"
     )
     assert uploads[0]["with"]["if-no-files-found"] == "error"
+    assert uploads[0]["with"]["overwrite"] is True
     assert set(gate_script.REQUIRED_JOBS) <= set(jobs)
 
 
@@ -238,6 +239,7 @@ def test_gate_fails_closed_on_api_errors(broken):
     code, output = gate(api)
     assert code == 1
     assert "could not check validation" in output
+    assert "gh workflow run validate.yml --ref <tag>" in output
 
 
 def test_gate_accepts_a_manual_run_on_the_tagged_commit():

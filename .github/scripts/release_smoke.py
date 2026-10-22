@@ -45,6 +45,8 @@ def live_version(base_url):
         version = json.loads(body)["version"]
     except (ValueError, KeyError, TypeError):
         return None, f"unexpected body: {body[:120]}"
+    if not isinstance(version, str):
+        return None, f"unexpected body: {body[:120]}"
     return version, version
 
 

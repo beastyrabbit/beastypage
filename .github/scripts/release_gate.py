@@ -135,8 +135,10 @@ def run_gate(
         try:
             state, messages = evaluate(api, repo, sha, tree)
         except GateError as error:
-            out(f"::error::Release gate could not check validation: {error}")
-            return 1
+            state, messages = (
+                FAIL,
+                [f"Release gate could not check validation: {error}"],
+            )
         if state == PASS:
             out(f"Validation proven for {sha} (tree {tree}) by {messages[0]}")
             return 0
