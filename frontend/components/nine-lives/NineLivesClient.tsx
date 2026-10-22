@@ -24,6 +24,10 @@ import {
   type NineLivesCredit,
   type NineLivesCreditGroup,
 } from "@/lib/nine-lives/credits";
+import {
+  hasAnalyticsConsent,
+  onAnalyticsConsentChange,
+} from "@/lib/telemetry/consent-state";
 
 const GAME_URL =
   process.env.NEXT_PUBLIC_NINE_LIVES_URL ??
@@ -53,6 +57,11 @@ type InputMessage = {
   v: 1;
   button: ButtonName;
   state: "down" | "up";
+};
+type ConsentMessage = {
+  type: "nine-lives:consent";
+  v: 1;
+  analytics: boolean;
 };
 
 const KEYBOARD_POINTER_IDS: Record<ButtonName, number> = {
@@ -149,9 +158,21 @@ const KEYMAP = [
 
 function postMessageToGame(
   iframe: HTMLIFrameElement | null,
-  message: InputMessage | { type: "nine-lives:release-all"; v: 1 },
+  message:
+    | InputMessage
+    | ConsentMessage
+    | { type: "nine-lives:release-all"; v: 1 },
 ) {
   iframe?.contentWindow?.postMessage(message, GAME_ORIGIN);
+}
+
+// The framed game shows no banner of its own and follows BeastyPage's choice.
+function postConsentToGame(iframe: HTMLIFrameElement | null) {
+  postMessageToGame(iframe, {
+    type: "nine-lives:consent",
+    v: 1,
+    analytics: hasAnalyticsConsent(),
+  });
 }
 
 function MorrowmewMark() {
@@ -551,16 +572,22 @@ export function NineLivesClient() /* NOSONAR */ {
         event.data?.v === 1
       ) {
         setReady(true);
+        // The game reloads after a withdrawal and asks again, so answer every ready.
+        postConsentToGame(iframeRef.current);
       }
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") releaseAll();
     };
+    const unsubscribeConsent = onAnalyticsConsentChange(() =>
+      postConsentToGame(iframeRef.current),
+    );
     window.addEventListener("message", onMessage);
     window.addEventListener("blur", releaseAll);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       releaseAll();
+      unsubscribeConsent();
       window.removeEventListener("message", onMessage);
       window.removeEventListener("blur", releaseAll);
       document.removeEventListener("visibilitychange", onVisibility);
