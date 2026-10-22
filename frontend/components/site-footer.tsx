@@ -33,21 +33,24 @@ export function SiteFooter() {
           </span>
           {"."}
         </p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <LegalLinks />
-          <CookieSettings />
-          <span aria-hidden className="h-4 w-px bg-border" />
-          {FOOTER_LINKS.map(({ href, label }) => (
-            <Link
-              key={label}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link-underline hover:text-foreground"
-            >
-              {label}
-            </Link>
-          ))}
+        <div className="flex flex-wrap items-center gap-x-10 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <LegalLinks />
+            <CookieSettings />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {FOOTER_LINKS.map(({ href, label }) => (
+              <Link
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-underline hover:text-foreground"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </footer>
