@@ -13,7 +13,9 @@ export function NineLivesSection({ lang, number }: PrivacySectionProps) {
           <a href="https://ninelives.beastyrabbit.com/datenschutz">
             {"Datenschutzerklärung von Nine Lives"}
           </a>
-          {"."}
+          {
+            ". Das eingebettete Spiel zeigt kein eigenes Cookie-Banner und folgt Ihrer Analytics-Wahl in den „Cookie settings“ von BeastyPage, wo Sie sie ändern oder widerrufen können."
+          }
         </p>
       ) : (
         <p>
@@ -25,7 +27,9 @@ export function NineLivesSection({ lang, number }: PrivacySectionProps) {
           <a href="https://ninelives.beastyrabbit.com/datenschutz">
             {"Nine Lives privacy policy"}
           </a>
-          {"."}
+          {
+            '. The embedded game shows no consent banner of its own and follows your analytics choice in BeastyPage\'s "Cookie settings", where you can change or withdraw it.'
+          }
         </p>
       )}
     </PrivacySection>
