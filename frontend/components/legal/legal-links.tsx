@@ -11,7 +11,7 @@ export function LegalLinks() {
   return (
     <nav
       aria-label="Legal"
-      className="flex flex-wrap items-center gap-x-4 gap-y-2"
+      className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
     >
       {LEGAL_LINKS.map(({ href, label, lang }) => (
         <Link
