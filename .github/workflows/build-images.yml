@@ -114,7 +114,20 @@ jobs:
             : "${SENTRY_AUTH_TOKEN:?Missing SENTRY_AUTH_TOKEN from Infisical prod /ci}"
           fi
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - name: Use the persistent homelab BuildKit
+        id: buildx-remote
+        continue-on-error: true
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+
+      - name: Fall back to the job's own Docker
+        id: buildx-local
+        if: steps.buildx-remote.outcome == 'failure'
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: docker
 
       - name: Log in to GHCR
         if: github.event_name != 'workflow_dispatch' || inputs.publish_images
@@ -138,6 +151,7 @@ jobs:
       - name: Build frontend image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
+          builder: ${{ steps.buildx-local.outputs.name || steps.buildx-remote.outputs.name }}
           context: ./frontend
           file: ./frontend/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
@@ -174,7 +188,20 @@ jobs:
         id: cat-system
         run: echo "hash=$(cat frontend/public/cat-system/catalog-hash.txt)" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - name: Use the persistent homelab BuildKit
+        id: buildx-remote
+        continue-on-error: true
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+
+      - name: Fall back to the job's own Docker
+        id: buildx-local
+        if: steps.buildx-remote.outcome == 'failure'
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: docker
 
       - name: Log in to GHCR
         if: github.event_name != 'workflow_dispatch' || inputs.publish_images
@@ -198,6 +225,7 @@ jobs:
       - name: Build renderer image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
+          builder: ${{ steps.buildx-local.outputs.name || steps.buildx-remote.outputs.name }}
           context: .
           file: ./backend/renderer_service/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
@@ -222,7 +250,20 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - name: Use the persistent homelab BuildKit
+        id: buildx-remote
+        continue-on-error: true
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+
+      - name: Fall back to the job's own Docker
+        id: buildx-local
+        if: steps.buildx-remote.outcome == 'failure'
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: docker
 
       - name: Log in to GHCR
         if: github.event_name != 'workflow_dispatch' || inputs.publish_images
@@ -246,6 +287,7 @@ jobs:
       - name: Build image-processing image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
+          builder: ${{ steps.buildx-local.outputs.name || steps.buildx-remote.outputs.name }}
           context: ./backend/image_processing_service
           file: ./backend/image_processing_service/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
@@ -270,7 +312,20 @@ jobs:
         id: cat-system
         run: echo "hash=$(cat frontend/public/cat-system/catalog-hash.txt)" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - name: Use the persistent homelab BuildKit
+        id: buildx-remote
+        continue-on-error: true
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+
+      - name: Fall back to the job's own Docker
+        id: buildx-local
+        if: steps.buildx-remote.outcome == 'failure'
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: docker
 
       - name: Log in to GHCR
         if: github.event_name != 'workflow_dispatch' || inputs.publish_images
@@ -294,6 +349,7 @@ jobs:
       - name: Build Discord bot image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
+          builder: ${{ steps.buildx-local.outputs.name || steps.buildx-remote.outputs.name }}
           context: ./backend/discord-bot
           file: ./backend/discord-bot/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
@@ -318,7 +374,20 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - name: Use the persistent homelab BuildKit
+        id: buildx-remote
+        continue-on-error: true
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+
+      - name: Fall back to the job's own Docker
+        id: buildx-local
+        if: steps.buildx-remote.outcome == 'failure'
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          driver: docker
 
       - name: Log in to GHCR
         if: github.event_name != 'workflow_dispatch' || inputs.publish_images
@@ -342,6 +411,7 @@ jobs:
       - name: Build media image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
+          builder: ${{ steps.buildx-local.outputs.name || steps.buildx-remote.outputs.name }}
           context: ./backend/media_service
           file: ./backend/media_service/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
