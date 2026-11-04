@@ -54,7 +54,7 @@ export async function findUploadsBySlug(
     .select()
     .from(quickShareUploads)
     .where(eq(quickShareUploads.slug, slug))
-    .orderBy(desc(quickShareUploads.createdAt))
+    .orderBy(desc(quickShareUploads.createdAt), desc(quickShareUploads.id))
     .limit(limit);
   if (lock) query = query.for("update") as typeof query;
   return query;

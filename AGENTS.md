@@ -12,6 +12,8 @@ Frontend and renderer service for BeastyPage with Docker/Kubernetes deploy flow.
 - Do not use fixed-interval polling from replicated services for PostgreSQL background work; prefer atomic event dispatch with bounded retry and infrequent recovery sweeps.
 - Roll out cross-service protocol and database function-signature changes in backward-compatible phases, and verify time-filtered production logs only after all legacy replicas are gone.
 
+Project knowledge lives in memex: project page `pages/projects/beastypage.md`.
+
 ## Ports
 - Dev frontend: `http://frontend.localhost:1355` (portless, via `pnpm run dev` in `frontend/`)
 - Renderer service: `8001`

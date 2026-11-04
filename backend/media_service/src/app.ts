@@ -688,6 +688,17 @@ export function createApp(
 		return c.json(withLink(upload, config));
 	});
 
+	app.post("/i/api/account/uploads/:id/remove", async (c) => {
+		const { bearer } = requestContext(c);
+		if (!bearer) return c.json({ error: "Unauthorized" }, 401);
+		const result = await control.call<{ removedIds: string[] }>(
+			"remove",
+			{ uploadId: c.req.param("id") },
+			bearer,
+		);
+		return c.json(result);
+	});
+
 	app.get("/i/api/admin/uploads", async (c) => {
 		const { bearer } = requestContext(c);
 		if (!bearer) return c.json({ error: "Unauthorized" }, 401);

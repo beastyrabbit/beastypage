@@ -12,6 +12,7 @@ import {
   LoaderCircle,
   RefreshCw,
   Share2,
+  Trash2,
 } from "lucide-react";
 import {
   type FormEvent,
@@ -127,10 +128,19 @@ function writeReceipt(receipt: Receipt) {
   localStorage.setItem(RECEIPTS_KEY, JSON.stringify(next));
 }
 
-function errorMessage(error: unknown) {
+const ACTIVE_LIMIT_MESSAGE =
+  "Too many shares are active. Wait for one to expire before creating another.";
+const OWNER_ACTIVE_LIMIT_MESSAGE =
+  "Too many shares are active. Delete one or wait for one to expire before creating another.";
+
+function activeLimitMessage(signedIn: boolean | undefined) {
+  return signedIn ? OWNER_ACTIVE_LIMIT_MESSAGE : ACTIVE_LIMIT_MESSAGE;
+}
+
+function errorMessage(error: unknown, signedIn?: boolean) {
   const raw = error instanceof Error ? error.message : "Something went wrong";
   if (raw.includes("ACTIVE_LIMIT")) {
-    return "Too many shares are active. Wait for one to expire before creating another.";
+    return activeLimitMessage(signedIn);
   }
   if (raw.includes("HOURLY_LIMIT")) {
     return "The hourly share limit has been reached. Try again later.";
@@ -412,6 +422,8 @@ export function QuickShareClient() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [now, setNow] = useState(0);
   const [currentItemCount, setCurrentItemCount] = useState(1);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const processingAbortRef = useRef<AbortController | null>(null);
 
   const selectFile = useCallback(
@@ -509,7 +521,7 @@ export function QuickShareClient() {
       }
     } catch (error) {
       setHistoryError(
-        `Recent shares could not be loaded. ${errorMessage(error)}`,
+        `Recent shares could not be loaded. ${errorMessage(error, isSignedIn)}`,
       );
     } finally {
       setHistoryLoading(false);
@@ -720,8 +732,7 @@ export function QuickShareClient() {
     if (activeHistoryCount + selectedFiles.length > policy.active) {
       setWork({
         kind: "error",
-        label:
-          "Too many shares are active. Wait for one to expire before creating another.",
+        label: activeLimitMessage(isSignedIn),
       });
       return;
     }
@@ -798,7 +809,7 @@ export function QuickShareClient() {
       }
     } catch (error) {
       if (!isAbortError(error)) {
-        setWork({ kind: "error", label: errorMessage(error) });
+        setWork({ kind: "error", label: errorMessage(error, isSignedIn) });
       }
     }
   }
@@ -811,7 +822,7 @@ export function QuickShareClient() {
       await uploadParts(file, activeUpload);
     } catch (error) {
       if (!isAbortError(error)) {
-        setWork({ kind: "error", label: errorMessage(error) });
+        setWork({ kind: "error", label: errorMessage(error, isSignedIn) });
       }
     }
   }
@@ -848,7 +859,7 @@ export function QuickShareClient() {
       await waitForProcessing(upload);
     } catch (error) {
       if (!isAbortError(error)) {
-        setWork({ kind: "error", label: errorMessage(error) });
+        setWork({ kind: "error", label: errorMessage(error, isSignedIn) });
       }
     }
   }
@@ -876,7 +887,41 @@ export function QuickShareClient() {
       if (current?.id === normalized.id) setCurrent(normalized);
       toast.success("Share extended to 30 days");
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.error(errorMessage(error, isSignedIn));
+    }
+  }
+
+  async function deleteShare(item: ShareStatus) {
+    if (confirmDeleteId !== item.id) {
+      setConfirmDeleteId(item.id);
+      return;
+    }
+    setConfirmDeleteId(null);
+    setDeletingId(item.id);
+    try {
+      const { removedIds } = await apiFetch<{ removedIds: string[] }>(
+        `/i/api/account/uploads/${item.id}/remove`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      const removed = new Set([item.id, ...removedIds]);
+      setHistory((items) =>
+        items.filter((existing) => !removed.has(existing.id)),
+      );
+      if (current && removed.has(current.id)) setCurrent(null);
+      setWork((state) =>
+        state.kind === "error" && state.label === OWNER_ACTIVE_LIMIT_MESSAGE
+          ? { kind: "idle" }
+          : state,
+      );
+      toast.success(
+        removed.size > 1
+          ? `Share deleted with all ${removed.size} files. The link no longer works.`
+          : "Share deleted. The link no longer works.",
+      );
+    } catch (error) {
+      toast.error(errorMessage(error, isSignedIn));
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -1201,7 +1246,9 @@ export function QuickShareClient() {
           </div>
 
           <div className="border-t border-border/70 bg-muted/20 px-4 py-4 text-xs leading-5 text-muted-foreground sm:px-6">
-            Shares cannot be deleted by the uploader. They expire automatically.
+            {isSignedIn
+              ? "Shares expire automatically, or delete one from Recent shares to free a slot."
+              : "Shares expire automatically. Shares you create while signed in can be deleted early, and you can keep more active."}{" "}
             A private original is retained for moderation for up to 30 days.
           </div>
         </section>
@@ -1271,6 +1318,36 @@ export function QuickShareClient() {
                     >
                       <Share2 className="size-3.5" /> Share
                     </button>
+                    {isSignedIn ? (
+                      <button
+                        type="button"
+                        disabled={deletingId === item.id}
+                        aria-label={
+                          confirmDeleteId === item.id
+                            ? `Confirm deleting ${item.originalName}`
+                            : `Delete ${item.originalName}`
+                        }
+                        className={cn(
+                          "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition disabled:opacity-40",
+                          confirmDeleteId === item.id
+                            ? "border-red-500 bg-red-600 text-white"
+                            : "border-border text-muted-foreground hover:border-red-500/40 hover:text-red-300",
+                        )}
+                        onBlur={() =>
+                          setConfirmDeleteId((id) =>
+                            id === item.id ? null : id,
+                          )
+                        }
+                        onClick={() => void deleteShare(item)}
+                      >
+                        {deletingId === item.id ? (
+                          <LoaderCircle className="size-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-3.5" />
+                        )}
+                        {confirmDeleteId === item.id ? "Delete?" : null}
+                      </button>
+                    ) : null}
                   </div>
                   {isSignedIn &&
                   policy &&
@@ -1291,8 +1368,9 @@ export function QuickShareClient() {
             </div>
           ) : null}
           <p className="mt-4 text-xs leading-5 text-muted-foreground">
-            There is no uploader delete button. Moderators can remove abusive
-            media early.
+            {isSignedIn
+              ? "Deleting a share turns its link off right away. Moderators can also remove abusive media early."
+              : "Shares created while signed in can be deleted early. Moderators can remove abusive media early."}
           </p>
         </aside>
       </div>

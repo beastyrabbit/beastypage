@@ -70,7 +70,7 @@ export const QUICK_SHARE_POLICY = {
     maxBytes: 2 * 1024 * MIB,
     hourlyStarts: 60,
     dailyBytes: 5 * 1024 * MIB,
-    active: 5,
+    active: 25,
     smallCutoffBytes: 250 * MIB,
     smallLifetimeMs: 30 * DAY_MS,
     largeLifetimeMs: 7 * DAY_MS,
@@ -800,6 +800,59 @@ async function extend(
   });
 }
 
+/**
+ * The signed-in owner takes a share offline early. Every item behind the
+ * share's link is revoked together, because a multi-file share is one link.
+ * The link stops working at once and the items stop counting toward the
+ * active limit. Private originals keep their normal retention for moderation,
+ * and the hourly and daily usage counters stay charged, so deleting does not
+ * reset abuse limits. An unfinished upload can be removed too: later part,
+ * complete and import calls require the `uploading` state, so it cannot come
+ * back.
+ */
+async function ownerRemove(
+  db: Database,
+  body: OpBody,
+  owner: string | undefined,
+  now: number,
+) {
+  if (!owner) return { status: 401, body: { error: "Unauthorized" } };
+  return withTransaction(db, async (tx) => {
+    const uploadId = id(body, "uploadId");
+    const found = await getUpload(tx, uploadId);
+    if (found?.ownerTokenIdentifier !== owner)
+      throw new Error("UPLOAD_NOT_AVAILABLE");
+    // Lock the whole share in one query so concurrent deletes of different
+    // files in it take their row locks in the same order.
+    const items = await findUploadsBySlug(
+      tx,
+      found.slug,
+      QUICK_SHARE_POLICY.collectionMaxItems,
+      true,
+    );
+    const upload = items.find((item) => item.id === uploadId);
+    if (!upload || upload.state === "removed")
+      throw new Error("UPLOAD_NOT_AVAILABLE");
+    const removed = items.filter(
+      (item) =>
+        item.ownerTokenIdentifier === owner &&
+        (item.id === upload.id || item.active),
+    );
+    for (const item of removed)
+      await updateUpload(tx, item.id, {
+        active: false,
+        state: "removed",
+        failureCode: "REMOVED_BY_OWNER",
+        failureMessage: "Deleted by the uploader.",
+        updatedAt: new Date(now),
+      });
+    return {
+      status: 200,
+      body: { removedIds: removed.map((item) => item.id) },
+    };
+  });
+}
+
 async function adminList(db: Database, body: OpBody, now: number) {
   const rows = await withTransaction(db, (tx) =>
     listAdminUploads(
@@ -1133,6 +1186,7 @@ export async function handleQuickShareOperation(
         ? result
         : { status: 200, body: result };
     },
+    remove: () => ownerRemove(db, body, owner, now),
     claimJob: async () => ({
       status: 200,
       body: await claimJob(db, body, now),
