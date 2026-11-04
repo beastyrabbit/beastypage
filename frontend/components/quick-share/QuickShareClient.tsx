@@ -925,6 +925,11 @@ export function QuickShareClient() {
     }
   }
 
+  // Files of a multi-file share share one link, and deleting removes them all.
+  const filesPerLink = new Map<string, number>();
+  for (const item of history)
+    filesPerLink.set(item.slug, (filesPerLink.get(item.slug) ?? 0) + 1);
+
   const busy =
     work.kind === "preparing" ||
     work.kind === "uploading" ||
@@ -1324,7 +1329,9 @@ export function QuickShareClient() {
                         disabled={deletingId === item.id}
                         aria-label={
                           confirmDeleteId === item.id
-                            ? `Confirm deleting ${item.originalName}`
+                            ? (filesPerLink.get(item.slug) ?? 1) > 1
+                              ? `Confirm deleting all ${filesPerLink.get(item.slug)} files of this share`
+                              : `Confirm deleting ${item.originalName}`
                             : `Delete ${item.originalName}`
                         }
                         className={cn(
@@ -1345,10 +1352,21 @@ export function QuickShareClient() {
                         ) : (
                           <Trash2 className="size-3.5" />
                         )}
-                        {confirmDeleteId === item.id ? "Delete?" : null}
+                        {confirmDeleteId === item.id
+                          ? (filesPerLink.get(item.slug) ?? 1) > 1
+                            ? `Delete ${filesPerLink.get(item.slug)} files?`
+                            : "Delete?"
+                          : null}
                       </button>
                     ) : null}
                   </div>
+                  {confirmDeleteId === item.id &&
+                  (filesPerLink.get(item.slug) ?? 1) > 1 ? (
+                    <p className="mt-2 text-xs text-red-300">
+                      This link holds {filesPerLink.get(item.slug)} files.
+                      Deleting removes all of them.
+                    </p>
+                  ) : null}
                   {isSignedIn &&
                   policy &&
                   item.originalSize > policy.smallCutoffBytes &&

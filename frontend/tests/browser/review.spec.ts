@@ -119,6 +119,75 @@ test("Quick Share lets a signed-in owner delete a share to free a slot", async (
   expect(errors).toEqual([]);
 });
 
+test("Quick Share warns before deleting every file of a multi-file share", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/i/api/policy", (route) =>
+    route.fulfill({
+      json: {
+        maxBytes: 104857600,
+        hourlyStarts: 60,
+        dailyBytes: 1073741824,
+        active: 25,
+        smallCutoffBytes: 10485760,
+        smallLifetimeMs: 86400000,
+        largeLifetimeMs: 3600000,
+        chunkBytes: 5242880,
+      },
+    }),
+  );
+  const file = (id: string, slug: string) => ({
+    id,
+    slug,
+    url: `/i/${slug}`,
+    source: "file",
+    originalName: `${id}.png`,
+    originalSize: 1024,
+    state: "ready",
+    publicExpiresAt: Date.now() + 86400000,
+    retainedUntil: Date.now() + 86400000,
+    extendedAt: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+  await page.route("**/i/api/account/uploads", (route) =>
+    route.fulfill({
+      json: [
+        file("album-1", "AlbumOne"),
+        file("album-2", "AlbumOne"),
+        file("solo", "SoloLink"),
+      ],
+    }),
+  );
+  let requests = 0;
+  await page.route("**/i/api/account/uploads/*/remove", (route) => {
+    requests += 1;
+    return route.fulfill({ json: { removedIds: ["album-1", "album-2"] } });
+  });
+  await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=quick-share`);
+  await page.getByRole("button", { name: "Delete album-1.png" }).click();
+  const confirm = page.getByRole("button", {
+    name: "Confirm deleting all 2 files of this share",
+  });
+  await expect(confirm).toHaveText("Delete 2 files?");
+  await expect(
+    page.getByText("This link holds 2 files. Deleting removes all of them."),
+  ).toBeVisible();
+  expect(requests).toBe(0);
+  await page.screenshot({
+    path: "../.playwright-mcp/quick-share-delete-collection-confirm.png",
+    animations: "disabled",
+  });
+  await confirm.click();
+  await expect(page.getByText("album-1.png")).toHaveCount(0);
+  await expect(page.getByText("album-2.png")).toHaveCount(0);
+  await expect(page.getByText("solo.png")).toBeVisible();
+  expect(requests).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test("host sign-in gate has a visible sign-in control", async ({ page }) => {
   await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=host`);
   await expect(
