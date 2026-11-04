@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { readDatabaseConfig } from "../db/config";
@@ -584,5 +584,121 @@ describe("Quick Share PostgreSQL service", () => {
     await db
       .delete(quickShareUploads)
       .where(eq(quickShareUploads.ipHash, "remove-ip"));
+  });
+
+  it("deletes an owner's older active file hidden behind inactive history", async () => {
+    const now = Date.now();
+    const owner = `https://clerk.quick-share.test|history-${now}`;
+    const slug = `H${String(now).slice(-7)}`;
+    const row = (index: number, active: boolean) => ({
+      slug,
+      source: "file" as const,
+      originalName: `history-${index}.png`,
+      originalSize: 1,
+      originalKey: `originals/history-${now}-${index}`,
+      state: active ? ("ready" as const) : ("failed" as const),
+      publicKey: `derivatives/history-${now}-${index}`,
+      publicMime: "image/png",
+      publicSize: 1,
+      receiptHash: `history-receipt-${now}-${index}`,
+      ownerTokenIdentifier: owner,
+      rateIdentity: `acct:${owner}`,
+      ipHash: "history-ip",
+      rawIp: "192.0.2.4",
+      publicExpiresAt: new Date(now + 60_000),
+      retainedUntil: new Date(now + 120_000),
+      active,
+      createdAt: new Date(now + index),
+      updatedAt: new Date(now + index),
+    });
+    // The oldest and newest files are live; 101 failed files sit between.
+    const rows = await db
+      .insert(quickShareUploads)
+      .values([
+        row(0, true),
+        ...Array.from({ length: 101 }, (_, index) => row(index + 1, false)),
+        row(102, true),
+      ])
+      .returning();
+    const newest = rows[rows.length - 1];
+    const result = await handleQuickShareOperation(
+      db,
+      "remove",
+      { uploadId: newest.id },
+      { tokenIdentifier: owner },
+      now + 500,
+    );
+    expect(
+      (result.body as { removedIds: string[] }).removedIds.toSorted(),
+    ).toEqual([rows[0].id, newest.id].toSorted());
+    expect(
+      await handleQuickShareOperation(
+        db,
+        "publicCollection",
+        { slug },
+        anonymous,
+        now + 600,
+      ),
+    ).toMatchObject({ status: 404 });
+    await db.delete(quickShareUploads).where(eq(quickShareUploads.slug, slug));
+  });
+
+  it("never leaves a file admitted during deletion live", async () => {
+    const now = Date.now();
+    const owner = `https://clerk.quick-share.test|admit-${now}`;
+    const slug = `A${String(now).slice(-7)}`;
+    const [first] = await db
+      .insert(quickShareUploads)
+      .values({
+        slug,
+        source: "file" as const,
+        originalName: "admit-0.png",
+        originalSize: 1,
+        originalKey: `originals/admit-${now}-0`,
+        state: "ready" as const,
+        receiptHash: `admit-receipt-${now}`,
+        ownerTokenIdentifier: owner,
+        rateIdentity: `acct:${owner}`,
+        ipHash: "admit-ip",
+        rawIp: "192.0.2.5",
+        publicExpiresAt: new Date(now + 60_000),
+        retainedUntil: new Date(now + 120_000),
+        active: true,
+        createdAt: new Date(now),
+        updatedAt: new Date(now),
+      })
+      .returning();
+    await Promise.all([
+      outcome(() =>
+        handleQuickShareOperation(
+          db,
+          "create",
+          input(slug, `admit-new-${now}`, {
+            collectionReceiptHash: `admit-receipt-${now}`,
+            ipHash: "admit-ip",
+          }),
+          { tokenIdentifier: owner },
+          now + 100,
+        ),
+      ),
+      handleQuickShareOperation(
+        db,
+        "remove",
+        { uploadId: first.id },
+        { tokenIdentifier: owner },
+        now + 100,
+      ),
+    ]);
+    const live = await db
+      .select()
+      .from(quickShareUploads)
+      .where(
+        and(
+          eq(quickShareUploads.slug, slug),
+          eq(quickShareUploads.active, true),
+        ),
+      );
+    expect(live).toEqual([]);
+    await db.delete(quickShareUploads).where(eq(quickShareUploads.slug, slug));
   });
 });

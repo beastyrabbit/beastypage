@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, gt, isNotNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, lte, or, sql } from "drizzle-orm";
 import {
   quickShareBans,
   quickShareJobs,
@@ -54,10 +54,41 @@ export async function findUploadsBySlug(
     .select()
     .from(quickShareUploads)
     .where(eq(quickShareUploads.slug, slug))
-    .orderBy(desc(quickShareUploads.createdAt), desc(quickShareUploads.id))
+    .orderBy(desc(quickShareUploads.createdAt))
     .limit(limit);
   if (lock) query = query.for("update") as typeof query;
   return query;
+}
+
+/**
+ * Locks the rows an owner delete revokes: the requested row and every active
+ * row the owner has behind the same slug. Inactive history is excluded so it
+ * cannot crowd active files out of the limit, and the fixed order keeps
+ * concurrent deletes from deadlocking.
+ */
+export async function lockOwnerShareRows(
+  tx: Transaction,
+  slug: string,
+  owner: string,
+  uploadId: string,
+  limit: number,
+): Promise<UploadRow[]> {
+  return tx
+    .select()
+    .from(quickShareUploads)
+    .where(
+      and(
+        eq(quickShareUploads.slug, slug),
+        eq(quickShareUploads.ownerTokenIdentifier, owner),
+        or(
+          eq(quickShareUploads.active, true),
+          eq(quickShareUploads.id, uploadId),
+        ),
+      ),
+    )
+    .orderBy(desc(quickShareUploads.createdAt), desc(quickShareUploads.id))
+    .limit(limit)
+    .for("update");
 }
 
 export async function findActiveRetainedUploadsBySlug(

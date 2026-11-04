@@ -37,6 +37,7 @@ import {
   listExpiredUsage,
   listPendingJobs,
   listUploadsByOwner,
+  lockOwnerShareRows,
   updateBan,
   updateJob,
   updateUpload,
@@ -817,40 +818,40 @@ async function ownerRemove(
   now: number,
 ) {
   if (!owner) return { status: 401, body: { error: "Unauthorized" } };
-  return withTransaction(db, async (tx) => {
-    const uploadId = id(body, "uploadId");
-    const found = await getUpload(tx, uploadId);
-    if (found?.ownerTokenIdentifier !== owner)
-      throw new Error("UPLOAD_NOT_AVAILABLE");
-    // Lock the whole share in one query so concurrent deletes of different
-    // files in it take their row locks in the same order.
-    const items = await findUploadsBySlug(
-      tx,
-      found.slug,
-      QUICK_SHARE_POLICY.collectionMaxItems,
-      true,
-    );
-    const upload = items.find((item) => item.id === uploadId);
-    if (!upload || upload.state === "removed")
-      throw new Error("UPLOAD_NOT_AVAILABLE");
-    const removed = items.filter(
-      (item) =>
-        item.ownerTokenIdentifier === owner &&
-        (item.id === upload.id || item.active),
-    );
-    for (const item of removed)
-      await updateUpload(tx, item.id, {
-        active: false,
-        state: "removed",
-        failureCode: "REMOVED_BY_OWNER",
-        failureMessage: "Deleted by the uploader.",
-        updatedAt: new Date(now),
-      });
-    return {
-      status: 200,
-      body: { removedIds: removed.map((item) => item.id) },
-    };
-  });
+  const uploadId = id(body, "uploadId");
+  // Serializable, like upload admission, so a file admitted to the share while
+  // this runs makes one of the two transactions retry instead of staying live.
+  return withTransaction(
+    db,
+    async (tx) => {
+      const found = await getUpload(tx, uploadId);
+      if (found?.ownerTokenIdentifier !== owner)
+        throw new Error("UPLOAD_NOT_AVAILABLE");
+      const removed = await lockOwnerShareRows(
+        tx,
+        found.slug,
+        owner,
+        uploadId,
+        QUICK_SHARE_POLICY.collectionMaxItems + 1,
+      );
+      const upload = removed.find((item) => item.id === uploadId);
+      if (!upload || upload.state === "removed")
+        throw new Error("UPLOAD_NOT_AVAILABLE");
+      for (const item of removed)
+        await updateUpload(tx, item.id, {
+          active: false,
+          state: "removed",
+          failureCode: "REMOVED_BY_OWNER",
+          failureMessage: "Deleted by the uploader.",
+          updatedAt: new Date(now),
+        });
+      return {
+        status: 200,
+        body: { removedIds: removed.map((item) => item.id) },
+      };
+    },
+    { isolation: "serializable", retries: 3 },
+  );
 }
 
 async function adminList(db: Database, body: OpBody, now: number) {

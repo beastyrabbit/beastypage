@@ -27,8 +27,10 @@ slug, so a multi-file share goes offline as one link, and returns
 `{ removedIds }`. The rows become `removed` and stop counting toward the
 active limit. Their `retainedUntil` is unchanged, so moderation keeps the
 private original for the normal retention period, and hourly and daily usage
-is not refunded. The operation locks all rows of the slug in one query to keep
-concurrent deletes from deadlocking.
+is not refunded. The operation runs serializable, like upload admission, so a
+file added to the share while it runs cannot stay live. It locks the target and
+the owner's active rows of the slug in one ordered query, so concurrent deletes
+do not deadlock.
 
 The media service calls this route through its required `CONTROL_PLANE_URL`.
 The value is the complete endpoint URL. The media configuration has no fallback
