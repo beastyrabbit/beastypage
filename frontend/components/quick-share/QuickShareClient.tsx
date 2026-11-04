@@ -137,6 +137,18 @@ function activeLimitMessage(signedIn: boolean | undefined) {
   return signedIn ? OWNER_ACTIVE_LIMIT_MESSAGE : ACTIVE_LIMIT_MESSAGE;
 }
 
+/** Wording for a share's delete button; a link may hold several files. */
+function deleteCopy(name: string, confirming: boolean, files: number) {
+  if (!confirming) return { label: `Delete ${name}`, text: null, note: null };
+  if (files <= 1)
+    return { label: `Confirm deleting ${name}`, text: "Delete?", note: null };
+  return {
+    label: `Confirm deleting all ${files} files of this share`,
+    text: `Delete ${files} files?`,
+    note: `This link holds ${files} files. Deleting removes all of them.`,
+  };
+}
+
 function errorMessage(error: unknown, signedIn?: boolean) {
   const raw = error instanceof Error ? error.message : "Something went wrong";
   if (raw.includes("ACTIVE_LIMIT")) {
@@ -925,6 +937,11 @@ export function QuickShareClient() {
     }
   }
 
+  // Files of a multi-file share share one link, and deleting removes them all.
+  const filesPerLink = new Map<string, number>();
+  for (const item of history)
+    filesPerLink.set(item.slug, (filesPerLink.get(item.slug) ?? 0) + 1);
+
   const busy =
     work.kind === "preparing" ||
     work.kind === "uploading" ||
@@ -1283,88 +1300,95 @@ export function QuickShareClient() {
           ) : null}
           {historyState === "list" ? (
             <div className="space-y-2">
-              {history.map((item) => (
-                <article
-                  key={item.id}
-                  className="rounded-lg border border-border/70 bg-background/60 p-3"
-                >
-                  <p className="truncate text-sm font-medium">
-                    {item.originalName}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock3 className="size-3.5" />
-                    <span>{formatExpiry(item.publicExpiresAt)}</span>
-                    <span aria-hidden>·</span>
-                    <span>{formatBytes(item.originalSize)}</span>
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      type="button"
-                      disabled={
-                        item.state !== "ready" || item.publicExpiresAt <= now
-                      }
-                      className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-foreground px-2 text-xs font-semibold text-background disabled:opacity-40"
-                      onClick={() => void copyLink(item.url)}
-                    >
-                      <Copy className="size-3.5" /> Copy
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        item.state !== "ready" || item.publicExpiresAt <= now
-                      }
-                      className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-border px-2 text-xs font-semibold disabled:opacity-40"
-                      onClick={() => void shareLink(item)}
-                    >
-                      <Share2 className="size-3.5" /> Share
-                    </button>
-                    {isSignedIn ? (
+              {history.map((item) => {
+                const confirming = confirmDeleteId === item.id;
+                const copy = deleteCopy(
+                  item.originalName,
+                  confirming,
+                  filesPerLink.get(item.slug) ?? 1,
+                );
+                return (
+                  <article
+                    key={item.id}
+                    className="rounded-lg border border-border/70 bg-background/60 p-3"
+                  >
+                    <p className="truncate text-sm font-medium">
+                      {item.originalName}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock3 className="size-3.5" />
+                      <span>{formatExpiry(item.publicExpiresAt)}</span>
+                      <span aria-hidden>·</span>
+                      <span>{formatBytes(item.originalSize)}</span>
+                    </div>
+                    <div className="mt-3 flex gap-2">
                       <button
                         type="button"
-                        disabled={deletingId === item.id}
-                        aria-label={
-                          confirmDeleteId === item.id
-                            ? `Confirm deleting ${item.originalName}`
-                            : `Delete ${item.originalName}`
+                        disabled={
+                          item.state !== "ready" || item.publicExpiresAt <= now
                         }
-                        className={cn(
-                          "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition disabled:opacity-40",
-                          confirmDeleteId === item.id
-                            ? "border-red-500 bg-red-600 text-white"
-                            : "border-border text-muted-foreground hover:border-red-500/40 hover:text-red-300",
-                        )}
-                        onBlur={() =>
-                          setConfirmDeleteId((id) =>
-                            id === item.id ? null : id,
-                          )
-                        }
-                        onClick={() => void deleteShare(item)}
+                        className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-foreground px-2 text-xs font-semibold text-background disabled:opacity-40"
+                        onClick={() => void copyLink(item.url)}
                       >
-                        {deletingId === item.id ? (
-                          <LoaderCircle className="size-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="size-3.5" />
-                        )}
-                        {confirmDeleteId === item.id ? "Delete?" : null}
+                        <Copy className="size-3.5" /> Copy
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          item.state !== "ready" || item.publicExpiresAt <= now
+                        }
+                        className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-border px-2 text-xs font-semibold disabled:opacity-40"
+                        onClick={() => void shareLink(item)}
+                      >
+                        <Share2 className="size-3.5" /> Share
+                      </button>
+                      {isSignedIn ? (
+                        <button
+                          type="button"
+                          disabled={deletingId === item.id}
+                          aria-label={copy.label}
+                          className={cn(
+                            "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition disabled:opacity-40",
+                            confirming
+                              ? "border-red-500 bg-red-600 text-white"
+                              : "border-border text-muted-foreground hover:border-red-500/40 hover:text-red-300",
+                          )}
+                          onBlur={() =>
+                            setConfirmDeleteId((id) =>
+                              id === item.id ? null : id,
+                            )
+                          }
+                          onClick={() => void deleteShare(item)}
+                        >
+                          {deletingId === item.id ? (
+                            <LoaderCircle className="size-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="size-3.5" />
+                          )}
+                          {copy.text}
+                        </button>
+                      ) : null}
+                    </div>
+                    {copy.note ? (
+                      <p className="mt-2 text-xs text-red-300">{copy.note}</p>
+                    ) : null}
+                    {isSignedIn &&
+                    policy &&
+                    item.originalSize > policy.smallCutoffBytes &&
+                    !item.extendedAt &&
+                    item.state === "ready" &&
+                    item.publicExpiresAt > now ? (
+                      <button
+                        type="button"
+                        className="mt-2 min-h-9 w-full rounded-md border border-amber-500/30 px-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/10"
+                        onClick={() => void extend(item)}
+                      >
+                        Extend to 30 days
                       </button>
                     ) : null}
-                  </div>
-                  {isSignedIn &&
-                  policy &&
-                  item.originalSize > policy.smallCutoffBytes &&
-                  !item.extendedAt &&
-                  item.state === "ready" &&
-                  item.publicExpiresAt > now ? (
-                    <button
-                      type="button"
-                      className="mt-2 min-h-9 w-full rounded-md border border-amber-500/30 px-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/10"
-                      onClick={() => void extend(item)}
-                    >
-                      Extend to 30 days
-                    </button>
-                  ) : null}
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           ) : null}
           <p className="mt-4 text-xs leading-5 text-muted-foreground">
