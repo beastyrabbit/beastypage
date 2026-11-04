@@ -16,8 +16,21 @@ contains `{ op, ...payload }`. The route checks
 `handleQuickShareOperation` in `frontend/server/services/quickShare.ts`.
 Supported operations are `policy`, `create`, `getUpload`, `recordPart`,
 `complete`, `finishImport`, `failImport`, `public`, `publicCollection`,
-`accountList`, `extend`, `claimJob`, `finishProcess`, `finishDelete`,
-`adminList`, `adminGet`, `adminBan`, `adminUnban`, and `adminRemove`.
+`accountList`, `extend`, `remove`, `claimJob`, `finishProcess`,
+`finishDelete`, `adminList`, `adminGet`, `adminBan`, `adminUnban`, and
+`adminRemove`.
+
+`remove` lets a signed-in owner delete a share early. The media service
+exposes it as `POST /i/api/account/uploads/:id/remove`, and anonymous uploads
+have no delete route. It revokes every owned active row behind the share's
+slug, so a multi-file share goes offline as one link, and returns
+`{ removedIds }`. The rows become `removed` and stop counting toward the
+active limit. Their `retainedUntil` is unchanged, so moderation keeps the
+private original for the normal retention period, and hourly and daily usage
+is not refunded. The operation runs serializable, like upload admission, so a
+file added to the share while it runs cannot stay live. It locks the target and
+the owner's active rows of the slug in one ordered query, so concurrent deletes
+do not deadlock.
 
 The media service calls this route through its required `CONTROL_PLANE_URL`.
 The value is the complete endpoint URL. The media configuration has no fallback
@@ -32,6 +45,9 @@ URL.
 queues expired deletes, and `quick-share.redispatch` sends pending jobs again.
 The recurring `quick-share.retention` job runs hourly and calls
 `maintainQuickShare`.
+
+`QUICK_SHARE_POLICY` sets the per-tier limits. Signed-in users may keep 25
+active shares and anonymous users 2.
 
 Upload admission runs in a serializable transaction with bounded retries for
 serialization failures. Active uploads and hourly and daily usage rows are

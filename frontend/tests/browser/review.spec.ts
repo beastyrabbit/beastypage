@@ -51,6 +51,74 @@ test("Quick Share handles a history 500 and recovers on refresh", async ({
   expect(errors).toEqual([]);
 });
 
+test("Quick Share lets a signed-in owner delete a share to free a slot", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/i/api/policy", (route) =>
+    route.fulfill({
+      json: {
+        maxBytes: 104857600,
+        hourlyStarts: 60,
+        dailyBytes: 1073741824,
+        active: 2,
+        smallCutoffBytes: 10485760,
+        smallLifetimeMs: 86400000,
+        largeLifetimeMs: 3600000,
+        chunkBytes: 5242880,
+      },
+    }),
+  );
+  const share = (id: string) => ({
+    id,
+    slug: id,
+    url: `/i/${id}`,
+    source: "file",
+    originalName: `${id}.png`,
+    originalSize: 1024,
+    state: "ready",
+    publicExpiresAt: Date.now() + 86400000,
+    retainedUntil: Date.now() + 86400000,
+    extendedAt: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+  await page.route("**/i/api/account/uploads", (route) =>
+    route.fulfill({ json: [share("fixture-a"), share("fixture-b")] }),
+  );
+  let removed: string | undefined;
+  await page.route("**/i/api/account/uploads/*/remove", (route) => {
+    removed = new URL(route.request().url()).pathname.split("/")[5];
+    return route.fulfill({ json: { removedIds: [removed] } });
+  });
+  await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=quick-share`);
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "new.png",
+    mimeType: "image/png",
+    buffer: Buffer.from([1, 2, 3, 4]),
+  });
+  await page.getByRole("button", { name: "Create link" }).click();
+  await expect(page.getByText(/Delete one or wait/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Delete fixture-a.png" }).click();
+  await expect(
+    page.getByRole("button", { name: "Confirm deleting fixture-a.png" }),
+  ).toBeVisible();
+  expect(removed).toBeUndefined();
+  await page
+    .getByRole("button", { name: "Confirm deleting fixture-a.png" })
+    .click();
+  await expect(page.getByText("fixture-a.png")).toHaveCount(0);
+  expect(removed).toBe("fixture-a");
+  await expect(page.getByText(/Delete one or wait/)).toHaveCount(0);
+  await expect(page.getByText("fixture-b.png")).toBeVisible();
+  await page.screenshot({
+    path: "../.playwright-mcp/quick-share-owner-delete.png",
+  });
+  expect(errors).toEqual([]);
+});
+
 test("host sign-in gate has a visible sign-in control", async ({ page }) => {
   await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=host`);
   await expect(

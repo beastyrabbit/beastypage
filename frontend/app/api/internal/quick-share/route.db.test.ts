@@ -133,6 +133,7 @@ describe("POST /api/internal/quick-share", () => {
     "publicCollection",
     "accountList",
     "extend",
+    "remove",
     "claimJob",
     "finishProcess",
     "finishDelete",

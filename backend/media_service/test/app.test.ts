@@ -244,7 +244,7 @@ describe("raw media delivery", () => {
 		expect(store.get).not.toHaveBeenCalled();
 	});
 
-	it("does not expose an uploader delete route", async () => {
+	it("does not expose a receipt-based delete route", async () => {
 		const store = {} as ObjectStore;
 		const { app } = createApp(config, store);
 		const response = await app.request(
@@ -252,6 +252,40 @@ describe("raw media delivery", () => {
 			{ method: "POST" },
 		);
 		expect(response.status).toBe(404);
+	});
+
+	it("requires a signed-in owner to delete a share", async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+		const { app } = createApp(config, {} as ObjectStore);
+		const response = await app.request(
+			"https://beastyrabbit.com/i/api/account/uploads/id/remove",
+			{ method: "POST" },
+		);
+		expect(response.status).toBe(401);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("relays an owner delete with the user's token", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(controlResponse({ removedIds: ["upload-id"] }));
+		vi.stubGlobal("fetch", fetchMock);
+		const { app } = createApp(config, {} as ObjectStore);
+		const response = await app.request(
+			"https://beastyrabbit.com/i/api/account/uploads/upload-id/remove",
+			{ method: "POST", headers: { authorization: "Bearer user-token" } },
+		);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ removedIds: ["upload-id"] });
+		const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body))).toEqual({
+			op: "remove",
+			uploadId: "upload-id",
+		});
+		expect(new Headers(init.headers).get("authorization")).toBe(
+			"Bearer user-token",
+		);
 	});
 
 	it("maps AWS range exceptions to a 416 response", async () => {
