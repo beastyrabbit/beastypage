@@ -30,7 +30,7 @@ echo "==> Setting up worktree at $WT (root: $ROOT)"
 
 # Print an env file without its DATABASE_URL lines.
 without_database_url() {
-  grep -Ev '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL=' "$1" || true
+  grep -Ev '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL[[:space:]]*=' "$1" || true
 }
 
 # Copy env files from the main checkout, except DATABASE_URL: each worktree
@@ -80,7 +80,9 @@ fi
 # helper's frontend/.env.database.local.
 echo "==> Starting this worktree's PostgreSQL"
 cd "$WT/frontend"
-if pnpm run db:local up && pnpm run db:migrate; then
+if pnpm run db:local up; then
+  # Migrate only this worktree's database, never one named by the environment.
+  env -u DATABASE_URL -u DATABASE_MIGRATION_URL pnpm run db:migrate
   env_file="$WT/frontend/.env.local"
   tmp="$(mktemp "$env_file.XXXXXX")"
   {
@@ -90,7 +92,7 @@ if pnpm run db:local up && pnpm run db:migrate; then
   mv "$tmp" "$env_file"
   echo "    Wrote this worktree's DATABASE_URL to frontend/.env.local"
 else
-  echo "warning: could not start or migrate this worktree's database." >&2
+  echo "warning: could not start this worktree's database." >&2
   echo "         Start Docker, then rerun: ./scripts/t3code-worktree-setup.sh $WT" >&2
 fi
 
