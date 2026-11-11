@@ -7,14 +7,25 @@
       "name": "Initialize worktree",
       "command": "./scripts/t3code-worktree-setup.sh",
       "icon": "configure",
-      "runOnWorktreeCreate": true
+      "runOnWorktreeCreate": true,
+      "async": false
+    },
+    {
+      "name": "Frontend dev",
+      "command": "pnpm dev:frontend",
+      "icon": "play",
+      "stopOnSettle": true
     },
     {
       "name": "Run locally",
       "command": "pnpm dev",
       "icon": "play",
-      "previewUrl": "http://frontend.localhost:1355",
-      "autoOpenPreview": true
+      "stopOnSettle": true
+    },
+    {
+      "name": "Typecheck",
+      "command": "pnpm typecheck",
+      "icon": "lint"
     }
   ]
 }

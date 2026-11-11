@@ -17,6 +17,15 @@ URL. The `/kubernetes/webpage/beastypage-postgres` and
 runtime paths. Run the frontend's Drizzle migrations before starting
 application routes that read the database.
 
+`scripts/t3code-worktree-setup.sh <worktree-path>` prepares a new worktree:
+it copies the main checkout's `.env.local` files without `DATABASE_URL`,
+installs every package from its lockfile, starts and migrates the worktree's own
+PostgreSQL, and writes that database's `DATABASE_URL` into
+`frontend/.env.local`. If Docker is not running it warns and skips the
+database; start Docker and run the script again. The T3 Code "Initialize
+worktree" action in `t3.json` runs it once the actions are imported into T3's
+project settings; T3 does not read `t3.json` actions on its own.
+
 The renderer's virtual environment is ignored at `backend/renderer_service/.venv/`;
 `pnpm dev:renderer` expects its Uvicorn executable there and starts the app on
 port 8001.
